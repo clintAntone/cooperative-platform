@@ -129,7 +129,7 @@ export function ConfigPage() {
         subtitle="Manage platform-wide system settings"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* Config Table */}
         <Card>
           <CardHeader>

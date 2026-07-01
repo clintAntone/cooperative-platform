@@ -344,7 +344,7 @@ export function FaqPage() {
         subtitle="Answers to common questions and step-by-step instructions"
       />
 
-      <div className="p-6 max-w-4xl mx-auto space-y-8">
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-8">
         {/* Quick nav */}
         <div className="flex flex-wrap gap-2">
           {sections.map(section => (

@@ -183,7 +183,12 @@ const navGroups: NavGroup[] = [
   },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { profile, signOut } = useAuth()
   const { data: branding } = useAppBranding()
   const { data: pendingCoMakerCount = 0 } = usePendingCoMakerCount()
@@ -201,7 +206,10 @@ export function Sidebar() {
     .filter(group => group.items.length > 0)
 
   return (
-    <aside className="flex flex-col w-64 h-screen sticky top-0 bg-gray-900 text-white overflow-y-auto">
+    <aside className={`flex flex-col w-64 bg-gray-900 text-white overflow-y-auto
+  fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-in-out
+  ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+  lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:flex-shrink-0`}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-700">
         <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -218,6 +226,15 @@ export function Sidebar() {
           <p className="text-sm font-semibold text-white leading-none">{branding?.name ?? 'CoopFinance'}</p>
           <p className="text-xs text-gray-400 mt-0.5">Platform</p>
         </div>
+        <button
+          onClick={onClose}
+          className="lg:hidden ml-auto p-1 text-gray-400 hover:text-white rounded-md"
+          aria-label="Close menu"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       {/* Navigation */}

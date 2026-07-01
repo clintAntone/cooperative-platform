@@ -117,9 +117,9 @@ export function MemberDetailPage() {
   const membershipStatusValue = (membershipStatus as any)?.status as string | undefined
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <button
           onClick={() => navigate('/admin/members')}
           className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -128,9 +128,9 @@ export function MemberDetailPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{profile.full_name}</h1>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{profile.full_name}</h1>
             {membershipStatusValue && <StatusBadge status={membershipStatusValue} />}
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -140,6 +140,7 @@ export function MemberDetailPage() {
         <Button
           size="sm"
           variant="outline"
+          className="flex-shrink-0"
           onClick={() => {
             const statementRows = contributions.map(c => ({
               date: formatDate(c.contribution_at),
@@ -170,16 +171,16 @@ export function MemberDetailPage() {
           { label: 'Active Loans', value: '—' },
           { label: 'Pending Requests', value: pendingRequests },
         ].map(c => (
-          <Card key={c.label} className="p-4 text-center">
-            <p className="text-2xl font-bold text-gray-900">{c.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{c.label}</p>
+          <Card key={c.label} className="p-3 sm:p-4 text-center">
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{c.value}</p>
+            <p className="text-xs text-gray-500 mt-1 truncate">{c.label}</p>
           </Card>
         ))}
       </div>
 
       {/* Equity Shares */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-gray-900">Equity Shares</h2>
             {shareLimit && (

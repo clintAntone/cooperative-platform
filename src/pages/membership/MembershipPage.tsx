@@ -55,7 +55,7 @@ export function MembershipPage() {
         subtitle="Your cooperative membership status and history"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* Main Status Card */}
         <Card className={`border-2 ${statusColorMap[currentStatus]}`}>
           <CardBody className="py-8">

@@ -131,7 +131,7 @@ export function AppSettingsPage() {
         subtitle="Customize your cooperative's branding and identity"
       />
 
-      <div className="p-6 space-y-6 max-w-2xl">
+      <div className="p-4 sm:p-6 space-y-6 max-w-2xl">
         {/* Branding */}
         <Card>
           <CardHeader>

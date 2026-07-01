@@ -59,9 +59,9 @@ export function DashboardPage() {
         subtitle="Here's an overview of your cooperative account"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* Stats grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
             title="Total Equity Invested"
             value={currency(equitySummary?.totalInvested ?? 0)}

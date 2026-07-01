@@ -103,24 +103,24 @@ export function LoanDetailPage() {
         }
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* Loan Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <Card className="p-5">
-            <p className="text-sm text-gray-500">Principal</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{currency(loan.principal)}</p>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+          <Card className="p-3 sm:p-5">
+            <p className="text-xs sm:text-sm text-gray-500">Principal</p>
+            <p className="text-base sm:text-xl font-bold text-gray-900 mt-1 truncate">{currency(loan.principal)}</p>
           </Card>
-          <Card className="p-5">
-            <p className="text-sm text-gray-500">Outstanding</p>
-            <p className="text-2xl font-bold text-red-600 mt-1">{currency(loan.outstanding)}</p>
+          <Card className="p-3 sm:p-5">
+            <p className="text-xs sm:text-sm text-gray-500">Outstanding</p>
+            <p className="text-base sm:text-xl font-bold text-red-600 mt-1 truncate">{currency(loan.outstanding)}</p>
           </Card>
-          <Card className="p-5">
-            <p className="text-sm text-gray-500">Amount Paid</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">{currency(loan.amount_paid)}</p>
+          <Card className="p-3 sm:p-5">
+            <p className="text-xs sm:text-sm text-gray-500">Amount Paid</p>
+            <p className="text-base sm:text-xl font-bold text-green-600 mt-1 truncate">{currency(loan.amount_paid)}</p>
           </Card>
-          <Card className="p-5">
-            <p className="text-sm text-gray-500">Status</p>
-            <div className="mt-2">
+          <Card className="p-3 sm:p-5">
+            <p className="text-xs sm:text-sm text-gray-500">Status</p>
+            <div className="mt-1.5">
               <StatusBadge status={loan.status} size="md" />
             </div>
           </Card>

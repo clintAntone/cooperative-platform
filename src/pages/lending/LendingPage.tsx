@@ -64,7 +64,7 @@ export function LendingPage() {
         title="Lending"
         subtitle="Loan applications and active loans"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {(applications && applications.length > 0) && (
               <Button
                 size="sm"
@@ -96,7 +96,7 @@ export function LendingPage() {
         }
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* Eligibility Banners */}
         {!isActiveMember && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">

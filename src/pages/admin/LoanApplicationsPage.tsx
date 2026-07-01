@@ -119,15 +119,16 @@ export function LoanApplicationsPage() {
         subtitle="Review and approve member loan applications"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-max min-w-full sm:w-fit">
           {tabs.map(tab => (
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
               className={cn(
-                'px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                'px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap',
                 activeTab === tab.value
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -136,6 +137,7 @@ export function LoanApplicationsPage() {
               {tab.label}
             </button>
           ))}
+        </div>
         </div>
 
         <Card className="overflow-hidden">

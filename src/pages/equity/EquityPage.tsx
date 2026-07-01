@@ -30,24 +30,24 @@ export function EquityPage() {
         subtitle="Manage your cooperative equity contributions"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-sm text-gray-500">Total Invested</p>
-            <p className="text-2xl font-semibold text-gray-900 mt-1">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5">
+            <p className="text-xs sm:text-sm text-gray-500 truncate">Total Invested</p>
+            <p className="text-base sm:text-xl font-semibold text-gray-900 mt-1 truncate">
               {currency(summary?.totalInvested ?? 0)}
             </p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-sm text-gray-500">Completed Shares</p>
-            <p className="text-2xl font-semibold text-gray-900 mt-1">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5">
+            <p className="text-xs sm:text-sm text-gray-500 truncate">Completed</p>
+            <p className="text-base sm:text-xl font-semibold text-gray-900 mt-1">
               {summary?.completedShares ?? 0}
             </p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-sm text-gray-500">Total Shares</p>
-            <p className="text-2xl font-semibold text-gray-900 mt-1">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5">
+            <p className="text-xs sm:text-sm text-gray-500 truncate">Total Shares</p>
+            <p className="text-base sm:text-xl font-semibold text-gray-900 mt-1">
               {summary?.totalShares ?? 0}
             </p>
           </div>

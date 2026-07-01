@@ -153,7 +153,7 @@ export function DepositRequestPage() {
     return (
       <div>
         <Header title="Request Deposit" subtitle="Submit a deposit for admin review" />
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <Card className="max-w-lg mx-auto p-8 text-center">
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -183,7 +183,7 @@ export function DepositRequestPage() {
         }
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         <Card className="max-w-2xl mx-auto">
           <CardHeader>
             <h2 className="text-base font-semibold text-gray-900">Deposit Request Form</h2>

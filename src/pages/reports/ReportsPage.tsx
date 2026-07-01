@@ -70,14 +70,29 @@ function useAllLoans() {
   return useQuery({
     queryKey: ['all_loans_report'],
     queryFn: async () => {
+      // loans.user_id → auth.users; profiles.id → auth.users (no direct FK loans→profiles)
+      // so we do a two-step fetch instead of a PostgREST join
       const { data, error } = await supabase
         .from('loans')
-        .select('amount, outstanding, status, disbursed_at, profiles(full_name)')
-        .order('disbursed_at', { ascending: false })
+        .select('principal, outstanding, status, disbursed_at, user_id')
+        .order('created_at', { ascending: false })
       if (error) throw error
+
+      const userIds = [...new Set((data as any[]).map(r => r.user_id).filter(Boolean))]
+      let nameMap: Record<string, string> = {}
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds)
+        if (profiles) {
+          nameMap = Object.fromEntries((profiles as any[]).map(p => [p.id, p.full_name]))
+        }
+      }
+
       return (data as any[]).map(r => ({
-        member_name: r.profiles?.full_name ?? 'Unknown',
-        amount: r.amount,
+        member_name: nameMap[r.user_id] ?? 'Unknown',
+        amount: r.principal,
         outstanding: r.outstanding,
         status: r.status,
         disbursed_at: r.disbursed_at,
@@ -135,94 +150,94 @@ export function ReportsPage() {
 
   return (
     <div>
-      <Header
-        title="Reports"
-        subtitle="Platform-wide analytics and summaries"
-        actions={
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (!filteredMembers) return
-                const rows = filteredMembers.map((m: any) => ({
-                  Name: m.full_name,
-                  'Account Status': m.account_status,
-                  'Membership Status': m.membership_status?.status ?? 'pending',
-                  'Completed Shares': m.membership_status?.completed_shares ?? 0,
-                }))
-                exportToExcel(rows, 'members-report')
-              }}
-            >
-              Export Members
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                exportMembersPdf(
-                  filteredMembers.map((m: any) => ({
-                    full_name: m.full_name,
-                    account_status: m.account_status,
-                    membership_status: m.membership_status?.status ?? 'pending',
-                    completed_shares: m.membership_status?.completed_shares ?? 0,
-                  })),
-                  `${filteredMembers.length} members`
-                )
-              }}
-            >
-              Export PDF
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                exportLoanPortfolioPdf(allLoans, {
-                  totalDisbursed: loanStats?.totalDisbursed ?? 0,
-                  totalOutstanding: loanStats?.totalOutstanding ?? 0,
-                  totalRepaid: loanStats?.totalRepaid ?? 0,
-                  activeLoans: loanStats?.activeLoans ?? 0,
-                })
-              }}
-            >
-              Loan Portfolio PDF
-            </Button>
-          </div>
-        }
-      />
+      <Header title="Reports" subtitle="Platform-wide analytics and summaries" />
 
-      <div className="px-6 pt-6 flex gap-3 flex-wrap">
-        <input
-          type="text"
-          placeholder="Search members..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"
-        />
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-        >
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="pending">Pending</option>
-          <option value="inactive">Inactive</option>
-          <option value="suspended">Suspended</option>
-        </select>
-        {(search || statusFilter !== 'all') && (
-          <button
-            onClick={() => { setSearch(''); setStatusFilter('all') }}
-            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+      {/* Export toolbar + member filter */}
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6 space-y-3">
+        {/* Export buttons */}
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const rows = filteredMembers.map((m: any) => ({
+                Name: m.full_name,
+                'Account Status': m.account_status,
+                'Membership Status': m.membership_status?.status ?? 'pending',
+                'Completed Shares': m.membership_status?.completed_shares ?? 0,
+              }))
+              exportToExcel(rows, 'members-report')
+            }}
           >
-            Clear
-          </button>
-        )}
+            Members XLS
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              exportMembersPdf(
+                filteredMembers.map((m: any) => ({
+                  full_name: m.full_name,
+                  account_status: m.account_status,
+                  membership_status: m.membership_status?.status ?? 'pending',
+                  completed_shares: m.membership_status?.completed_shares ?? 0,
+                })),
+                `${filteredMembers.length} members`
+              )
+            }}
+          >
+            Members PDF
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              exportLoanPortfolioPdf(allLoans, {
+                totalDisbursed: loanStats?.totalDisbursed ?? 0,
+                totalOutstanding: loanStats?.totalOutstanding ?? 0,
+                totalRepaid: loanStats?.totalRepaid ?? 0,
+                activeLoans: loanStats?.activeLoans ?? 0,
+              })
+            }}
+          >
+            Loans PDF
+          </Button>
+        </div>
+
+        {/* Member search + filter on one row */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Search members..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="flex-shrink-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+          </select>
+          {(search || statusFilter !== 'all') && (
+            <button
+              onClick={() => { setSearch(''); setStatusFilter('all') }}
+              className="flex-shrink-0 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Key Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* Key Stats — 2-col bento on mobile, 4-col on desktop */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
             title="Total Members"
             value={totalMembers}
