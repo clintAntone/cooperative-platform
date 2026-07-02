@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { useAuth } from '../../context/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
+import { useAppBranding } from '../../hooks/useAppBranding'
 
 const schema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -50,6 +51,7 @@ function clearAttempts() {
 export function LoginPage() {
   const { user, signIn, loading } = useAuth()
   const navigate = useNavigate()
+  const { data: branding } = useAppBranding()
   const [serverError, setServerError] = useState<string | null>(null)
   const [lockInfo, setLockInfo] = useState<{ locked: boolean; remaining: number }>({ locked: false, remaining: 0 })
 
@@ -95,13 +97,17 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl mb-4">
-            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
+          <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl mb-4 overflow-hidden">
+            {branding?.logoUrl ? (
+              <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">CoopFinance</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{branding?.name ?? 'CoopFinance'}</h1>
           <p className="text-gray-500 mt-1">Sign in to your account</p>
         </div>
 

@@ -22,6 +22,7 @@ import { DepositRequestPage } from './pages/equity/DepositRequestPage'
 import { MembershipPage } from './pages/membership/MembershipPage'
 import { LendingPage } from './pages/lending/LendingPage'
 import { LoanDetailPage } from './pages/lending/LoanDetailPage'
+import { LoanCalculatorPage } from './pages/lending/LoanCalculatorPage'
 import { ReportsPage } from './pages/reports/ReportsPage'
 import { AdminPage } from './pages/admin/AdminPage'
 import { ConfigPage } from './pages/admin/ConfigPage'
@@ -50,7 +51,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ToastProvider>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <OfflineBanner />
           <Routes>
             {/* Public routes */}
@@ -75,6 +76,7 @@ export default function App() {
               <Route path="/equity/deposit-request" element={<ErrorBoundary><DepositRequestPage /></ErrorBoundary>} />
               <Route path="/membership" element={<ErrorBoundary><MembershipPage /></ErrorBoundary>} />
               <Route path="/lending" element={<ErrorBoundary><LendingPage /></ErrorBoundary>} />
+              <Route path="/lending/calculator" element={<ErrorBoundary><LoanCalculatorPage /></ErrorBoundary>} />
               <Route path="/lending/:id" element={<ErrorBoundary><LoanDetailPage /></ErrorBoundary>} />
               <Route path="/activity" element={<ErrorBoundary><ActivityPage /></ErrorBoundary>} />
             </Route>

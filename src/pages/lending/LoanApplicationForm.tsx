@@ -6,9 +6,10 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { useCreateLoanApplication, useEligibleCoMakers, useActiveLoanProducts } from '../../hooks/useLoans'
 import { supabase } from '../../lib/supabase'
-import { calculateTotalRepayable, calculateMonthlyPayment } from '../../lib/utils'
+import { calculateTotalRepayable, calculateMonthlyPayment, formatInterestLabel } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
 import { useAuth } from '../../context/AuthContext'
+import { useLoanEligibility } from '../../hooks/useLoanEligibility'
 import type { EligibleCoMaker, LoanProduct } from '../../types'
 
 const schema = z.object({
@@ -37,7 +38,7 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
   const { format: currency } = useCurrency()
 
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null)
-  const [maxEligible, setMaxEligible] = useState<number | null>(null)
+  const { data: maxEligible = null } = useLoanEligibility()
   const [minCoMakers, setMinCoMakers] = useState(1)
   const [previewAmount, setPreviewAmount] = useState(0)
   const [previewTerm, setPreviewTerm] = useState(0)
@@ -47,6 +48,7 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
 
   const interestRate = selectedProduct?.interest_rate ?? 12
   const calcMethod = selectedProduct?.calculation_method ?? 'reducing_balance'
+  const ratePeriod = selectedProduct?.interest_rate_period ?? 'annual'
 
   // Build term options from the selected product
   const termOptions = selectedProduct
@@ -84,59 +86,20 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
   }, [selectedProduct, setValue])
 
   useEffect(() => {
-    async function fetchEligibility() {
+    async function fetchCoMakerConfig() {
       if (!user) return
-
       const { data: configs } = await supabase
         .from('system_config')
         .select('config_key, config_value')
-        .in('config_key', [
-          'loan_ratio_new_member',
-          'loan_ratio_senior_member',
-          'loan_ratio_tenure_months',
-          'share_price',
-          'loan_min_co_makers',
-        ])
-
+        .eq('config_key', 'loan_min_co_makers')
       if (!configs) return
-
       const cfg: Record<string, string> = {}
       configs.forEach((c: { config_key: string; config_value: string }) => {
         cfg[c.config_key] = c.config_value
       })
-
-      const sharePrice = parseFloat(cfg.share_price ?? '5000')
-      const ratioNewMember = parseFloat(cfg.loan_ratio_new_member ?? '1')
-      const ratioSenior = parseFloat(cfg.loan_ratio_senior_member ?? '3')
-      const tenureMonths = parseInt(cfg.loan_ratio_tenure_months ?? '12')
-      const minCo = parseInt(cfg.loan_min_co_makers ?? '1')
-
-      setMinCoMakers(minCo)
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('created_at')
-        .eq('id', user.id)
-        .single()
-
-      let ratio = ratioNewMember
-      if (profile) {
-        const memberSince = new Date(profile.created_at)
-        const monthsAsMember = (Date.now() - memberSince.getTime()) / (1000 * 60 * 60 * 24 * 30.44)
-        if (monthsAsMember >= tenureMonths) ratio = ratioSenior
-      }
-
-      const { count } = await supabase
-        .from('equity_shares')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'completed')
-
-      const completedShares = count ?? 0
-      setMaxEligible(completedShares * sharePrice * ratio)
+      setMinCoMakers(parseInt(cfg.loan_min_co_makers ?? '1'))
     }
-
-    fetchEligibility()
+    fetchCoMakerConfig()
   }, [user])
 
   // Auto-select if only one product
@@ -183,11 +146,11 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
     : maxEligible ?? undefined
 
   const monthlyPayment = previewAmount > 0 && previewTerm > 0
-    ? calculateMonthlyPayment(previewAmount, interestRate, previewTerm, calcMethod)
+    ? calculateMonthlyPayment(previewAmount, interestRate, previewTerm, calcMethod, ratePeriod)
     : 0
 
   const totalRepayable = previewAmount > 0 && previewTerm > 0
-    ? calculateTotalRepayable(previewAmount, interestRate, previewTerm, calcMethod)
+    ? calculateTotalRepayable(previewAmount, interestRate, previewTerm, calcMethod, ratePeriod)
     : 0
 
   return (
@@ -229,7 +192,7 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
                     <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>
                   )}
                   <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-gray-500">
-                    <span>{p.interest_rate}% p.a. ({p.calculation_method.replace('_', ' ')})</span>
+                    <span>{formatInterestLabel(p.interest_rate, p.interest_rate_period ?? 'annual', p.calculation_method)}</span>
                     <span>Term: {p.min_term_months}–{p.max_term_months} mo</span>
                     {p.max_amount && <span>Up to {currency(p.max_amount)}</span>}
                   </div>

@@ -14,13 +14,10 @@ export function useMembershipStatus(userId?: string) {
         .from('membership_status')
         .select('*')
         .eq('user_id', targetId!)
-        .single()
+        .maybeSingle()
 
-      if (error) {
-        if (error.code === 'PGRST116') return null // Not found
-        throw error
-      }
-      return data as MembershipStatus
+      if (error) throw error
+      return data as MembershipStatus | null
     },
     enabled: !!targetId,
   })

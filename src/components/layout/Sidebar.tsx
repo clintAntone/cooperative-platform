@@ -1,33 +1,18 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
 import { usePendingCoMakerCount } from '../../hooks/useLoans'
 import { usePendingDepositCount } from '../../hooks/useDepositRequests'
+import { useAppBranding } from '../../hooks/useAppBranding'
 import { cn } from '../../lib/utils'
-
-function useAppBranding() {
-  return useQuery({
-    queryKey: ['app_branding'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('system_config')
-        .select('config_key, config_value')
-        .in('config_key', ['app_name', 'app_logo_url'])
-      const map = Object.fromEntries((data ?? []).map(r => [r.config_key, r.config_value]))
-      return { name: map['app_name'] || 'CoopFinance', logoUrl: map['app_logo_url'] || '' }
-    },
-    staleTime: 60_000,
-  })
-}
 
 interface NavItem {
   path: string
   label: string
   icon: React.ReactNode
   roles?: string[]
+  end?: boolean
 }
 
 interface NavGroup {
@@ -75,6 +60,7 @@ const navGroups: NavGroup[] = [
       {
         path: '/lending',
         label: 'Lending',
+        end: true,
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -271,6 +257,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <NavLink
                   key={item.path}
                   to={item.path}
+                  end={item.end}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',

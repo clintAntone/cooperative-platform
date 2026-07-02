@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
@@ -114,6 +114,37 @@ export function LendingPage() {
           </div>
         }
       />
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 px-4 sm:px-6">
+        <div className="flex gap-1">
+          <NavLink
+            to="/lending"
+            end
+            className={({ isActive }) =>
+              `px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                isActive
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`
+            }
+          >
+            My Loans
+          </NavLink>
+          <NavLink
+            to="/lending/calculator"
+            className={({ isActive }) =>
+              `px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                isActive
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`
+            }
+          >
+            Loan Calculator
+          </NavLink>
+        </div>
+      </div>
 
       <div className="p-4 sm:p-6 space-y-6">
         {/* Eligibility Banners */}
