@@ -9,6 +9,7 @@ import { PageLoader } from '../../components/shared/LoadingSpinner'
 import { useMemberDetail } from '../../hooks/useMembers'
 import { useAdminCreateShare, useAdminDeleteShare, useShareLimit } from '../../hooks/useEquity'
 import { useApproveDepositRequest, useRejectDepositRequest } from '../../hooks/useDepositRequests'
+import { useLoans } from '../../hooks/useLoans'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, formatDateTime, getProgressPercent } from '../../lib/utils'
 import { exportMemberStatementPdf } from '../../lib/exportPdf'
@@ -55,6 +56,7 @@ export function MemberDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data, isLoading } = useMemberDetail(id!)
+  const { data: loans = [] } = useLoans(id!)
   const { format: currency } = useCurrency()
   const approveRequest = useApproveDepositRequest()
   const rejectRequest = useRejectDepositRequest()
@@ -77,24 +79,10 @@ export function MemberDetailPage() {
   const totalInvested = equityShares.reduce((sum, s) => sum + s.paid_amount, 0)
   const completedShares = equityShares.filter(s => s.status === 'completed').length
   const pendingRequests = depositRequests.filter(r => r.status === 'pending').length
+  const activeLoans = loans.filter((l: any) => l.status === 'active').length
 
-  // Build map of deposit_request by share for receipt lookup
-  const depositByShare: Record<string, DepositRequest[]> = {}
-  for (const dr of depositRequests) {
-    if (!depositByShare[dr.share_id]) depositByShare[dr.share_id] = []
-    depositByShare[dr.share_id].push(dr)
-  }
-
-  // Map contribution_at to deposit_request for receipt linking
-  // (best effort: match by amount and approx date within same share)
   function findReceiptForContribution(contrib: EquityContribution): string | null {
-    const requests = depositByShare[contrib.share_id] ?? []
-    const match = requests.find(r =>
-      r.status === 'approved' &&
-      r.amount === contrib.amount &&
-      r.receipt_url
-    )
-    return match?.receipt_url ?? null
+    return contrib.deposit_requests?.receipt_url ?? null
   }
 
   const handleApprove = (requestId: string) => {
@@ -119,48 +107,63 @@ export function MemberDetailPage() {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <button
-          onClick={() => navigate('/admin/members')}
-          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{profile.full_name}</h1>
-            {membershipStatusValue && <StatusBadge status={membershipStatusValue} />}
-          </div>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {profile.employee_id ? `Employee ID: ${profile.employee_id}` : 'No employee ID'} · Joined {formatDate(profile.created_at)}
-          </p>
+      <div className="space-y-3">
+        {/* Nav row: back + export */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate('/admin/members')}
+            title="Back to Members"
+            className="inline-flex items-center justify-center w-9 h-9 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const statementRows = contributions.map(c => ({
+                date: formatDate(c.contribution_at),
+                type: 'Contribution',
+                description: `${c.payment_method.replace('_', ' ')}${c.reference ? ` — Ref: ${c.reference}` : ''}`,
+                amount: c.amount,
+              }))
+              exportMemberStatementPdf(
+                profile.full_name,
+                statementRows,
+                {
+                  totalContributions: totalInvested,
+                  completedShares,
+                  membershipStatus: membershipStatusValue ?? 'pending',
+                }
+              )
+            }}
+          >
+            <svg className="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span className="hidden sm:inline">Export Statement PDF</span>
+          </Button>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-shrink-0"
-          onClick={() => {
-            const statementRows = contributions.map(c => ({
-              date: formatDate(c.contribution_at),
-              type: 'Contribution',
-              description: `${c.payment_method.replace('_', ' ')}${c.reference ? ` — Ref: ${c.reference}` : ''}`,
-              amount: c.amount,
-            }))
-            exportMemberStatementPdf(
-              profile.full_name,
-              statementRows,
-              {
-                totalContributions: totalInvested,
-                completedShares,
-                membershipStatus: membershipStatusValue ?? 'pending',
-              }
-            )
-          }}
-        >
-          Export Statement PDF
-        </Button>
+        {/* Member info */}
+        <div>
+          <div className="flex items-center gap-2">
+            {membershipStatusValue && (
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                membershipStatusValue === 'active'    ? 'bg-green-500' :
+                membershipStatusValue === 'pending'   ? 'bg-yellow-400' :
+                membershipStatusValue === 'suspended' ? 'bg-red-500' :
+                'bg-gray-400'
+              }`} />
+            )}
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{profile.full_name}</h1>
+          </div>
+          {profile.employee_id && (
+            <p className="text-sm text-gray-500 font-mono mt-0.5">{profile.employee_id}</p>
+          )}
+          <p className="text-sm text-gray-500">Joined {formatDate(profile.created_at)}</p>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -168,7 +171,7 @@ export function MemberDetailPage() {
         {[
           { label: 'Total Invested', value: currency(totalInvested) },
           { label: 'Completed Shares', value: completedShares },
-          { label: 'Active Loans', value: '—' },
+          { label: 'Active Loans', value: activeLoans },
           { label: 'Pending Requests', value: pendingRequests },
         ].map(c => (
           <Card key={c.label} className="p-3 sm:p-4 text-center">
@@ -330,7 +333,6 @@ export function MemberDetailPage() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Share #</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Amount</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Method</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
@@ -340,13 +342,9 @@ export function MemberDetailPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {depositRequests.map(req => {
-                    const share = equityShares.find(s => s.id === req.share_id)
                     return (
                       <tr key={req.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(req.created_at)}</td>
-                        <td className="px-4 py-3 text-gray-700">
-                          {share ? `#${share.share_number}` : '—'}
-                        </td>
                         <td className="px-4 py-3 font-medium text-gray-900">{currency(req.amount)}</td>
                         <td className="px-4 py-3 text-gray-600 capitalize">{req.payment_method.replace('_', ' ')}</td>
                         <td className="px-4 py-3">
@@ -376,27 +374,27 @@ export function MemberDetailPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {req.status === 'pending' && (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="primary"
-                                loading={approveRequest.isPending}
-                                onClick={() => handleApprove(req.id)}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                onClick={() => setRejectTarget(req)}
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              disabled={req.status !== 'pending'}
+                              loading={req.status === 'pending' && approveRequest.isPending}
+                              onClick={() => req.status === 'pending' && handleApprove(req.id)}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              disabled={req.status !== 'pending'}
+                              onClick={() => req.status === 'pending' && setRejectTarget(req)}
+                            >
+                              Reject
+                            </Button>
+                          </div>
                           {req.status === 'rejected' && req.rejection_reason && (
-                            <span className="text-xs text-red-600">{req.rejection_reason}</span>
+                            <span className="text-xs text-red-600 mt-1 block">{req.rejection_reason}</span>
                           )}
                         </td>
                       </tr>
@@ -406,6 +404,45 @@ export function MemberDetailPage() {
               </table>
             </div>
           </Card>
+        )}
+      </div>
+
+      {/* Loans */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Loans</h2>
+        {loans.length === 0 ? (
+          <Card className="p-6 text-center text-gray-400 text-sm">No loans yet.</Card>
+        ) : (
+          <div className="space-y-3">
+            {loans.map((loan: any) => (
+              <Card key={loan.id} className="p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{currency(loan.principal)}</p>
+                    <p className="text-xs text-gray-400">{loan.disbursed_at ? `Disbursed ${formatDate(loan.disbursed_at)}` : formatDate(loan.created_at)}</p>
+                  </div>
+                  <StatusBadge status={loan.status} />
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="text-gray-400">Outstanding</p>
+                    <p className="font-medium text-gray-900">{currency(loan.outstanding ?? 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Paid</p>
+                    <p className="font-medium text-gray-900">{currency(loan.amount_paid ?? 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Term</p>
+                    <p className="font-medium text-gray-900">{loan.term_months}mo</p>
+                  </div>
+                </div>
+                {loan.purpose && (
+                  <p className="text-xs text-gray-500 italic">{loan.purpose}</p>
+                )}
+              </Card>
+            ))}
+          </div>
         )}
       </div>
 

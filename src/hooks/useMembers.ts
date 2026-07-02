@@ -30,14 +30,17 @@ export function useMembers() {
 
       const { data: shares } = await supabase
         .from('equity_shares')
-        .select('user_id, paid_amount, status')
+        .select('user_id, paid_amount, target_amount, status')
         .in('user_id', profileIds)
 
       const equityMap: Record<string, { totalInvested: number; completedShares: number }> = {}
       for (const s of shares ?? []) {
         if (!equityMap[s.user_id]) equityMap[s.user_id] = { totalInvested: 0, completedShares: 0 }
         equityMap[s.user_id].totalInvested += s.paid_amount ?? 0
-        if (s.status === 'completed') equityMap[s.user_id].completedShares += 1
+        const target = s.target_amount ?? 0
+        if (target > 0) {
+          equityMap[s.user_id].completedShares += Math.min((s.paid_amount ?? 0) / target, 1)
+        }
       }
 
       return (data ?? []).map((p: any) => ({
@@ -77,7 +80,7 @@ export function useMemberDetail(userId: string) {
           .order('share_number', { ascending: true }),
         supabase
           .from('equity_contributions')
-          .select('*')
+          .select('*, deposit_requests(receipt_url)')
           .eq('user_id', userId)
           .order('contribution_at', { ascending: false }),
         supabase

@@ -23,12 +23,11 @@ function useLoanConfigured() {
   return useQuery({
     queryKey: ['loan_configured'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('system_config')
-        .select('config_key, config_value')
-        .in('config_key', ['loan_interest_rate', 'share_price'])
-      const map = Object.fromEntries((data ?? []).map((c: any) => [c.config_key, c.config_value]))
-      return parseFloat(map['loan_interest_rate'] ?? '0') > 0 && parseFloat(map['share_price'] ?? '0') > 0
+      const { count } = await supabase
+        .from('loan_products')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+      return (count ?? 0) > 0
     },
     staleTime: 60_000,
   })
@@ -136,11 +135,14 @@ function ExportDropdown({ onMembersXls, onMembersPdf, onLoansPdf }: ExportDropdo
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
       >
-        Export
-        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+        </svg>
+        <span className="hidden sm:inline">Export</span>
+        <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && (
@@ -217,99 +219,104 @@ export function ReportsPage() {
       <Header
         title="Reports"
         subtitle="Platform-wide analytics and summaries"
-        actions={<ExportDropdown
-          onMembersXls={() => {
-            const rows = filteredMembers.map((m: any) => ({
-              Name: m.full_name,
-              'Account Status': m.account_status,
-              'Membership Status': m.membership_status?.status ?? 'pending',
-              'Completed Shares': m.membership_status?.completed_shares ?? 0,
-              Joined: m.created_at,
-            }))
-            exportToExcel(rows, 'members-report')
-          }}
-          onMembersPdf={() => {
-            exportMembersPdf(
-              filteredMembers.map((m: any) => ({
-                full_name: m.full_name,
-                account_status: m.account_status,
-                membership_status: m.membership_status?.status ?? 'pending',
-                completed_shares: m.membership_status?.completed_shares ?? 0,
-              })),
-              `${filteredMembers.length} members${hasDateFilter ? ' (filtered)' : ''}`
-            )
-          }}
-          onLoansPdf={() => {
-            exportLoanPortfolioPdf(allLoans, {
-              totalDisbursed: loanStats?.totalDisbursed ?? 0,
-              totalOutstanding: loanStats?.totalOutstanding ?? 0,
-              totalRepaid: loanStats?.totalRepaid ?? 0,
-              activeLoans: loanStats?.activeLoans ?? 0,
-            })
-          }}
-        />}
+        actions={
+          <ExportDropdown
+            onMembersXls={() => {
+              const rows = filteredMembers.map((m: any) => ({
+                Name: m.full_name,
+                'Account Status': m.account_status,
+                'Membership Status': m.membership_status?.status ?? 'pending',
+                'Completed Shares': m.membership_status?.completed_shares ?? 0,
+                Joined: m.created_at,
+              }))
+              exportToExcel(rows, 'members-report')
+            }}
+            onMembersPdf={() => {
+              exportMembersPdf(
+                filteredMembers.map((m: any) => ({
+                  full_name: m.full_name,
+                  account_status: m.account_status,
+                  membership_status: m.membership_status?.status ?? 'pending',
+                  completed_shares: m.membership_status?.completed_shares ?? 0,
+                })),
+                `${filteredMembers.length} members${hasDateFilter ? ' (filtered)' : ''}`
+              )
+            }}
+            onLoansPdf={() => {
+              exportLoanPortfolioPdf(allLoans, {
+                totalDisbursed: loanStats?.totalDisbursed ?? 0,
+                totalOutstanding: loanStats?.totalOutstanding ?? 0,
+                totalRepaid: loanStats?.totalRepaid ?? 0,
+                activeLoans: loanStats?.activeLoans ?? 0,
+              })
+            }}
+          />
+        }
       />
 
-      {/* Filters */}
-      <div className="px-4 sm:px-6 pt-3 pb-1 space-y-2">
-        {/* Search + status on one row */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Search members..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="flex-shrink-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="all">All</option>
-            <option value="active">Active</option>
-            <option value="pending">Pending</option>
-            <option value="inactive">Inactive</option>
-            <option value="suspended">Suspended</option>
-          </select>
-          {(search || statusFilter !== 'all') && (
-            <button
-              onClick={() => { setSearch(''); setStatusFilter('all') }}
-              className="flex-shrink-0 px-2.5 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Date range on one compact row */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">Joined:</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-            className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <span className="text-xs text-gray-400 flex-shrink-0">–</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {hasDateFilter && (
-            <button
-              onClick={() => { setDateFrom(''); setDateTo('') }}
-              className="flex-shrink-0 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
-
       <div className="p-4 sm:p-6 space-y-6">
+        {/* Filters */}
+        <div className="space-y-2">
+          {/* Search + status */}
+          <div className="flex gap-2">
+            <div className="relative flex-1 min-w-0">
+              <input
+                type="text"
+                placeholder="Search members…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+
+          {/* Date range */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">Joined:</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-400 flex-shrink-0">–</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {hasDateFilter && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo('') }}
+                className="flex-shrink-0 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
         {/* Key Stats */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
@@ -423,20 +430,15 @@ export function ReportsPage() {
             <CardBody>
               <div className="space-y-3">
                 {membershipBreakdown && Object.entries(membershipBreakdown).map(([status, count]) => (
-                  <div key={status} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <StatusBadge status={status} />
-                      <span className="text-sm text-gray-600 capitalize">{status}</span>
+                  <div key={status} className="flex items-center gap-3">
+                    <StatusBadge status={status} />
+                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full bg-blue-500"
+                        style={{ width: totalMembers > 0 ? `${(count / totalMembers) * 100}%` : '0%' }}
+                      />
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-32 bg-gray-100 rounded-full h-2">
-                        <div
-                          className="h-2 rounded-full bg-blue-500"
-                          style={{ width: totalMembers > 0 ? `${(count / totalMembers) * 100}%` : '0%' }}
-                        />
-                      </div>
-                      <span className="text-sm font-semibold text-gray-900 w-8 text-right">{formatNumber(count)}</span>
-                    </div>
+                    <span className="text-sm font-semibold text-gray-900 w-6 text-right">{formatNumber(count)}</span>
                   </div>
                 ))}
               </div>

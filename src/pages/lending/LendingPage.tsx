@@ -6,7 +6,7 @@ import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 import { Table, Thead, Tbody, Th, Tr, Td } from '../../components/ui/Table'
 import { LoanApplicationForm } from './LoanApplicationForm'
 import { useLoanApplications, useLoans, useMyCoMakerRequests, useRespondToCoMakerRequest, useMyApplicationCoMakers } from '../../hooks/useLoans'
@@ -20,14 +20,11 @@ function useLoanConfigured() {
   return useQuery({
     queryKey: ['loan_configured'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('system_config')
-        .select('config_key, config_value')
-        .in('config_key', ['loan_interest_rate', 'share_price'])
-      const map = Object.fromEntries((data ?? []).map((c: any) => [c.config_key, c.config_value]))
-      const rate = parseFloat(map['loan_interest_rate'] ?? '0')
-      const price = parseFloat(map['share_price'] ?? '0')
-      return rate > 0 && price > 0
+      const { count } = await supabase
+        .from('loan_products')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+      return (count ?? 0) > 0
     },
     staleTime: 60_000,
   })
@@ -47,7 +44,7 @@ export function LendingPage() {
   const { format: currency } = useCurrency()
   const isLoading = membershipLoading || applicationsLoading || loansLoading
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <SkeletonPage cards={2} rows={4} />
 
   const isActiveMember = membershipStatus?.status === 'active'
   const hasCompletedShares = (membershipStatus?.completed_shares ?? 0) > 0
@@ -58,6 +55,25 @@ export function LendingPage() {
   const hasActiveLoan = activeLoans.length > 0
   const canApply = isActiveMember && hasCompletedShares && !hasPendingApplication && !hasActiveLoan && loanConfigured
 
+  if (!loanConfigured) {
+    return (
+      <div>
+        <Header title="Lending" subtitle="Loan applications and active loans" />
+        <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+          <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Lending Coming Soon</h2>
+          <p className="text-sm text-gray-500 max-w-xs">
+            The loan product hasn't been configured yet. Please check back later or contact your cooperative administrator.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <Header
@@ -66,9 +82,7 @@ export function LendingPage() {
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             {(applications && applications.length > 0) && (
-              <Button
-                size="sm"
-                variant="outline"
+              <button
                 onClick={() => {
                   const rows = (applications ?? []).map(app => ({
                     Amount: app.amount_requested,
@@ -79,9 +93,14 @@ export function LendingPage() {
                   }))
                   exportToExcel(rows, 'loan-applications')
                 }}
+                title="Export to Excel"
+                className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
               >
-                Export
-              </Button>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                <span className="hidden sm:inline">Export</span>
+              </button>
             )}
             {isActiveMember && (
               <Button
@@ -238,42 +257,70 @@ export function LendingPage() {
               </div>
             </CardHeader>
             <CardBody className="p-0">
-              <Table>
-                <Thead>
-                  <Tr>
-                    <Th>Principal</Th>
-                    <Th>Outstanding</Th>
-                    <Th>Interest Rate</Th>
-                    <Th>Due Date</Th>
-                    <Th>Status</Th>
-                    <Th></Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {activeLoans.map(loan => (
-                    <Tr key={loan.id} onClick={() => navigate(`/lending/${loan.id}`)}>
-                      <Td>{currency(loan.principal)}</Td>
-                      <Td>
-                        <span className="font-medium text-gray-900">{currency(loan.outstanding)}</span>
-                      </Td>
-                      <Td>{loan.interest_rate}% p.a.</Td>
-                      <Td>{formatDate(loan.due_date)}</Td>
-                      <Td><StatusBadge status={loan.status} /></Td>
-                      <Td>
-                        <button
-                          className="text-blue-600 text-sm hover:underline"
-                          onClick={e => {
-                            e.stopPropagation()
-                            navigate(`/lending/${loan.id}`)
-                          }}
-                        >
-                          View
-                        </button>
-                      </Td>
+              {/* Mobile cards */}
+              <div className="sm:hidden divide-y divide-gray-100">
+                {activeLoans.map(loan => (
+                  <div key={loan.id} className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-lg font-bold text-gray-900">{currency(loan.principal)}</span>
+                      <StatusBadge status={loan.status} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3">
+                      <span className="text-gray-500">Outstanding</span>
+                      <span className="font-medium text-gray-900">{currency(loan.outstanding)}</span>
+                      <span className="text-gray-500">Interest</span>
+                      <span className="text-gray-700">{loan.interest_rate}%</span>
+                      <span className="text-gray-500">Due Date</span>
+                      <span className="text-gray-700">{formatDate(loan.due_date)}</span>
+                    </div>
+                    <button
+                      className="text-xs text-blue-600 hover:underline"
+                      onClick={() => navigate(`/lending/${loan.id}`)}
+                    >
+                      View Details →
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden sm:block">
+                <Table>
+                  <Thead>
+                    <Tr>
+                      <Th>Principal</Th>
+                      <Th>Outstanding</Th>
+                      <Th>Interest Rate</Th>
+                      <Th>Due Date</Th>
+                      <Th>Status</Th>
+                      <Th></Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </Table>
+                  </Thead>
+                  <Tbody>
+                    {activeLoans.map(loan => (
+                      <Tr key={loan.id} onClick={() => navigate(`/lending/${loan.id}`)}>
+                        <Td>{currency(loan.principal)}</Td>
+                        <Td>
+                          <span className="font-medium text-gray-900">{currency(loan.outstanding)}</span>
+                        </Td>
+                        <Td>{loan.interest_rate}% p.a.</Td>
+                        <Td>{formatDate(loan.due_date)}</Td>
+                        <Td><StatusBadge status={loan.status} /></Td>
+                        <Td>
+                          <button
+                            className="text-blue-600 text-sm hover:underline"
+                            onClick={e => {
+                              e.stopPropagation()
+                              navigate(`/lending/${loan.id}`)
+                            }}
+                          >
+                            View
+                          </button>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </div>
             </CardBody>
           </Card>
         )}
@@ -296,76 +343,132 @@ export function LendingPage() {
                 <p className="text-sm text-gray-500">No loan applications yet</p>
               </div>
             ) : (
-              <Table>
-                <Thead>
-                  <Tr>
-                    <Th>Amount Requested</Th>
-                    <Th>Purpose</Th>
-                    <Th>Term</Th>
-                    <Th>Status</Th>
-                    <Th>Co-makers</Th>
-                    <Th>Applied On</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
+              <>
+                {/* Mobile cards */}
+                <div className="sm:hidden divide-y divide-gray-100">
                   {applications.map(app => {
                     const appCoMakers = myAppCoMakers.filter(cm => cm.application_id === app.id)
                     const declined = appCoMakers.filter(cm => cm.status === 'declined').length
                     return (
-                      <Tr key={app.id}>
-                        <Td>
-                          <span className="font-medium">{currency(app.amount_requested)}</span>
-                        </Td>
-                        <Td>
-                          <span className="max-w-xs truncate block" title={app.purpose ?? undefined}>
-                            {app.purpose ?? '—'}
-                          </span>
-                        </Td>
-                        <Td>{app.term_months} months</Td>
-                        <Td>
+                      <div key={app.id} className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-gray-900">{currency(app.amount_requested)}</span>
                           {app.status === 'draft' ? (
                             <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">
                               Awaiting co-makers
                             </span>
                           ) : (
-                            <div className="space-y-1">
-                              <StatusBadge status={app.status} />
-                              {app.status === 'rejected' && app.rejection_reason && (
-                                <p className="text-xs text-red-600 max-w-[180px]" title={app.rejection_reason}>
-                                  {app.rejection_reason}
-                                </p>
-                              )}
-                            </div>
+                            <StatusBadge status={app.status} />
                           )}
-                        </Td>
-                        <Td>
-                          {appCoMakers.length > 0 ? (
-                            <div className="flex flex-col gap-0.5">
-                              {appCoMakers.map(cm => (
-                                <span key={cm.co_maker_user_id} className={`text-xs ${
-                                  cm.status === 'confirmed' ? 'text-green-700' :
-                                  cm.status === 'declined'  ? 'text-red-600' :
-                                  'text-yellow-700'
-                                }`}>
-                                  {cm.full_name} {cm.status === 'confirmed' ? '✓' : cm.status === 'declined' ? '✗' : '⏳'}
-                                </span>
-                              ))}
-                              {declined > 0 && (
-                                <p className="text-xs text-red-500 mt-0.5">
-                                  {declined} declined — contact them to re-confirm
-                                </p>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </Td>
-                        <Td>{formatDate(app.created_at)}</Td>
-                      </Tr>
+                        </div>
+                        {app.purpose && (
+                          <p className="text-xs text-gray-500 line-clamp-2 mb-2">{app.purpose}</p>
+                        )}
+                        {app.status === 'rejected' && app.rejection_reason && (
+                          <p className="text-xs text-red-600 mb-2">{app.rejection_reason}</p>
+                        )}
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-2">
+                          <span className="text-gray-500">Term</span>
+                          <span className="text-gray-700">{app.term_months} months</span>
+                          <span className="text-gray-500">Applied</span>
+                          <span className="text-gray-700">{formatDate(app.created_at)}</span>
+                        </div>
+                        {appCoMakers.length > 0 && (
+                          <div className="flex flex-col gap-0.5 mt-1">
+                            {appCoMakers.map(cm => (
+                              <span key={cm.co_maker_user_id} className={`text-xs ${
+                                cm.status === 'confirmed' ? 'text-green-700' :
+                                cm.status === 'declined'  ? 'text-red-600' :
+                                'text-yellow-700'
+                              }`}>
+                                {cm.full_name} {cm.status === 'confirmed' ? '✓' : cm.status === 'declined' ? '✗' : '⏳'}
+                              </span>
+                            ))}
+                            {declined > 0 && (
+                              <p className="text-xs text-red-500 mt-0.5">
+                                {declined} declined — contact them to re-confirm
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
-                </Tbody>
-              </Table>
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <Thead>
+                      <Tr>
+                        <Th>Amount Requested</Th>
+                        <Th>Purpose</Th>
+                        <Th>Term</Th>
+                        <Th>Status</Th>
+                        <Th>Co-makers</Th>
+                        <Th>Applied On</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {applications.map(app => {
+                        const appCoMakers = myAppCoMakers.filter(cm => cm.application_id === app.id)
+                        const declined = appCoMakers.filter(cm => cm.status === 'declined').length
+                        return (
+                          <Tr key={app.id}>
+                            <Td>
+                              <span className="font-medium">{currency(app.amount_requested)}</span>
+                            </Td>
+                            <Td>
+                              <span className="max-w-xs truncate block" title={app.purpose ?? undefined}>
+                                {app.purpose ?? '—'}
+                              </span>
+                            </Td>
+                            <Td>{app.term_months} months</Td>
+                            <Td>
+                              {app.status === 'draft' ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">
+                                  Awaiting co-makers
+                                </span>
+                              ) : (
+                                <div className="space-y-1">
+                                  <StatusBadge status={app.status} />
+                                  {app.status === 'rejected' && app.rejection_reason && (
+                                    <p className="text-xs text-red-600 max-w-[180px]" title={app.rejection_reason}>
+                                      {app.rejection_reason}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </Td>
+                            <Td>
+                              {appCoMakers.length > 0 ? (
+                                <div className="flex flex-col gap-0.5">
+                                  {appCoMakers.map(cm => (
+                                    <span key={cm.co_maker_user_id} className={`text-xs ${
+                                      cm.status === 'confirmed' ? 'text-green-700' :
+                                      cm.status === 'declined'  ? 'text-red-600' :
+                                      'text-yellow-700'
+                                    }`}>
+                                      {cm.full_name} {cm.status === 'confirmed' ? '✓' : cm.status === 'declined' ? '✗' : '⏳'}
+                                    </span>
+                                  ))}
+                                  {declined > 0 && (
+                                    <p className="text-xs text-red-500 mt-0.5">
+                                      {declined} declined — contact them to re-confirm
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-400">—</span>
+                              )}
+                            </Td>
+                            <Td>{formatDate(app.created_at)}</Td>
+                          </Tr>
+                        )
+                      })}
+                    </Tbody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardBody>
         </Card>

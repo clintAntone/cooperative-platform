@@ -80,6 +80,23 @@ export function useAllDepositRequests(statusFilter?: string) {
   })
 }
 
+// ─── Admin: pending deposit count for nav badge ───────────────────────────────
+
+export function usePendingDepositCount() {
+  return useQuery({
+    queryKey: ['pending_deposit_count'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('deposit_requests')
+        .select('id')
+        .eq('status', 'pending')
+      if (error) return 0
+      return data?.length ?? 0
+    },
+    refetchInterval: 60_000,
+  })
+}
+
 // ─── Submit deposit request (member) ─────────────────────────────────────────
 
 interface SubmitDepositRequestInput {

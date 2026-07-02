@@ -31,6 +31,7 @@ import { MembersPage } from './pages/admin/MembersPage'
 import { MemberDetailPage } from './pages/admin/MemberDetailPage'
 import { DepositRequestsPage } from './pages/admin/DepositRequestsPage'
 import { LoanApplicationsPage } from './pages/admin/LoanApplicationsPage'
+import { LoanProductsPage } from './pages/admin/LoanProductsPage'
 import { FaqPage } from './pages/FaqPage'
 import { ActivityPage } from './pages/activity/ActivityPage'
 
@@ -86,6 +87,7 @@ export default function App() {
               <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
               <Route path="/admin/deposit-requests" element={<ErrorBoundary><DepositRequestsPage /></ErrorBoundary>} />
               <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
+              <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
             </Route>
 
             {/* Admin only */}

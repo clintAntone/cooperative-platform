@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
+import { exportToExcel } from '../../lib/exportExcel'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 import { Pagination } from '../../components/shared/Pagination'
 import { supabase } from '../../lib/supabase'
 import {
@@ -38,7 +39,8 @@ const tabs: { label: string; value: TabValue }[] = [
 ]
 
 export function LoanApplicationsPage() {
-  const [activeTab, setActiveTab] = useState<TabValue>('all')
+  const [activeTab, setActiveTab] = useState<TabValue>('submitted')
+  const [search, setSearch] = useState('')
   const [approveError, setApproveError] = useState<Record<string, string>>({})
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -46,7 +48,7 @@ export function LoanApplicationsPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
 
-  useEffect(() => { setPage(0) }, [activeTab, sortKey, sortDir])
+  useEffect(() => { setPage(0) }, [activeTab, search, sortKey, sortDir])
 
   const { data: applications = [], isLoading } = useAllLoanApplications()
   const approveLoan = useAdminApproveLoan()
@@ -83,7 +85,12 @@ export function LoanApplicationsPage() {
   // Admins never see 'draft' — those are still awaiting co-maker confirmation
   const filtered = (applications as any[]).filter(app => {
     if (app.status === 'draft') return false
-    return activeTab === 'all' ? true : app.status === activeTab
+    const matchesTab = activeTab === 'all' ? true : app.status === activeTab
+    const q = search.toLowerCase()
+    const matchesSearch = !q ||
+      (app.profiles?.full_name ?? '').toLowerCase().includes(q) ||
+      (app.purpose ?? '').toLowerCase().includes(q)
+    return matchesTab && matchesSearch
   })
 
   const sorted = [...filtered].sort((a: any, b: any) => {
@@ -118,13 +125,35 @@ export function LoanApplicationsPage() {
     )
   }
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <SkeletonPage cards={3} rows={6} />
 
   return (
     <div>
       <Header
         title="Loan Applications"
         subtitle="Review and approve member loan applications"
+        actions={
+          <button
+            onClick={() => {
+              const rows = filtered.map((app: any) => ({
+                Member: app.profiles?.full_name ?? '',
+                Amount: app.amount_requested,
+                'Term (months)': app.term_months,
+                Purpose: app.purpose ?? '',
+                Status: app.status,
+                'Applied On': formatDate(app.created_at),
+              }))
+              exportToExcel(rows, `loan-applications-${activeTab}`)
+            }}
+            title="Export to Excel"
+            className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            <span className="hidden sm:inline">Export</span>
+          </button>
+        }
       />
 
       <div className="p-4 sm:p-6 space-y-6">
@@ -148,8 +177,123 @@ export function LoanApplicationsPage() {
         </div>
         </div>
 
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search by member name or purpose…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Clear search"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <select
+            value={`${sortKey}-${sortDir}`}
+            onChange={e => {
+              const [key, dir] = e.target.value.split('-') as [typeof sortKey, typeof sortDir]
+              setSortKey(key)
+              setSortDir(dir)
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="created_at-desc">Newest first</option>
+            <option value="created_at-asc">Oldest first</option>
+            <option value="amount_requested-desc">Amount ↓</option>
+            <option value="amount_requested-asc">Amount ↑</option>
+            <option value="term_months-desc">Term ↓</option>
+            <option value="term_months-asc">Term ↑</option>
+          </select>
+        </div>
+
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Mobile cards */}
+          <div className="sm:hidden divide-y divide-gray-100">
+            {paged.length === 0 && <p className="text-center py-10 text-gray-400 text-sm">No applications found</p>}
+            {paged.map((app: any) => {
+              const cm = coMakerSummary(app.id)
+              const allConfirmed = cm.total > 0 && cm.confirmed === cm.total
+              const canApprove = app.status === 'submitted' || app.status === 'under_review'
+              const err = approveError[app.id]
+              return (
+                <div key={app.id} className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-sm text-gray-900">{app.profiles?.full_name ?? '—'}</p>
+                      <p className="text-xs text-gray-400">{formatDate(app.created_at)}</p>
+                    </div>
+                    <StatusBadge status={app.status} />
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-lg font-bold text-gray-900">{currency(app.amount_requested)}</span>
+                    <span className="text-xs text-gray-400">{app.term_months} mo</span>
+                  </div>
+                  {app.purpose && <p className="text-xs text-gray-600 line-clamp-2">{app.purpose}</p>}
+                  <div>
+                    {cm.total === 0 ? (
+                      <span className="text-xs text-gray-400">No co-makers</span>
+                    ) : (
+                      <span className={`text-xs font-medium ${
+                        allConfirmed ? 'text-green-700' :
+                        cm.declined > 0 ? 'text-red-600' : 'text-yellow-700'
+                      }`}>
+                        {cm.confirmed}/{cm.total} confirmed
+                        {cm.declined > 0 && `, ${cm.declined} declined`}
+                        {cm.pending > 0 && `, ${cm.pending} pending`}
+                      </span>
+                    )}
+                  </div>
+                  {canApprove && (
+                    <div className="flex flex-col gap-1 pt-1">
+                      <div className="flex gap-3">
+                        {app.status === 'submitted' && (
+                          <button
+                            onClick={() => setUnderReview.mutate(app.id)}
+                            disabled={setUnderReview.isPending}
+                            className="text-xs text-blue-600 hover:underline font-medium"
+                          >
+                            Review
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleApprove(app.id)}
+                          disabled={approveLoan.isPending || !allConfirmed}
+                          title={!allConfirmed ? 'All co-makers must confirm first' : undefined}
+                          className="text-xs text-green-700 hover:underline font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => { setRejectingId(app.id); setRejectReason('') }}
+                          className="text-xs text-red-600 hover:underline font-medium"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                      {err && (
+                        <p className="text-xs text-red-600 max-w-[200px]">{err}</p>
+                      )}
+                    </div>
+                  )}
+                  {app.status === 'rejected' && app.rejection_reason && (
+                    <p className="text-xs text-gray-400 italic">{app.rejection_reason}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -264,7 +408,7 @@ export function LoanApplicationsPage() {
                 })}
               </tbody>
             </table>
-          </div>
+          </div>{/* end hidden sm:block */}
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
@@ -18,6 +19,20 @@ interface UserRow {
   membership_status: MembershipStatusValue | null
   completed_shares: number | null
   created_at: string
+  deleted_at?: string | null
+}
+
+function useDeleteUser() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc('admin_soft_delete_user', { p_user_id: userId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+    },
+  })
 }
 
 interface EditState {
@@ -50,6 +65,23 @@ export function UsersPage() {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [editState, setEditState] = useState<EditState | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [pressingId, setPressingId] = useState<string | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const deleteUser = useDeleteUser()
+
+  const startLongPress = (userId: string) => {
+    setPressingId(userId)
+    longPressTimer.current = setTimeout(() => {
+      setDeleteConfirmId(userId)
+      setPressingId(null)
+    }, 700)
+  }
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    setPressingId(null)
+  }
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin-users'],
@@ -114,75 +146,163 @@ export function UsersPage() {
     suspended: users.filter(u => u.account_status === 'suspended').length,
   }
 
+  const handleExport = () => {
+    const rows = filtered.map(u => ({
+      Name: u.full_name,
+      Role: u.role,
+      'Account Status': u.account_status,
+      'Membership Status': u.membership_status ?? '',
+      'Completed Shares': u.completed_shares ?? 0,
+      Joined: new Date(u.created_at).toLocaleDateString(),
+    }))
+    exportToExcel(rows, 'users')
+  }
+
   if (isLoading) return <LoadingSpinner />
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage roles and account status for all users</p>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            const rows = filtered.map(u => ({
-              Name: u.full_name,
-              Role: u.role,
-              'Account Status': u.account_status,
-              'Membership Status': u.membership_status ?? '',
-              'Completed Shares': u.completed_shares ?? 0,
-              Joined: new Date(u.created_at).toLocaleDateString(),
-            }))
-            exportToExcel(rows, 'users')
-          }}
-        >
-          Export
-        </Button>
-      </div>
+    <div>
+      <Header
+        title="User Management"
+        subtitle="Manage roles and account status for all users"
+        actions={
+          <button
+            onClick={handleExport}
+            title="Export to Excel"
+            className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            {/* Download icon */}
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            <span className="hidden sm:inline">Export</span>
+          </button>
+        }
+      />
 
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-2">
         {[
-          { label: 'Total Users', value: counts.total, color: 'text-gray-900' },
+          { label: 'Total', value: counts.total, color: 'text-gray-900' },
           { label: 'Admins', value: counts.admin, color: 'text-purple-700' },
           { label: 'Staff', value: counts.staff, color: 'text-blue-700' },
           { label: 'Members', value: counts.member, color: 'text-gray-700' },
         ].map(c => (
-          <Card key={c.label} className="p-4 text-center">
-            <p className={`text-2xl font-bold ${c.color}`}>{c.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{c.label}</p>
+          <Card key={c.label} className="p-3 text-center">
+            <p className={`text-xl font-bold ${c.color}`}>{c.value}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{c.label}</p>
           </Card>
         ))}
       </div>
 
       {/* Filters */}
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Search by name..."
+            placeholder="Search by name or email…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <select
-            value={roleFilter}
-            onChange={e => setRoleFilter(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="staff">Staff</option>
-            <option value="member">Member</option>
-          </select>
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear search"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
-      </Card>
+        <select
+          value={roleFilter}
+          onChange={e => setRoleFilter(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        >
+          <option value="all">All Roles</option>
+          <option value="admin">Admin</option>
+          <option value="staff">Staff</option>
+          <option value="member">Member</option>
+        </select>
+      </div>
 
       {/* Users table */}
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile card list */}
+        <div className="sm:hidden space-y-3">
+          {filtered.length === 0 && (
+            <p className="text-center py-10 text-sm text-gray-400">No users found</p>
+          )}
+          {filtered.map(user => (
+            <div
+              key={user.id}
+              className={`bg-white rounded-xl border px-4 py-3.5 space-y-2.5 select-none transition-colors ${
+                pressingId === user.id
+                  ? 'border-red-300 bg-red-50'
+                  : 'border-gray-200'
+              }`}
+              onTouchStart={() => startLongPress(user.id)}
+              onTouchEnd={cancelLongPress}
+              onTouchCancel={cancelLongPress}
+              onContextMenu={e => e.preventDefault()}
+            >
+              {/* Name + role */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm text-gray-900 leading-snug">{user.full_name}</p>
+                  {user.phone && <p className="text-xs text-gray-400 mt-0.5">{user.phone}</p>}
+                </div>
+                <span className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${roleColors[user.role]}`}>
+                  {user.role}
+                </span>
+              </div>
+
+              {/* Status badges */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[user.account_status]}`}>
+                  {user.account_status}
+                </span>
+                {user.membership_status && (
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${membershipColors[user.membership_status]}`}>
+                    {user.membership_status} membership
+                  </span>
+                )}
+              </div>
+
+              {/* Meta row */}
+              <p className="text-xs text-gray-400">
+                {user.completed_shares ?? 0} {(user.completed_shares ?? 0) === 1 ? 'share' : 'shares'}
+                {' · '}
+                Joined {new Date(user.created_at).toLocaleDateString()}
+              </p>
+
+              {/* Actions */}
+              <div
+                className="flex items-center gap-2 pt-0.5 border-t border-gray-100"
+                onTouchStart={e => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => setEditState({ user, field: 'role', newValue: user.role })}
+                  className="flex-1 text-xs text-center py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-medium transition-colors"
+                >
+                  Change Role
+                </button>
+                <div className="w-px h-4 bg-gray-200" />
+                <button
+                  onClick={() => setEditState({ user, field: 'account_status', newValue: user.account_status })}
+                  className="flex-1 text-xs text-center py-1.5 rounded-lg text-orange-600 hover:bg-orange-50 font-medium transition-colors"
+                >
+                  Change Status
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Desktop table */}
+        <Card className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -249,14 +369,50 @@ export function UsersPage() {
                       >
                         Change Status
                       </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        onClick={() => setDeleteConfirmId(user.id)}
+                        className="text-xs text-red-600 hover:text-red-800 font-medium"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </Card>
+    </div>
+
+      {/* Confirm delete modal */}
+      <Modal
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        title="Delete User"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            This will soft-delete the user. They won't be able to log in and will be hidden from all lists. This can be undone.
+          </p>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              loading={deleteUser.isPending}
+              onClick={() => {
+                deleteUser.mutate(deleteConfirmId!, {
+                  onSuccess: () => setDeleteConfirmId(null)
+                })
+              }}
+            >
+              Delete
+            </Button>
+          </div>
         </div>
-      </Card>
+      </Modal>
 
       {/* Confirm edit modal */}
       {editState && (
@@ -324,3 +480,4 @@ export function UsersPage() {
     </div>
   )
 }
+

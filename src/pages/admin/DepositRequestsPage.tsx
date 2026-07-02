@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
@@ -38,7 +38,7 @@ const tabs: { label: string; value: TabValue }[] = [
 ]
 
 export function DepositRequestsPage() {
-  const [activeTab, setActiveTab] = useState<TabValue>('all')
+  const [activeTab, setActiveTab] = useState<TabValue>('pending')
   const { data: requests = [], isLoading } = useAllDepositRequests(activeTab)
   const { format: currency } = useCurrency()
   const approveRequest = useApproveDepositRequest()
@@ -104,9 +104,7 @@ export function DepositRequestsPage() {
         title="Deposit Requests"
         subtitle="Review and approve member deposit requests"
         actions={
-          <Button
-            size="sm"
-            variant="outline"
+          <button
             onClick={() => {
               const rows = dateFiltered.map(r => ({
                 Member: r.profiles?.full_name ?? '',
@@ -120,9 +118,14 @@ export function DepositRequestsPage() {
               }))
               exportToExcel(rows, `deposit-requests-${activeTab}`)
             }}
+            title="Export to Excel"
+            className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
-            Export
-          </Button>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            <span className="hidden sm:inline">Export</span>
+          </button>
         }
       />
 
@@ -148,42 +151,109 @@ export function DepositRequestsPage() {
         </div>
 
         {/* Date range filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={e => setDateFrom(e.target.value)}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 whitespace-nowrap">To</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={e => setDateTo(e.target.value)}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <span className="text-gray-400 text-sm flex-shrink-0">–</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
           {hasDateFilter && (
             <button
               onClick={() => { setDateFrom(''); setDateTo('') }}
-              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
+              className="flex-shrink-0 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
             >
-              Clear dates
+              Clear
             </button>
-          )}
-          {hasDateFilter && (
-            <span className="text-xs text-gray-400">
-              {dateFiltered.length} result{dateFiltered.length !== 1 ? 's' : ''}
-            </span>
           )}
         </div>
 
         {/* Requests table */}
         <Card className="overflow-hidden">
+          {/* Mobile cards */}
+          <div className="sm:hidden divide-y divide-gray-100">
+            {paged.length === 0 && <p className="text-center py-10 text-gray-400 text-sm">No deposit requests found</p>}
+            {paged.map(req => (
+              <div key={req.id} className="p-4 space-y-3">
+                {/* Header row */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-sm text-gray-900">{req.profiles?.full_name ?? '—'}</p>
+                    {req.profiles?.employee_id && (
+                      <p className="font-mono text-xs text-gray-400 mt-0.5">{req.profiles.employee_id}</p>
+                    )}
+                  </div>
+                  <StatusBadge status={req.status} />
+                </div>
+
+                {/* Amount + method + date */}
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xl font-bold text-gray-900">{currency(req.amount)}</span>
+                  <span className="text-xs text-gray-400">{formatDate(req.created_at)}</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <span className="capitalize">{req.payment_method.replace('_', ' ')}</span>
+                  {req.reference && (
+                    <span className="font-mono text-gray-600">Ref: {req.reference}</span>
+                  )}
+                  {req.receipt_url && (
+                    <button
+                      onClick={() => setReceiptModal({ url: req.receipt_url!, details: { amount: currency(req.amount), date: req.created_at, method: req.payment_method, reference: req.reference, notes: req.notes } })}
+                      className="text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      View Receipt
+                    </button>
+                  )}
+                </div>
+
+                {/* Rejection reason */}
+                {req.status === 'rejected' && req.rejection_reason && (
+                  <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{req.rejection_reason}</p>
+                )}
+
+                {/* Actions */}
+                {req.status === 'pending' && (
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="primary" loading={approveRequest.isPending} onClick={() => setConfirmApproveId(req.id)}>
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => { setInlineRejectId(inlineRejectId === req.id ? null : req.id); setInlineReason('') }}>
+                      Reject
+                    </Button>
+                  </div>
+                )}
+                {inlineRejectId === req.id && (
+                  <div className="space-y-2 pt-1">
+                    <input
+                      type="text"
+                      placeholder="Enter rejection reason..."
+                      value={inlineReason}
+                      onChange={e => setInlineReason(e.target.value)}
+                      className="w-full border border-red-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="danger" loading={rejectRequest.isPending} disabled={!inlineReason.trim()} onClick={() => handleInlineReject(req)}>
+                        Confirm
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setInlineRejectId(null); setInlineReason('') }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -215,8 +285,8 @@ export function DepositRequestsPage() {
                   </tr>
                 )}
                 {paged.map(req => (
-                  <>
-                    <tr key={req.id} className="hover:bg-gray-50">
+                  <React.Fragment key={req.id}>
+                    <tr className="hover:bg-gray-50">
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{req.profiles?.full_name ?? '—'}</p>
                       </td>
@@ -341,11 +411,12 @@ export function DepositRequestsPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>{/* end overflow-x-auto */}
+          </div>{/* end hidden sm:block */}
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}

@@ -7,6 +7,8 @@ import { useMembershipStatus, useMembershipHistory } from '../../hooks/useMember
 import { useEquitySummary } from '../../hooks/useEquity'
 import { formatDateTime, formatDate } from '../../lib/utils'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
+import { exportMembershipCertificate } from '../../lib/exportPdf'
 
 const statusDescriptions: Record<string, string> = {
   pending: 'You have not yet completed any equity shares. Complete at least one share to become an active member.',
@@ -16,9 +18,23 @@ const statusDescriptions: Record<string, string> = {
 }
 
 export function MembershipPage() {
+  const { profile } = useAuth()
   const { data: membershipStatus, isLoading: statusLoading } = useMembershipStatus()
   const { data: history, isLoading: historyLoading } = useMembershipHistory()
   const { data: equitySummary, isLoading: equityLoading } = useEquitySummary()
+
+  const { data: appName = 'CoopFinance' } = useQuery({
+    queryKey: ['app_name_config'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('system_config')
+        .select('config_value')
+        .eq('config_key', 'app_name')
+        .single()
+      return data?.config_value ?? 'CoopFinance'
+    },
+    staleTime: Infinity,
+  })
 
   const { data: sharePrice = 0 } = useQuery({
     queryKey: ['share_price_config'],
@@ -85,15 +101,35 @@ export function MembershipPage() {
               </div>
 
               <div className="text-center sm:text-left">
-                <div className="flex items-center gap-3 justify-center sm:justify-start mb-2">
-                  <h2 className="text-2xl font-bold text-gray-900">Membership Status</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Membership Status</h2>
+                <div className="flex justify-center sm:justify-start mb-3">
                   <StatusBadge status={currentStatus} size="md" />
                 </div>
                 <p className="text-gray-600 max-w-lg">
                   {statusDescriptions[currentStatus]}
                 </p>
                 {membershipStatus?.reason && (
-                  <p className="mt-2 text-sm text-gray-500 italic">Reason: {membershipStatus.reason}</p>
+                  <p className="mt-2 text-sm text-gray-500 italic">Note: {membershipStatus.reason}</p>
+                )}
+                {(membershipStatus?.completed_shares ?? 0) > 0 && (
+                  <button
+                    onClick={() => exportMembershipCertificate({
+                      memberName: profile?.full_name ?? 'Member',
+                      employeeId: (profile as any)?.employee_id,
+                      completedShares: membershipStatus?.completed_shares ?? 0,
+                      totalInvested: equitySummary?.totalInvested ?? 0,
+                      memberSince: membershipStatus?.last_evaluated_at
+                        ? formatDate(membershipStatus.last_evaluated_at)
+                        : new Date().toLocaleDateString(),
+                      coopName: appName,
+                    })}
+                    className="mt-4 inline-flex items-center gap-2 border border-green-300 bg-green-50 rounded-lg px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Download Certificate
+                  </button>
                 )}
               </div>
             </div>
@@ -101,26 +137,28 @@ export function MembershipPage() {
         </Card>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardBody>
-              <p className="text-sm text-gray-500">Completed Shares</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">
-                {membershipStatus?.completed_shares ?? 0}
-              </p>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardBody>
-              <p className="text-sm text-gray-500">Total Shares</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">
-                {effectiveShares}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {equitySummary?.totalShares ?? 0} share(s) opened
-              </p>
-            </CardBody>
-          </Card>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Card>
+              <CardBody>
+                <p className="text-sm text-gray-500">Completed Shares</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">
+                  {membershipStatus?.completed_shares ?? 0}
+                </p>
+              </CardBody>
+            </Card>
+            <Card>
+              <CardBody>
+                <p className="text-sm text-gray-500">Total Shares</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">
+                  {effectiveShares}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {equitySummary?.totalShares ?? 0} share(s) opened
+                </p>
+              </CardBody>
+            </Card>
+          </div>
           <Card>
             <CardBody>
               <p className="text-sm text-gray-500">Last Evaluated</p>

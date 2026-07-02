@@ -4,6 +4,21 @@ export type MembershipStatusValue = 'pending' | 'active' | 'suspended' | 'inacti
 export type EquityShareStatus = 'in_progress' | 'completed' | 'cancelled'
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'mobile_money'
 export type LoanApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'cancelled'
+
+export interface LoanProduct {
+  id: string
+  name: string
+  description: string | null
+  interest_rate: number
+  min_amount: number
+  max_amount: number | null
+  min_term_months: number
+  max_term_months: number
+  calculation_method: 'flat' | 'reducing_balance'
+  is_active: boolean
+  created_at: string
+  created_by: string | null
+}
 export type LoanStatus = 'active' | 'completed' | 'defaulted' | 'written_off'
 export type RepaymentScheduleStatus = 'pending' | 'partial' | 'paid' | 'overdue' | 'waived'
 export type LedgerEntryType = 'equity_contribution' | 'equity_reversal' | 'loan_disbursement' | 'loan_repayment' | 'fee' | 'adjustment'
@@ -37,12 +52,14 @@ export interface EquityContribution {
   id: string
   user_id: string
   share_id: string
+  deposit_request_id: string | null
   amount: number
   payment_method: PaymentMethod
   reference: string | null
   recorded_by: string | null
   contribution_at: string
   created_at: string
+  deposit_requests?: { receipt_url: string | null } | null
 }
 
 export interface MembershipStatus {
@@ -68,6 +85,7 @@ export interface MembershipHistory {
 export interface LoanApplication {
   id: string
   user_id: string
+  loan_product_id: string | null
   amount_requested: number
   purpose: string | null
   term_months: number

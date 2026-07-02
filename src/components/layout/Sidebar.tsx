@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { usePendingCoMakerCount } from '../../hooks/useLoans'
+import { usePendingDepositCount } from '../../hooks/useDepositRequests'
 import { cn } from '../../lib/utils'
 
 function useAppBranding() {
@@ -142,6 +143,16 @@ const navGroups: NavGroup[] = [
     roles: ['admin', 'staff'],
     items: [
       {
+        path: '/admin/loan-products',
+        label: 'Loan Products',
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
+          </svg>
+        ),
+      },
+      {
         path: '/admin/loans',
         label: 'Loan Applications',
         icon: (
@@ -202,6 +213,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { profile, signOut } = useAuth()
   const { data: branding } = useAppBranding()
   const { data: pendingCoMakerCount = 0 } = usePendingCoMakerCount()
+  const { data: pendingDepositCount = 0 } = usePendingDepositCount()
   const [confirmSignOut, setConfirmSignOut] = React.useState(false)
 
   const visibleGroups = navGroups
@@ -273,6 +285,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   {item.path === '/lending' && pendingCoMakerCount > 0 && (
                     <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
                       {pendingCoMakerCount}
+                    </span>
+                  )}
+                  {item.path === '/admin/deposit-requests' && pendingDepositCount > 0 && (
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400" />
                     </span>
                   )}
                 </NavLink>

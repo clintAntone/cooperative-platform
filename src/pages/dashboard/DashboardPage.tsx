@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { Header } from '../../components/layout/Header'
 import { StatCard } from '../../components/ui/Card'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 import { formatDateTime, formatDate } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
 import type { LedgerEntry } from '../../types'
@@ -50,7 +50,7 @@ export function DashboardPage() {
     return loan.due_date < earliest ? loan.due_date : earliest
   }, null)
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <SkeletonPage cards={4} rows={5} />
 
   return (
     <div>

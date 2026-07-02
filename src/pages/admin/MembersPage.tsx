@@ -6,7 +6,7 @@ import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 import { Pagination } from '../../components/shared/Pagination'
 import { useMembers } from '../../hooks/useMembers'
 import { useCurrency } from '../../hooks/useCurrency'
@@ -143,6 +143,30 @@ export function MembersPage() {
       <Header
         title="Members"
         subtitle="View and manage cooperative members"
+        actions={
+          activeTab === 'members' ? (
+            <button
+              onClick={() => {
+                const rows = filtered.map(m => ({
+                  Name: m.full_name,
+                  'Employee ID': m.employee_id ?? '',
+                  'Membership Status': (m.membership_status as any)?.status ?? 'pending',
+                  'Completed Shares': m.completed_shares,
+                  'Total Invested': m.total_invested,
+                  Joined: m.created_at,
+                }))
+                exportToExcel(rows, 'members')
+              }}
+              title="Export to Excel"
+              className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              <span className="hidden sm:inline">Export</span>
+            </button>
+          ) : undefined
+        }
       />
 
       <div className="p-4 sm:p-6 space-y-6">
@@ -171,7 +195,7 @@ export function MembersPage() {
         {activeTab === 'members' && (
           <>
             {isLoading ? (
-              <PageLoader />
+              <SkeletonPage cards={3} rows={6} />
             ) : (
               <>
                 {approveError && (
@@ -180,62 +204,101 @@ export function MembersPage() {
                   </div>
                 )}
 
-                {/* Search + Add */}
-                <div className="flex gap-3 flex-wrap">
-                  <Card className="p-4 flex-1">
-                    <div className="flex gap-2 items-center flex-wrap">
+                {/* Search + filters + actions */}
+                <div className="flex flex-col gap-2">
+                  {/* Row 1: search + add member */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1 min-w-0">
                       <input
                         type="text"
                         placeholder="Search by name or employee ID..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
-                      <select
-                        value={statusFilter}
-                        onChange={e => setStatusFilter(e.target.value)}
-                        className="w-full sm:w-auto border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                      >
-                        <option value="all">All Statuses</option>
-                        <option value="active">Active</option>
-                        <option value="pending">Pending</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="suspended">Suspended</option>
-                      </select>
-                      {(search || statusFilter !== 'all') && (
+                      {search && (
                         <button
-                          onClick={() => { setSearch(''); setStatusFilter('all') }}
-                          className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                          onClick={() => setSearch('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          aria-label="Clear search"
                         >
-                          Clear
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
                         </button>
                       )}
                     </div>
-                  </Card>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const rows = filtered.map(m => ({
-                        Name: m.full_name,
-                        'Employee ID': m.employee_id ?? '',
-                        'Membership Status': (m.membership_status as any)?.status ?? 'pending',
-                        'Completed Shares': m.completed_shares,
-                        'Total Invested': m.total_invested,
-                        Joined: m.created_at,
-                      }))
-                      exportToExcel(rows, 'members')
-                    }}
-                  >
-                    Export
-                  </Button>
-                  <Button onClick={() => { setShowAddModal(true); setSelectedUserId(''); setAddError(null) }}>
-                    + Add Member
-                  </Button>
+                    <Button size="sm" onClick={() => { setShowAddModal(true); setSelectedUserId(''); setAddError(null) }}>
+                      <svg className="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="hidden sm:inline">+ Add Member</span>
+                    </Button>
+                  </div>
+                  {/* Row 2: status filter */}
+                  <div className="flex gap-2">
+                    <select
+                      value={statusFilter}
+                      onChange={e => setStatusFilter(e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="active">Active</option>
+                      <option value="pending">Pending</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Members table */}
-                <Card className="overflow-hidden">
-                  <div className="overflow-x-auto">
+                  {/* Mobile card list */}
+                  <div className="sm:hidden space-y-3">
+                    {paged.map(member => {
+                      const msStatus = (member.membership_status as any)?.status ?? null
+                      const isPending = !msStatus || msStatus === 'pending'
+                      return (
+                        <div
+                          key={member.id}
+                          className="bg-white rounded-xl border border-gray-200 px-4 py-3 cursor-pointer active:bg-gray-50"
+                          onClick={() => navigate(`/admin/members/${member.id}`)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm text-gray-900">{member.full_name}</span>
+                            {msStatus ? <StatusBadge status={msStatus} /> : <StatusBadge status="pending" />}
+                          </div>
+                          {member.employee_id && <p className="font-mono text-xs text-gray-400 mt-0.5">{member.employee_id}</p>}
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                            <div>
+                              <p className="text-xs text-gray-400">Shares</p>
+                              <p className="text-xs text-gray-700">{Number(member.completed_shares.toFixed(2))}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400">Invested</p>
+                              <p className="text-xs text-gray-700">{currency(member.total_invested)}</p>
+                            </div>
+                          </div>
+                          {isPending && member.completed_shares > 0 && (
+                            <button
+                              disabled={approveMember.isPending}
+                              onClick={e => {
+                                e.stopPropagation()
+                                setApproveError(null)
+                                approveMember.mutate(member.id, {
+                                  onError: (err: any) => setApproveError(err.message ?? 'Failed to approve'),
+                                })
+                              }}
+                              className="mt-2 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                            >
+                              Approve Membership
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {/* Desktop table */}
+                  <Card className="hidden sm:block overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
@@ -325,14 +388,13 @@ export function MembersPage() {
                         })}
                       </tbody>
                     </table>
-                  </div>
+                  </Card>
                   <Pagination
                     page={page}
                     pageSize={PAGE_SIZE}
                     total={sorted.length}
                     onChange={setPage}
                   />
-                </Card>
               </>
             )}
           </>

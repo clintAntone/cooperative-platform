@@ -15,9 +15,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
 const paymentMethodOptions = [
-  { value: 'cash', label: 'Cash' },
+  { value: 'mobile_money', label: 'Mobile Banking' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'mobile_money', label: 'Mobile Money' },
+  { value: 'cash', label: 'Cash' },
 ]
 
 function buildSchema(minAmount: number) {
@@ -93,7 +93,7 @@ export function DepositRequestPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       share_id: defaultShareId,
-      payment_method: 'cash',
+      payment_method: 'mobile_money',
     },
   })
 

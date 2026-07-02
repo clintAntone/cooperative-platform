@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import type { LoanApplication, Loan, LoanRepaymentSchedule, LoanRepayment, EligibleCoMaker, CoMakerRequest } from '../types'
+import type { LoanApplication, Loan, LoanRepaymentSchedule, LoanRepayment, EligibleCoMaker, CoMakerRequest, LoanProduct } from '../types'
 import { useAuth } from '../context/AuthContext'
 import { toast } from '../lib/toast'
 
@@ -115,6 +115,7 @@ interface LoanApplicationInput {
   purpose: string
   term_months: number
   co_maker_ids: string[]
+  loan_product_id?: string
 }
 
 export function useCreateLoanApplication() {
@@ -130,6 +131,7 @@ export function useCreateLoanApplication() {
           amount_requested: input.amount_requested,
           purpose: input.purpose,
           term_months: input.term_months,
+          loan_product_id: input.loan_product_id ?? null,
           status: 'draft',
         })
         .select()
@@ -276,13 +278,13 @@ export function usePendingCoMakerCount() {
   return useQuery({
     queryKey: ['pending_co_maker_count'],
     queryFn: async () => {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from('loan_co_makers')
-        .select('*', { count: 'exact', head: true })
+        .select('id')
         .eq('co_maker_user_id', user!.id)
         .eq('status', 'pending')
       if (error) return 0
-      return count ?? 0
+      return data?.length ?? 0
     },
     enabled: !!user,
     refetchInterval: 60_000,
@@ -361,6 +363,81 @@ export function useAdminSetUnderReview() {
     },
   })
 }
+
+// ── Loan Products ─────────────────────────────────────────────────────────────
+
+export function useLoanProducts() {
+  return useQuery({
+    queryKey: ['loan_products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loan_products')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as LoanProduct[]
+    },
+  })
+}
+
+export function useActiveLoanProducts() {
+  return useQuery({
+    queryKey: ['loan_products_active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loan_products')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
+      if (error) throw error
+      return (data ?? []) as LoanProduct[]
+    },
+    staleTime: 60_000,
+  })
+}
+
+export function useCreateLoanProduct() {
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
+  return useMutation({
+    mutationFn: async (input: Omit<LoanProduct, 'id' | 'created_at' | 'created_by'>) => {
+      const { data, error } = await supabase
+        .from('loan_products')
+        .insert({ ...input, created_by: user!.id })
+        .select()
+        .single()
+      if (error) throw error
+      return data as LoanProduct
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['loan_products'] })
+      queryClient.invalidateQueries({ queryKey: ['loan_products_active'] })
+      toast({ title: 'Loan product created', variant: 'success' })
+    },
+  })
+}
+
+export function useUpdateLoanProduct() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: Partial<LoanProduct> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('loan_products')
+        .update(patch)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as LoanProduct
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['loan_products'] })
+      queryClient.invalidateQueries({ queryKey: ['loan_products_active'] })
+    },
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function useAdminMarkDefaulted() {
   const queryClient = useQueryClient()

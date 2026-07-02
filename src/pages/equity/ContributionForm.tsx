@@ -24,9 +24,9 @@ interface ContributionFormProps {
 }
 
 const paymentMethodOptions = [
-  { value: 'cash', label: 'Cash' },
+  { value: 'mobile_money', label: 'Mobile Banking' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'mobile_money', label: 'Mobile Money' },
+  { value: 'cash', label: 'Cash' },
 ]
 
 export function ContributionForm({ share, onSuccess, onCancel }: ContributionFormProps) {
@@ -41,7 +41,7 @@ export function ContributionForm({ share, onSuccess, onCancel }: ContributionFor
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      payment_method: 'cash',
+      payment_method: 'mobile_money',
     },
   })
 

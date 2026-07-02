@@ -1,13 +1,16 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/shared/StatusBadge'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
+import { ReceiptModal } from '../../components/shared/ReceiptModal'
 import { useEquityShares, useEquitySummary } from '../../hooks/useEquity'
 import { useMyDepositRequests } from '../../hooks/useDepositRequests'
 import { formatDate, getProgressPercent } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
+import { exportToExcel } from '../../lib/exportExcel'
 import type { EquityShare } from '../../types'
 
 export function EquityPage() {
@@ -15,9 +18,10 @@ export function EquityPage() {
   const { data: shares, isLoading } = useEquityShares()
   const { data: summary } = useEquitySummary()
   const { data: myDepositRequests = [] } = useMyDepositRequests()
+  const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
 
   const { format: currency } = useCurrency()
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <SkeletonPage cards={3} rows={4} />
 
   const handleRequestDeposit = (share: EquityShare) => {
     navigate(`/equity/deposit-request?share_id=${share.id}`)
@@ -28,29 +32,71 @@ export function EquityPage() {
       <Header
         title="Equity Shares"
         subtitle="Manage your cooperative equity contributions"
+        actions={
+          myDepositRequests.length > 0 ? (
+            <button
+              onClick={() => {
+                const rows = myDepositRequests.map(r => ({
+                  Date: formatDate(r.created_at),
+                  Amount: r.amount,
+                  Method: r.payment_method.replace('_', ' '),
+                  Status: r.status,
+                  Reference: r.reference ?? '',
+                }))
+                exportToExcel(rows, 'my-deposit-requests')
+              }}
+              title="Export to Excel"
+              className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              <span className="hidden sm:inline">Export</span>
+            </button>
+          ) : undefined
+        }
       />
 
       <div className="p-4 sm:p-6 space-y-6">
         {/* Summary */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5">
-            <p className="text-xs sm:text-sm text-gray-500 truncate">Total Invested</p>
-            <p className="text-base sm:text-xl font-semibold text-gray-900 mt-1 truncate">
-              {currency(summary?.totalInvested ?? 0)}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5">
-            <p className="text-xs sm:text-sm text-gray-500 truncate">Completed</p>
-            <p className="text-base sm:text-xl font-semibold text-gray-900 mt-1">
-              {summary?.completedShares ?? 0}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-5">
-            <p className="text-xs sm:text-sm text-gray-500 truncate">Total Shares</p>
-            <p className="text-base sm:text-xl font-semibold text-gray-900 mt-1">
-              {summary?.totalShares ?? 0}
-            </p>
-          </div>
+          {[
+            {
+              label: 'Total Invested',
+              value: currency(summary?.totalInvested ?? 0),
+              icon: (
+                <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ),
+            },
+            {
+              label: 'Completed',
+              value: summary?.completedShares ?? 0,
+              icon: (
+                <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ),
+            },
+            {
+              label: 'Total Shares',
+              value: summary?.totalShares ?? 0,
+              icon: (
+                <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              ),
+            },
+          ].map(c => (
+            <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                {c.icon}
+                <p className="text-xs text-gray-500 truncate">{c.label}</p>
+              </div>
+              <p className="text-sm sm:text-lg font-semibold text-gray-900 truncate">{c.value}</p>
+            </div>
+          ))}
         </div>
 
         {/* Shares List */}
@@ -140,35 +186,47 @@ export function EquityPage() {
         {myDepositRequests.length > 0 && (
           <div>
             <h2 className="text-base font-semibold text-gray-900 mb-3">My Deposit Requests</h2>
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">Amount</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">Method</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {myDepositRequests.slice(0, 5).map(req => (
-                      <tr key={req.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(req.created_at)}</td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{currency(req.amount)}</td>
-                        <td className="px-4 py-3 text-gray-600 capitalize">{req.payment_method.replace('_', ' ')}</td>
-                        <td className="px-4 py-3">
-                          <StatusBadge status={req.status} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            <div className="space-y-2">
+              {myDepositRequests.slice(0, 10).map(req => {
+                const clickable = !!req.receipt_url
+                return (
+                  <div
+                    key={req.id}
+                    onClick={() => clickable && setReceiptModal({ url: req.receipt_url!, details: { amount: currency(req.amount), date: req.created_at, method: req.payment_method, reference: req.reference } })}
+                    className={`bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between gap-3 ${clickable ? 'cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors' : ''}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-gray-900">{currency(req.amount)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 capitalize">
+                        {req.payment_method.replace('_', ' ')} · {formatDate(req.created_at)}
+                        {req.reference && <span> · #{req.reference}</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <StatusBadge status={req.status} />
+                      {clickable && (
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
+
+      {receiptModal && (
+        <ReceiptModal
+          isOpen={!!receiptModal}
+          onClose={() => setReceiptModal(null)}
+          receiptUrl={receiptModal.url}
+          details={receiptModal.details}
+        />
+      )}
     </div>
   )
 }

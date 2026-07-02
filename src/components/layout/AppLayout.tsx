@@ -4,6 +4,23 @@ import { Sidebar } from './Sidebar'
 import { useAuth } from '../../context/AuthContext'
 import { LoadingSpinner } from '../shared/LoadingSpinner'
 import { OfflineBanner } from '../shared/OfflineBanner'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../lib/supabase'
+
+function useAppBranding() {
+  return useQuery({
+    queryKey: ['app_branding'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('system_config')
+        .select('config_key, config_value')
+        .in('config_key', ['app_name', 'app_logo_url'])
+      const map = Object.fromEntries((data ?? []).map(r => [r.config_key, r.config_value]))
+      return { name: map['app_name'] || 'CoopFinance', logoUrl: map['app_logo_url'] || '' }
+    },
+    staleTime: 60_000,
+  })
+}
 
 interface AppLayoutProps {
   requiredRoles?: string[]
@@ -12,6 +29,7 @@ interface AppLayoutProps {
 export function AppLayout({ requiredRoles }: AppLayoutProps) {
   const { user, profile, loading } = useAuth()
   const location = useLocation()
+  const { data: branding } = useAppBranding()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Close sidebar on navigation
@@ -49,7 +67,19 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="text-white font-semibold text-sm">CoopFinance</span>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+            {branding?.logoUrl ? (
+              <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            )}
+          </div>
+          <span className="text-white font-semibold text-sm">{branding?.name ?? 'CoopFinance'}</span>
+        </div>
       </div>
 
       {/* Overlay backdrop for mobile sidebar */}
