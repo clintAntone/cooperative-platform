@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { ReceiptModal } from '../../components/shared/ReceiptModal'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonDetailPage } from '../../components/shared/Skeleton'
 import { useMemberDetail } from '../../hooks/useMembers'
 import { useAdminCreateShare, useAdminDeleteShare, useShareLimit } from '../../hooks/useEquity'
 import { useApproveDepositRequest, useRejectDepositRequest } from '../../hooks/useDepositRequests'
@@ -71,7 +71,7 @@ export function MemberDetailPage() {
   const [shareError, setShareError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <SkeletonDetailPage />
   if (!data) return <div className="p-6 text-gray-500">Member not found.</div>
 
   const { profile, membershipStatus, equityShares, contributions, depositRequests } = data
@@ -157,7 +157,7 @@ export function MemberDetailPage() {
                 'bg-gray-400'
               }`} />
             )}
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{profile.full_name}</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate" title={profile.full_name}>{profile.full_name}</h1>
           </div>
           {profile.employee_id && (
             <p className="text-sm text-gray-500 font-mono mt-0.5">{profile.employee_id}</p>
@@ -175,8 +175,8 @@ export function MemberDetailPage() {
           { label: 'Pending Requests', value: pendingRequests },
         ].map(c => (
           <Card key={c.label} className="p-3 sm:p-4 text-center">
-            <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{c.value}</p>
-            <p className="text-xs text-gray-500 mt-1 truncate">{c.label}</p>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate" title={String(c.value)}>{c.value}</p>
+            <p className="text-xs text-gray-500 mt-1 truncate" title={c.label}>{c.label}</p>
           </Card>
         ))}
       </div>

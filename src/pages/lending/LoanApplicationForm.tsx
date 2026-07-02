@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -45,6 +45,7 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
   const [selectedCoMakers, setSelectedCoMakers] = useState<EligibleCoMaker[]>([])
   const [coMakerError, setCoMakerError] = useState<string | null>(null)
   const [purposeLen, setPurposeLen] = useState(0)
+  const submittingRef = useRef(false)
 
   const interestRate = selectedProduct?.interest_rate ?? 12
   const calcMethod = selectedProduct?.calculation_method ?? 'reducing_balance'
@@ -125,20 +126,26 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
   )
 
   const onSubmit = async (values: FormValues) => {
+    if (submittingRef.current) return
     if (!maxEligible || maxEligible <= 0) return
     if (!selectedProduct) return
     if (selectedCoMakers.length < minCoMakers) {
       setCoMakerError(`At least ${minCoMakers} co-maker${minCoMakers > 1 ? 's are' : ' is'} required`)
       return
     }
-    await createApplication.mutateAsync({
-      amount_requested: values.amount_requested,
-      purpose: values.purpose,
-      term_months: values.term_months,
-      co_maker_ids: selectedCoMakers.map(m => m.id),
-      loan_product_id: selectedProduct.id,
-    })
-    onSuccess()
+    submittingRef.current = true
+    try {
+      await createApplication.mutateAsync({
+        amount_requested: values.amount_requested,
+        purpose: values.purpose,
+        term_months: values.term_months,
+        co_maker_ids: selectedCoMakers.map(m => m.id),
+        loan_product_id: selectedProduct.id,
+      })
+      onSuccess()
+    } finally {
+      submittingRef.current = false
+    }
   }
 
   const effectiveMax = selectedProduct?.max_amount

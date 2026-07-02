@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { ReceiptModal } from '../../components/shared/ReceiptModal'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 import { Pagination } from '../../components/shared/Pagination'
 import {
   useAllDepositRequests,
@@ -39,43 +39,53 @@ const tabs: { label: string; value: TabValue }[] = [
 
 export function DepositRequestsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('pending')
-  const { data: requests = [], isLoading } = useAllDepositRequests(activeTab)
-  const { format: currency } = useCurrency()
-  const approveRequest = useApproveDepositRequest()
-  const rejectRequest = useRejectDepositRequest()
   const [sortKey, setSortKey] = useState<'amount' | 'created_at'>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  const handleSort = (key: 'amount' | 'created_at') => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(0)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  const { format: currency } = useCurrency()
+  const approveRequest = useApproveDepositRequest()
+  const rejectRequest = useRejectDepositRequest()
 
   const [inlineRejectId, setInlineRejectId] = useState<string | null>(null)
   const [inlineReason, setInlineReason] = useState('')
   const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
   const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null)
 
-  useEffect(() => { setPage(0) }, [activeTab, dateFrom, dateTo, sortKey, sortDir])
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
-  const handleSort = (key: typeof sortKey) => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(key); setSortDir('asc') }
-  }
+  useEffect(() => { setPage(0) }, [activeTab, dateFrom, dateTo, sortKey, sortDir, debouncedSearch])
 
-  const sorted = [...requests].sort((a, b) => {
-    const dir = sortDir === 'asc' ? 1 : -1
-    if (sortKey === 'amount') return (a.amount - b.amount) * dir
-    if (sortKey === 'created_at') return (a.created_at > b.created_at ? 1 : -1) * dir
-    return 0
+  const { data: requestsPage, isLoading } = useAllDepositRequests({
+    statusFilter: activeTab,
+    page,
+    pageSize: PAGE_SIZE,
+    search: debouncedSearch,
+    sortKey,
+    sortDir,
+    dateFrom,
+    dateTo,
   })
 
-  const dateFiltered = sorted.filter(req => {
-    if (dateFrom && req.created_at < dateFrom) return false
-    if (dateTo && req.created_at > dateTo + 'T23:59:59.999Z') return false
-    return true
-  })
-
-  const paged = dateFiltered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const paged = requestsPage?.rows ?? []
+  const totalRequests = requestsPage?.total ?? 0
+  const dateFiltered = paged // kept for export reference
 
   const handleApprove = (requestId: string) => {
     approveRequest.mutate(requestId)
@@ -94,7 +104,7 @@ export function DepositRequestsPage() {
     )
   }
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <SkeletonPage cards={0} rows={8} />
 
   const hasDateFilter = !!(dateFrom || dateTo)
 
@@ -150,7 +160,28 @@ export function DepositRequestsPage() {
           </div>
         </div>
 
-        {/* Date range filter */}
+        {/* Search + date range filter */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search by member name…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <input
             type="date"
@@ -420,7 +451,7 @@ export function DepositRequestsPage() {
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}
-            total={dateFiltered.length}
+            total={totalRequests}
             onChange={setPage}
           />
         </Card>

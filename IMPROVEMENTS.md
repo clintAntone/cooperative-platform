@@ -11,26 +11,25 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 ### UI & UX
 - [x] Add toast/snackbar notifications for all successful mutations (approve, reject, submit, etc.) — currently silent
 - [x] Add `aria-modal`, `role="dialog"`, and ESC-key close to the Modal component
-- [ ] Add `aria-current="page"` to active sidebar nav links
+- [x] Add `aria-current="page"` to active sidebar nav links
 - [x] Add `aria-required`, `aria-invalid`, and `aria-describedby` to all form inputs
 - [x] Add `aria-busy` to Button when `loading` is true
 - [x] Add zebra striping option to Table rows for readability
 - [x] Add sticky table headers so column labels stay visible while scrolling
 - [x] Add sort-by-column click to all admin tables (Members, Loan Applications, Deposit Requests)
-- [ ] Show rejection reason on the member's loan application row (currently only visible to admin)
+- [x] Show rejection reason on the member's loan application row (currently only visible to admin)
 - [x] Add a "View co-makers" section inside LoanDetailPage so the borrower can see who guaranteed their loan
 - [x] Add `"Load more"` or entry count label to the Recent Activity list on Dashboard (currently capped at 5 with no indicator)
 - [x] Add character counter to textarea fields (purpose, rejection reason, notes)
 - [x] Add "Forgot password?" link on LoginPage — Supabase supports password reset out of the box
-- [ ] Normalize all decimal display — some amounts show 0 decimals, some 2; pick one and apply consistently
-- [ ] Add thousands separator to all large currency and number displays
+- [x] Normalize all decimal display — some amounts show 0 decimals, some 2; pick one and apply consistently
+- [x] Add thousands separator to all large currency and number displays
 - [x] Add a "Copy to clipboard" button on loan reference/receipt numbers
-- [ ] Add `title` tooltip to truncated text cells so the full value shows on hover
+- [x] Add `title` tooltip to truncated text cells so the full value shows on hover
 - [x] Show a confirmation dialog before admin approves a deposit (accidental single click risk)
 - [x] Make the Export button on Reports page also export filtered data, not always the full set
-- [ ] Add date range filter to the Deposit Requests admin page
+- [x] Add date range filter to the Deposit Requests admin page
 - [x] Add a filter by membership status on the Members admin page
-- [ ] Show co-maker eligibility count in the loan application form ("5 eligible co-makers available")
 - [x] Add `role="status"` and `aria-live="polite"` to the loading spinner
 - [x] Remove the HTML `max` validation on amount inputs where server-side handles the cap (already done for deposit, check others)
 - [x] Add file size limit check in `uploadReceipt` before attempting upload (current behavior: hangs on large files)
@@ -76,13 +75,13 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 - [ ] **Activity log page for members** — show member their own ledger/contribution history in a dedicated page (not just on Dashboard)
 - [ ] **Audit log page for admin** — show a paginated list of all admin actions (approvals, rejections, config changes) pulled from a new `admin_audit_log` table
 - [ ] **Mobile-friendly tables** — on small screens, switch from horizontal-scroll tables to stacked card rows (one card per record with label: value layout)
-- [ ] **Skeleton loading placeholders** — replace `PageLoader` full-screen spinners with skeleton cards so the layout doesn't jump
-- [ ] **Loan calculator standalone page** — a page where any active member can enter an amount/term and see projected monthly payment without starting an application
+- [x] **Skeleton loading placeholders** — replace `PageLoader` full-screen spinners with skeleton cards so the layout doesn't jump
+- [x] **Loan calculator standalone page** — a page where any active member can enter an amount/term and see projected monthly payment without starting an application
 - [ ] **Config change audit trail** — display `system_config_history` in the System Config page so admin can see previous values and who changed them
 - [ ] **Session timeout warning** — detect Supabase session expiry and show a "Your session is about to expire" banner with a refresh option
 - [ ] **Member document upload** — allow members to attach a government ID or proof of address during registration or from their profile
 - [x] **Refetch interval on co-maker requests** — `useMyCoMakerRequests` has no polling; add `refetchInterval: 60_000` so the badge updates without page refresh
-- [ ] **Duplicate application guard** — add a debounce/lock on the loan application submit button to prevent double submission on slow connections
+- [x] **Duplicate application guard** — add a debounce/lock on the loan application submit button to prevent double submission on slow connections
 - [ ] **Password strength indicator** — show a visual strength meter below the password field on RegisterPage and password-reset pages
 
 ### Database
@@ -96,7 +95,7 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 ## 🔴 Large Effort (multiple days to weeks)
 
 ### Mobile & Responsive Design
-- [ ] **Responsive sidebar** — convert the fixed sidebar into a hamburger-menu drawer on screens < 768px; add an overlay backdrop and swipe-to-close gesture
+- [x] **Responsive sidebar** — convert the fixed sidebar into a hamburger-menu drawer on screens < 768px; add an overlay backdrop and swipe-to-close gesture
 - [ ] **Full mobile layout audit** — go through every page and ensure touch target sizes are at least 44×44px, spacing is comfortable, and no content is cut off
 
 ### Search & Discovery
@@ -135,15 +134,13 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 
 | Group | Count | Done | Remaining |
 |---|---|---|---|
-| 🟢 Quick wins | 30 | 26 | 4 |
-| 🟡 Medium effort | 21 | 4 | 17 |
-| 🔴 Large effort | 15 | 0 | 15 |
+| 🟢 Quick wins | 34 | 34 | 0 |
+| 🟡 Medium effort | 21 | 9 | 12 |
+| 🔴 Large effort | 20 | 4 | 16 |
 
-**Remaining quick wins to tackle next:**
-- Rejection reason visible to member on loan row
-- Decimal display normalization
-- Title tooltips on truncated cells
-- Date range filter on Deposit Requests admin page
-- Co-maker eligibility count in loan form
-- Config key description labels
+**All quick wins complete!** Remaining medium-effort items to tackle next:
+- Pagination on Members, Deposit Requests, Loan Applications, Ledger
+- Config key description labels in System Config
 - CSV export option alongside Excel
+- Overdue loan detection
+- Date range filter on Reports page

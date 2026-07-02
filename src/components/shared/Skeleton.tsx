@@ -104,3 +104,47 @@ export function SkeletonList({ rows = 4 }: { rows?: number }) {
     </div>
   )
 }
+
+// Detail page skeleton — avatar header + stat cards + content (MemberDetail, LoanDetail, etc.)
+export function SkeletonDetailPage({ cards = 4 }: { cards?: number }) {
+  return (
+    <div className="p-4 sm:p-6 space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+        <div className="flex items-center gap-4 mb-4">
+          <Skeleton className="w-14 h-14 rounded-full flex-shrink-0" />
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-5 w-44" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: cards }).map((_, i) => (
+            <SkeletonStatCard key={i} />
+          ))}
+        </div>
+      </div>
+      {/* Content */}
+      <SkeletonList rows={5} />
+    </div>
+  )
+}
+
+// Form/settings page skeleton — rows of label + input pairs
+export function SkeletonFormPage({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="p-4 sm:p-6 space-y-4">
+      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-36" />
+              <Skeleton className="h-3 w-52" />
+            </div>
+            <Skeleton className="h-8 w-40 rounded-lg flex-shrink-0" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

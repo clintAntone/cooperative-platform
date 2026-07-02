@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { Header } from '../../components/layout/Header'
 import { Card, CardBody } from '../../components/ui/Card'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonList } from '../../components/shared/Skeleton'
 import { Pagination } from '../../components/shared/Pagination'
 import { formatDateTime } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
@@ -51,7 +51,7 @@ export function ActivityPage() {
   const entries = data?.entries ?? []
   const total = data?.total ?? 0
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <SkeletonList rows={6} />
 
   return (
     <div>

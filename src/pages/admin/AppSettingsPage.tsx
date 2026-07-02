@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonFormPage } from '../../components/shared/Skeleton'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
@@ -120,7 +120,7 @@ export function AppSettingsPage() {
     }
   }
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <SkeletonFormPage rows={4} />
 
   const logoUrl = logoPreview ?? get('app_logo_url') ?? null
 

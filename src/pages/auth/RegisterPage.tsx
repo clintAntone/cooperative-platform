@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { useAppBranding } from '../../hooks/useAppBranding'
+import { supabase } from '../../lib/supabase'
 
 const EMPLOYEE_API_URL = import.meta.env.DEV
   ? `/api/pos/employees`
@@ -82,6 +83,18 @@ export function RegisterPage() {
 
       if (!match) {
         setLookupError('Employee ID not found. Please check your ID and try again.')
+        return
+      }
+
+      // Check if an account already exists for this employee ID
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('employee_id', trimmed)
+        .maybeSingle()
+
+      if (existing) {
+        setLookupError('An account already exists for this Employee ID. Please sign in instead.')
         return
       }
 

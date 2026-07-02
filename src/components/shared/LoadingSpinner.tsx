@@ -33,11 +33,3 @@ export function LoadingSpinner({ size = 'md', className, label }: LoadingSpinner
     </div>
   )
 }
-
-export function PageLoader() {
-  return (
-    <div className="flex items-center justify-center h-64">
-      <LoadingSpinner size="lg" label="Loading..." />
-    </div>
-  )
-}

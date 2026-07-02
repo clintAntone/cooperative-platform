@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { Input, Select } from '../../components/ui/Input'
 import { StatusBadge } from '../../components/shared/StatusBadge'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonDetailPage } from '../../components/shared/Skeleton'
 import { Table, Thead, Tbody, Th, Tr, Td } from '../../components/ui/Table'
 import { useLoan, useLoanSchedule, useLoanRepayments, useRecordRepayment, useLoanCoMakers } from '../../hooks/useLoans'
 import { formatDate, formatDateTime } from '../../lib/utils'
@@ -56,7 +56,7 @@ export function LoanDetailPage() {
     defaultValues: { payment_method: 'cash' },
   })
 
-  if (loanLoading || scheduleLoading || repaymentsLoading) return <PageLoader />
+  if (loanLoading || scheduleLoading || repaymentsLoading) return <SkeletonDetailPage cards={3} />
 
   if (!loan) {
     return (

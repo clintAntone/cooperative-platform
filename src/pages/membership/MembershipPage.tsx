@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { StatusBadge } from '../../components/shared/StatusBadge'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 import { useMembershipStatus, useMembershipHistory } from '../../hooks/useMembership'
 import { useEquitySummary } from '../../hooks/useEquity'
 import { formatDateTime, formatDate } from '../../lib/utils'
@@ -49,7 +49,7 @@ export function MembershipPage() {
     staleTime: Infinity,
   })
 
-  if (statusLoading || historyLoading || equityLoading) return <PageLoader />
+  if (statusLoading || historyLoading || equityLoading) return <SkeletonPage cards={3} rows={4} />
 
   const effectiveShares = sharePrice > 0 && equitySummary
     ? Number((equitySummary.totalInvested / sharePrice).toFixed(2))

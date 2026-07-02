@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonFormPage } from '../../components/shared/Skeleton'
 import { Table, Thead, Tbody, Th, Tr, Td } from '../../components/ui/Table'
 import { supabase } from '../../lib/supabase'
 import { formatDateTime } from '../../lib/utils'
@@ -122,7 +122,7 @@ export function ConfigPage() {
   const [logoUploading, setLogoUploading] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
 
-  if (configsLoading || historyLoading) return <PageLoader />
+  if (configsLoading || historyLoading) return <SkeletonFormPage rows={8} />
 
   const handleEdit = (config: SystemConfig) => {
     setEditingKey(config.config_key)

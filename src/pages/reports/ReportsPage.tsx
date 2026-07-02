@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { Header } from '../../components/layout/Header'
 import { StatCard, Card, CardHeader, CardBody } from '../../components/ui/Card'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { Table, Thead, Tbody, Th, Tr, Td } from '../../components/ui/Table'
 import { supabase } from '../../lib/supabase'
@@ -162,13 +162,13 @@ function ExportDropdown({ onMembersXls, onMembersPdf, onLoansPdf }: ExportDropdo
   )
 }
 
-function CurrencyTooltip({ active, payload, label }: any) {
+function CurrencyTooltip({ active, payload, label, symbol = '₱' }: any) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-sm">
       <p className="text-gray-500 mb-1">{label}</p>
       <p className="font-semibold text-gray-900">
-        ₱{new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2 }).format(payload[0].value)}
+        {symbol}{new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2 }).format(payload[0].value)}
       </p>
     </div>
   )
@@ -205,8 +205,8 @@ export function ReportsPage() {
 
   const isLoading = breakdownLoading || equityLoading || loanStatsLoading || membersLoading || contributionsLoading || newMembersLoading
 
-  const { format: currency } = useCurrency()
-  if (isLoading) return <PageLoader />
+  const { format: currency, symbol: currencySymbol } = useCurrency()
+  if (isLoading) return <SkeletonPage cards={4} rows={6} />
 
   const totalMembers = membershipBreakdown
     ? Object.values(membershipBreakdown).reduce((a, b) => a + b, 0)
@@ -383,9 +383,9 @@ export function ReportsPage() {
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: number) => `₱${(v / 1000).toFixed(0)}k`}
+                      tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`}
                     />
-                    <Tooltip content={<CurrencyTooltip />} />
+                    <Tooltip content={<CurrencyTooltip symbol={currencySymbol} />} />
                     <Bar dataKey="amount" fill="#3b82f6" barSize={20} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

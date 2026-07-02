@@ -5,7 +5,7 @@ import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
-import { LoadingSpinner } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 import { exportToExcel } from '../../lib/exportExcel'
 import type { UserRole, AccountStatus, MembershipStatusValue } from '../../types'
 
@@ -158,7 +158,7 @@ export function UsersPage() {
     exportToExcel(rows, 'users')
   }
 
-  if (isLoading) return <LoadingSpinner />
+  if (isLoading) return <SkeletonPage cards={2} rows={6} />
 
   return (
     <div>

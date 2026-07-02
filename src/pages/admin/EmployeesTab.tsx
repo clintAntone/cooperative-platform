@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
-import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { SkeletonPage } from '../../components/shared/Skeleton'
 
 interface PosEmployee {
   employee_id: string
@@ -126,7 +126,7 @@ export function EmployeesTab() {
   const joinedCount = posEmployees.filter(e => linkedMap.has(e.employee_id)).length
   const notJoinedCount = posEmployees.length - joinedCount
 
-  if (loadingPos || loadingProfiles) return <PageLoader />
+  if (loadingPos || loadingProfiles) return <SkeletonPage cards={2} rows={6} />
 
   if (posError) {
     return (
