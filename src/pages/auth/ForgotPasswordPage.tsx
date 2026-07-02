@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/Input'
 import { useAppBranding } from '../../hooks/useAppBranding'
 
 export function ForgotPasswordPage() {
-  const { data: branding } = useAppBranding()
+  const { data: branding, isPending: brandingPending } = useAppBranding()
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -44,7 +44,10 @@ export function ForgotPasswordPage() {
               </svg>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{branding?.name ?? 'CoopFinance'}</h1>
+          {brandingPending
+            ? <div className="h-8 w-40 mx-auto bg-gray-200 rounded-lg animate-pulse" />
+            : <h1 className="text-2xl font-bold text-gray-900">{branding?.name || 'CoopFinance'}</h1>
+          }
           <p className="text-gray-500 mt-1">Reset your password</p>
         </div>
 

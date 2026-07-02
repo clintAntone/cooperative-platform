@@ -38,7 +38,7 @@ type RegistrationValues = z.infer<typeof registrationSchema>
 export function RegisterPage() {
   const { user, signUp, loading } = useAuth()
   const navigate = useNavigate()
-  const { data: branding } = useAppBranding()
+  const { data: branding, isPending: brandingPending } = useAppBranding()
 
   // Step 1: employee lookup
   const [employeeId, setEmployeeId] = useState('')
@@ -148,7 +148,10 @@ export function RegisterPage() {
               </svg>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Join {branding?.name ?? 'CoopFinance'}</h1>
+          {brandingPending
+            ? <div className="h-8 w-44 mx-auto bg-gray-200 rounded-lg animate-pulse" />
+            : <h1 className="text-2xl font-bold text-gray-900">Join {branding?.name || 'CoopFinance'}</h1>
+          }
           <p className="text-gray-500 mt-1">
             {verifiedEmployee ? 'Complete your account setup' : 'Employees only — verify your ID to continue'}
           </p>

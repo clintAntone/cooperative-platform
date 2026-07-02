@@ -51,7 +51,7 @@ function clearAttempts() {
 export function LoginPage() {
   const { user, signIn, loading } = useAuth()
   const navigate = useNavigate()
-  const { data: branding } = useAppBranding()
+  const { data: branding, isPending: brandingPending } = useAppBranding()
   const [serverError, setServerError] = useState<string | null>(null)
   const [lockInfo, setLockInfo] = useState<{ locked: boolean; remaining: number }>({ locked: false, remaining: 0 })
 
@@ -107,7 +107,10 @@ export function LoginPage() {
               </svg>
             )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{branding?.name ?? 'CoopFinance'}</h1>
+          {brandingPending
+            ? <div className="h-8 w-40 mx-auto bg-gray-200 rounded-lg animate-pulse" />
+            : <h1 className="text-2xl font-bold text-gray-900">{branding?.name || 'CoopFinance'}</h1>
+          }
           <p className="text-gray-500 mt-1">Sign in to your account</p>
         </div>
 

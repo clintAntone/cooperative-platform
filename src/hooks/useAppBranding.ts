@@ -10,7 +10,7 @@ export function useAppBranding() {
         .select('config_key, config_value')
         .in('config_key', ['app_name', 'app_logo_url'])
       const map = Object.fromEntries((data ?? []).map(r => [r.config_key, r.config_value]))
-      return { name: map['app_name'] || 'CoopFinance', logoUrl: map['app_logo_url'] || '' }
+      return { name: map['app_name'] || '', logoUrl: map['app_logo_url'] || '' }
     },
     staleTime: 60_000,
   })
