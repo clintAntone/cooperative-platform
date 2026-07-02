@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api\/pos/, '/api'),
           headers: {
-            'x-api-key': env.VITE_EMPLOYEE_API_KEY,
+            ...(env.VITE_EMPLOYEE_API_KEY ? { 'x-api-key': env.VITE_EMPLOYEE_API_KEY } : {}),
           },
         },
       },

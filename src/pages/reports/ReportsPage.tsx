@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 // @ts-ignore - recharts not in devDependencies yet
 import {
@@ -7,7 +7,6 @@ import {
 } from 'recharts'
 import { Header } from '../../components/layout/Header'
 import { StatCard, Card, CardHeader, CardBody } from '../../components/ui/Card'
-import { Button } from '../../components/ui/Button'
 import { PageLoader } from '../../components/shared/LoadingSpinner'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { Table, Thead, Tbody, Th, Tr, Td } from '../../components/ui/Table'
@@ -109,6 +108,58 @@ function useAllLoans(dateFrom: string, dateTo: string) {
   })
 }
 
+interface ExportDropdownProps {
+  onMembersXls: () => void
+  onMembersPdf: () => void
+  onLoansPdf: () => void
+}
+
+function ExportDropdown({ onMembersXls, onMembersPdf, onLoansPdf }: ExportDropdownProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const items = [
+    { label: 'Members — Excel (.xlsx)', action: onMembersXls },
+    { label: 'Members — PDF', action: onMembersPdf },
+    { label: 'Loan Portfolio — PDF', action: onLoansPdf },
+  ]
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        Export
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-52 bg-white rounded-lg border border-gray-200 shadow-lg z-10 py-1">
+          {items.map(item => (
+            <button
+              key={item.label}
+              onClick={() => { item.action(); setOpen(false) }}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CurrencyTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
@@ -163,93 +214,45 @@ export function ReportsPage() {
 
   return (
     <div>
-      <Header title="Reports" subtitle="Platform-wide analytics and summaries" />
+      <Header
+        title="Reports"
+        subtitle="Platform-wide analytics and summaries"
+        actions={<ExportDropdown
+          onMembersXls={() => {
+            const rows = filteredMembers.map((m: any) => ({
+              Name: m.full_name,
+              'Account Status': m.account_status,
+              'Membership Status': m.membership_status?.status ?? 'pending',
+              'Completed Shares': m.membership_status?.completed_shares ?? 0,
+              Joined: m.created_at,
+            }))
+            exportToExcel(rows, 'members-report')
+          }}
+          onMembersPdf={() => {
+            exportMembersPdf(
+              filteredMembers.map((m: any) => ({
+                full_name: m.full_name,
+                account_status: m.account_status,
+                membership_status: m.membership_status?.status ?? 'pending',
+                completed_shares: m.membership_status?.completed_shares ?? 0,
+              })),
+              `${filteredMembers.length} members${hasDateFilter ? ' (filtered)' : ''}`
+            )
+          }}
+          onLoansPdf={() => {
+            exportLoanPortfolioPdf(allLoans, {
+              totalDisbursed: loanStats?.totalDisbursed ?? 0,
+              totalOutstanding: loanStats?.totalOutstanding ?? 0,
+              totalRepaid: loanStats?.totalRepaid ?? 0,
+              activeLoans: loanStats?.activeLoans ?? 0,
+            })
+          }}
+        />}
+      />
 
-      {/* Export toolbar + filters */}
-      <div className="px-4 sm:px-6 pt-4 sm:pt-6 space-y-3">
-        {/* Export buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              const rows = filteredMembers.map((m: any) => ({
-                Name: m.full_name,
-                'Account Status': m.account_status,
-                'Membership Status': m.membership_status?.status ?? 'pending',
-                'Completed Shares': m.membership_status?.completed_shares ?? 0,
-                Joined: m.created_at,
-              }))
-              exportToExcel(rows, 'members-report')
-            }}
-          >
-            Members XLS
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              exportMembersPdf(
-                filteredMembers.map((m: any) => ({
-                  full_name: m.full_name,
-                  account_status: m.account_status,
-                  membership_status: m.membership_status?.status ?? 'pending',
-                  completed_shares: m.membership_status?.completed_shares ?? 0,
-                })),
-                `${filteredMembers.length} members${hasDateFilter ? ' (filtered)' : ''}`
-              )
-            }}
-          >
-            Members PDF
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              exportLoanPortfolioPdf(allLoans, {
-                totalDisbursed: loanStats?.totalDisbursed ?? 0,
-                totalOutstanding: loanStats?.totalOutstanding ?? 0,
-                totalRepaid: loanStats?.totalRepaid ?? 0,
-                activeLoans: loanStats?.activeLoans ?? 0,
-              })
-            }}
-          >
-            Loans PDF
-          </Button>
-        </div>
-
-        {/* Date range filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-gray-500 font-medium">Date range:</span>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={e => setDateFrom(e.target.value)}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 whitespace-nowrap">To</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={e => setDateTo(e.target.value)}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          {hasDateFilter && (
-            <button
-              onClick={() => { setDateFrom(''); setDateTo('') }}
-              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        {/* Member search + status filter */}
+      {/* Filters */}
+      <div className="px-4 sm:px-6 pt-3 pb-1 space-y-2">
+        {/* Search + status on one row */}
         <div className="flex gap-2">
           <input
             type="text"
@@ -272,9 +275,35 @@ export function ReportsPage() {
           {(search || statusFilter !== 'all') && (
             <button
               onClick={() => { setSearch(''); setStatusFilter('all') }}
-              className="flex-shrink-0 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="flex-shrink-0 px-2.5 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               ✕
+            </button>
+          )}
+        </div>
+
+        {/* Date range on one compact row */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">Joined:</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <span className="text-xs text-gray-400 flex-shrink-0">–</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {hasDateFilter && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo('') }}
+              className="flex-shrink-0 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
+            >
+              Clear
             </button>
           )}
         </div>

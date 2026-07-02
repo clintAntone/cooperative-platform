@@ -57,6 +57,7 @@ export function EmployeesTab() {
       const headers: Record<string, string> = {}
       if (!import.meta.env.DEV) {
         headers['apikey'] = import.meta.env.VITE_SUPABASE_ANON_KEY
+        headers['Authorization'] = `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
       }
       const res = await fetch(EMPLOYEE_API_URL, { headers })
       if (!res.ok) throw new Error('Failed to fetch employee list')
@@ -153,19 +154,19 @@ export function EmployeesTab() {
         </button>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{posEmployees.length}</p>
-          <p className="text-xs text-gray-500 mt-1">Total Employees</p>
+      {/* Summary — bento grid */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="p-3 sm:p-5">
+          <p className="text-xs sm:text-sm text-gray-500 truncate">Total Employees</p>
+          <p className="text-base sm:text-2xl font-bold text-gray-900 mt-1">{posEmployees.length}</p>
         </Card>
-        <Card className="p-4 text-center">
-          <p className="text-2xl font-bold text-green-700">{joinedCount}</p>
-          <p className="text-xs text-gray-500 mt-1">Joined Cooperative</p>
+        <Card className="p-3 sm:p-5">
+          <p className="text-xs sm:text-sm text-gray-500 truncate">Joined</p>
+          <p className="text-base sm:text-2xl font-bold text-green-700 mt-1">{joinedCount}</p>
         </Card>
-        <Card className="p-4 text-center">
-          <p className="text-2xl font-bold text-yellow-600">{notJoinedCount}</p>
-          <p className="text-xs text-gray-500 mt-1">Not Yet Joined</p>
+        <Card className="p-3 sm:p-5">
+          <p className="text-xs sm:text-sm text-gray-500 truncate">Not Yet Joined</p>
+          <p className="text-base sm:text-2xl font-bold text-yellow-600 mt-1">{notJoinedCount}</p>
         </Card>
       </div>
 
