@@ -32,6 +32,10 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ')
 }
 
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat('en-PH').format(Math.round(value))
+}
+
 export function getProgressPercent(paid: number, target: number): number {
   if (target <= 0) return 0
   return Math.min(100, Math.round((paid / target) * 100))

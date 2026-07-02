@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { Pagination } from '../../components/shared/Pagination'
 import { supabase } from '../../lib/supabase'
 import {
   useAllLoanApplications,
@@ -17,6 +18,8 @@ import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, cn } from '../../lib/utils'
 
 type TabValue = 'all' | 'submitted' | 'under_review' | 'approved' | 'rejected'
+
+const PAGE_SIZE = 25
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   return (
@@ -41,6 +44,9 @@ export function LoanApplicationsPage() {
   const [rejectReason, setRejectReason] = useState('')
   const [sortKey, setSortKey] = useState<'amount_requested' | 'term_months' | 'created_at'>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage] = useState(0)
+
+  useEffect(() => { setPage(0) }, [activeTab, sortKey, sortDir])
 
   const { data: applications = [], isLoading } = useAllLoanApplications()
   const approveLoan = useAdminApproveLoan()
@@ -87,6 +93,8 @@ export function LoanApplicationsPage() {
     if (sortKey === 'created_at') return (a.created_at > b.created_at ? 1 : -1) * dir
     return 0
   })
+
+  const paged = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const handleApprove = async (applicationId: string) => {
     setApproveError(prev => ({ ...prev, [applicationId]: '' }))
@@ -172,7 +180,7 @@ export function LoanApplicationsPage() {
                     </td>
                   </tr>
                 )}
-                {sorted.map((app: any) => {
+                {paged.map((app: any) => {
                   const cm = coMakerSummary(app.id)
                   const allConfirmed = cm.total > 0 && cm.confirmed === cm.total
                   const canApprove = app.status === 'submitted' || app.status === 'under_review'
@@ -257,6 +265,12 @@ export function LoanApplicationsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={sorted.length}
+            onChange={setPage}
+          />
         </Card>
       </div>
 

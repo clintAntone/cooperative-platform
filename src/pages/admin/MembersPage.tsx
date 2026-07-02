@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { Pagination } from '../../components/shared/Pagination'
 import { useMembers } from '../../hooks/useMembers'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate } from '../../lib/utils'
@@ -33,6 +34,8 @@ function useApproveMember() {
 }
 
 type Tab = 'members' | 'employees'
+
+const PAGE_SIZE = 20
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   return (
@@ -74,11 +77,14 @@ export function MembersPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
     return () => clearTimeout(timer)
   }, [search])
+
+  useEffect(() => { setPage(0) }, [debouncedSearch, statusFilter])
 
   const { data: nonMembers = [], isLoading: loadingNonMembers } = useNonMemberUsers()
   const approveMember = useApproveMember()
@@ -129,6 +135,7 @@ export function MembersPage() {
     return 0
   })
 
+  const paged = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
   const selectedUser = nonMembers.find(u => u.id === selectedUserId)
 
   return (
@@ -261,7 +268,7 @@ export function MembersPage() {
                             </td>
                           </tr>
                         )}
-                        {sorted.map(member => {
+                        {paged.map(member => {
                           const msStatus = (member.membership_status as any)?.status ?? null
                           const isPending = !msStatus || msStatus === 'pending'
                           return (
@@ -319,6 +326,12 @@ export function MembersPage() {
                       </tbody>
                     </table>
                   </div>
+                  <Pagination
+                    page={page}
+                    pageSize={PAGE_SIZE}
+                    total={sorted.length}
+                    onChange={setPage}
+                  />
                 </Card>
               </>
             )}

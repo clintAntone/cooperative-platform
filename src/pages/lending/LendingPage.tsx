@@ -328,7 +328,14 @@ export function LendingPage() {
                               Awaiting co-makers
                             </span>
                           ) : (
-                            <StatusBadge status={app.status} />
+                            <div className="space-y-1">
+                              <StatusBadge status={app.status} />
+                              {app.status === 'rejected' && app.rejection_reason && (
+                                <p className="text-xs text-red-600 max-w-[180px]" title={app.rejection_reason}>
+                                  {app.rejection_reason}
+                                </p>
+                              )}
+                            </div>
                           )}
                         </Td>
                         <Td>

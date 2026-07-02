@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
@@ -6,6 +6,7 @@ import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { ReceiptModal } from '../../components/shared/ReceiptModal'
 import { PageLoader } from '../../components/shared/LoadingSpinner'
+import { Pagination } from '../../components/shared/Pagination'
 import {
   useAllDepositRequests,
   useApproveDepositRequest,
@@ -18,6 +19,8 @@ import { cn } from '../../lib/utils'
 import { exportToExcel } from '../../lib/exportExcel'
 
 type TabValue = 'all' | 'pending' | 'approved' | 'rejected'
+
+const PAGE_SIZE = 25
 
 function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   return (
@@ -43,9 +46,16 @@ export function DepositRequestsPage() {
   const [sortKey, setSortKey] = useState<'amount' | 'created_at'>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [page, setPage] = useState(0)
+
   const [inlineRejectId, setInlineRejectId] = useState<string | null>(null)
   const [inlineReason, setInlineReason] = useState('')
   const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
+  const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null)
+
+  useEffect(() => { setPage(0) }, [activeTab, dateFrom, dateTo, sortKey, sortDir])
 
   const handleSort = (key: typeof sortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -58,7 +68,14 @@ export function DepositRequestsPage() {
     if (sortKey === 'created_at') return (a.created_at > b.created_at ? 1 : -1) * dir
     return 0
   })
-  const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null)
+
+  const dateFiltered = sorted.filter(req => {
+    if (dateFrom && req.created_at < dateFrom) return false
+    if (dateTo && req.created_at > dateTo + 'T23:59:59.999Z') return false
+    return true
+  })
+
+  const paged = dateFiltered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const handleApprove = (requestId: string) => {
     approveRequest.mutate(requestId)
@@ -79,6 +96,8 @@ export function DepositRequestsPage() {
 
   if (isLoading) return <PageLoader />
 
+  const hasDateFilter = !!(dateFrom || dateTo)
+
   return (
     <div>
       <Header
@@ -89,7 +108,7 @@ export function DepositRequestsPage() {
             size="sm"
             variant="outline"
             onClick={() => {
-              const rows = requests.map(r => ({
+              const rows = dateFiltered.map(r => ({
                 Member: r.profiles?.full_name ?? '',
                 'Employee ID': r.profiles?.employee_id ?? '',
                 'Share #': r.equity_shares?.share_number ?? '',
@@ -107,7 +126,7 @@ export function DepositRequestsPage() {
         }
       />
 
-      <div className="p-4 sm:p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4">
         {/* Filter tabs */}
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-max min-w-full sm:w-fit">
@@ -126,6 +145,41 @@ export function DepositRequestsPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Date range filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 whitespace-nowrap">To</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {hasDateFilter && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo('') }}
+              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
+            >
+              Clear dates
+            </button>
+          )}
+          {hasDateFilter && (
+            <span className="text-xs text-gray-400">
+              {dateFiltered.length} result{dateFiltered.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
 
         {/* Requests table */}
@@ -153,14 +207,14 @@ export function DepositRequestsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {sorted.length === 0 && (
+                {paged.length === 0 && (
                   <tr>
                     <td colSpan={10} className="text-center py-10 text-gray-400">
                       No deposit requests found
                     </td>
                   </tr>
                 )}
-                {sorted.map(req => (
+                {paged.map(req => (
                   <>
                     <tr key={req.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
@@ -252,7 +306,6 @@ export function DepositRequestsPage() {
                         )}
                       </td>
                     </tr>
-                    {/* Inline reject reason row */}
                     {inlineRejectId === req.id && (
                       <tr key={`${req.id}-reject`} className="bg-red-50">
                         <td colSpan={10} className="px-4 py-3">
@@ -293,10 +346,15 @@ export function DepositRequestsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={dateFiltered.length}
+            onChange={setPage}
+          />
         </Card>
       </div>
 
-      {/* Receipt modal */}
       {receiptModal && (
         <ReceiptModal
           isOpen={!!receiptModal}
@@ -306,7 +364,6 @@ export function DepositRequestsPage() {
         />
       )}
 
-      {/* Confirm Approve modal */}
       <Modal
         isOpen={!!confirmApproveId}
         onClose={() => setConfirmApproveId(null)}

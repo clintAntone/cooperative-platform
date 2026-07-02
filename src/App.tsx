@@ -32,6 +32,7 @@ import { MemberDetailPage } from './pages/admin/MemberDetailPage'
 import { DepositRequestsPage } from './pages/admin/DepositRequestsPage'
 import { LoanApplicationsPage } from './pages/admin/LoanApplicationsPage'
 import { FaqPage } from './pages/FaqPage'
+import { ActivityPage } from './pages/activity/ActivityPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,6 +75,7 @@ export default function App() {
               <Route path="/membership" element={<ErrorBoundary><MembershipPage /></ErrorBoundary>} />
               <Route path="/lending" element={<ErrorBoundary><LendingPage /></ErrorBoundary>} />
               <Route path="/lending/:id" element={<ErrorBoundary><LoanDetailPage /></ErrorBoundary>} />
+              <Route path="/activity" element={<ErrorBoundary><ActivityPage /></ErrorBoundary>} />
             </Route>
 
             {/* Admin + Staff */}

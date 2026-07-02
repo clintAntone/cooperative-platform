@@ -13,6 +13,7 @@ import { StatusBadge } from '../../components/shared/StatusBadge'
 import { Table, Thead, Tbody, Th, Tr, Td } from '../../components/ui/Table'
 import { supabase } from '../../lib/supabase'
 import { useCurrency } from '../../hooks/useCurrency'
+import { formatNumber } from '../../lib/utils'
 import { useMembershipBreakdown } from '../../hooks/useMembership'
 import { useLoanPortfolioStats } from '../../hooks/useLoans'
 import { useMonthlyContributions, useMonthlyNewMembers } from '../../hooks/useReports'
@@ -49,33 +50,39 @@ function useTotalEquity() {
   })
 }
 
-function useMemberList() {
+function useMemberList(dateFrom: string, dateTo: string) {
   return useQuery({
-    queryKey: ['member_list_report'],
+    queryKey: ['member_list_report', dateFrom, dateTo],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, full_name, role, account_status, created_at, membership_status(status, completed_shares)')
         .eq('role', 'member')
         .order('created_at', { ascending: false })
-        .limit(20)
 
+      if (dateFrom) query = query.gte('created_at', dateFrom)
+      if (dateTo) query = query.lte('created_at', dateTo + 'T23:59:59.999Z')
+
+      const { data, error } = await query
       if (error) throw error
       return data
     },
   })
 }
 
-function useAllLoans() {
+function useAllLoans(dateFrom: string, dateTo: string) {
   return useQuery({
-    queryKey: ['all_loans_report'],
+    queryKey: ['all_loans_report', dateFrom, dateTo],
     queryFn: async () => {
-      // loans.user_id → auth.users; profiles.id → auth.users (no direct FK loans→profiles)
-      // so we do a two-step fetch instead of a PostgREST join
-      const { data, error } = await supabase
+      let query = supabase
         .from('loans')
         .select('principal, outstanding, status, disbursed_at, user_id')
         .order('created_at', { ascending: false })
+
+      if (dateFrom) query = query.gte('disbursed_at', dateFrom)
+      if (dateTo) query = query.lte('disbursed_at', dateTo + 'T23:59:59.999Z')
+
+      const { data, error } = await query
       if (error) throw error
 
       const userIds = [...new Set((data as any[]).map(r => r.user_id).filter(Boolean))]
@@ -107,7 +114,9 @@ function CurrencyTooltip({ active, payload, label }: any) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-sm">
       <p className="text-gray-500 mb-1">{label}</p>
-      <p className="font-semibold text-gray-900">₱{payload[0].value.toLocaleString()}</p>
+      <p className="font-semibold text-gray-900">
+        ₱{new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2 }).format(payload[0].value)}
+      </p>
     </div>
   )
 }
@@ -115,16 +124,18 @@ function CurrencyTooltip({ active, payload, label }: any) {
 export function ReportsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
   const { data: membershipBreakdown, isLoading: breakdownLoading } = useMembershipBreakdown()
   const { data: totalEquity, isLoading: equityLoading } = useTotalEquity()
   const { data: loanStats, isLoading: loanStatsLoading } = useLoanPortfolioStats()
   const { data: loanConfigured = false } = useLoanConfigured()
-  const { data: membersRaw, isLoading: membersLoading } = useMemberList()
+  const { data: membersRaw, isLoading: membersLoading } = useMemberList(dateFrom, dateTo)
   const { data: contributions = [], isLoading: contributionsLoading } = useMonthlyContributions()
   const { data: newMembers = [], isLoading: newMembersLoading } = useMonthlyNewMembers()
-  const { data: allLoans = [] } = useAllLoans()
+  const { data: allLoans = [] } = useAllLoans(dateFrom, dateTo)
 
-  // membership_status join may return object or array depending on Supabase FK resolution
   const members = (membersRaw ?? []).map((m: any) => ({
     ...m,
     membership_status: Array.isArray(m.membership_status)
@@ -148,11 +159,13 @@ export function ReportsPage() {
     ? Object.values(membershipBreakdown).reduce((a, b) => a + b, 0)
     : 0
 
+  const hasDateFilter = !!(dateFrom || dateTo)
+
   return (
     <div>
       <Header title="Reports" subtitle="Platform-wide analytics and summaries" />
 
-      {/* Export toolbar + member filter */}
+      {/* Export toolbar + filters */}
       <div className="px-4 sm:px-6 pt-4 sm:pt-6 space-y-3">
         {/* Export buttons */}
         <div className="flex gap-2 flex-wrap">
@@ -165,6 +178,7 @@ export function ReportsPage() {
                 'Account Status': m.account_status,
                 'Membership Status': m.membership_status?.status ?? 'pending',
                 'Completed Shares': m.membership_status?.completed_shares ?? 0,
+                Joined: m.created_at,
               }))
               exportToExcel(rows, 'members-report')
             }}
@@ -182,7 +196,7 @@ export function ReportsPage() {
                   membership_status: m.membership_status?.status ?? 'pending',
                   completed_shares: m.membership_status?.completed_shares ?? 0,
                 })),
-                `${filteredMembers.length} members`
+                `${filteredMembers.length} members${hasDateFilter ? ' (filtered)' : ''}`
               )
             }}
           >
@@ -204,7 +218,38 @@ export function ReportsPage() {
           </Button>
         </div>
 
-        {/* Member search + filter on one row */}
+        {/* Date range filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-gray-500 font-medium">Date range:</span>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 whitespace-nowrap">To</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {hasDateFilter && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo('') }}
+              className="text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Member search + status filter */}
         <div className="flex gap-2">
           <input
             type="text"
@@ -236,11 +281,11 @@ export function ReportsPage() {
       </div>
 
       <div className="p-4 sm:p-6 space-y-6">
-        {/* Key Stats — 2-col bento on mobile, 4-col on desktop */}
+        {/* Key Stats */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
             title="Total Members"
-            value={totalMembers}
+            value={formatNumber(totalMembers)}
             subtitle="Registered members"
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -251,8 +296,8 @@ export function ReportsPage() {
           />
           <StatCard
             title="Active Members"
-            value={membershipBreakdown?.active ?? 0}
-            subtitle={`${membershipBreakdown?.pending ?? 0} pending`}
+            value={formatNumber(membershipBreakdown?.active ?? 0)}
+            subtitle={`${formatNumber(membershipBreakdown?.pending ?? 0)} pending`}
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -274,7 +319,7 @@ export function ReportsPage() {
           <StatCard
             title="Loan Portfolio"
             value={loanConfigured ? currency(loanStats?.totalOutstanding ?? 0) : 'N/A'}
-            subtitle={loanConfigured ? `${loanStats?.activeLoans ?? 0} active loans` : 'Loan product not configured'}
+            subtitle={loanConfigured ? `${formatNumber(loanStats?.activeLoans ?? 0)} active loans` : 'Loan product not configured'}
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -286,7 +331,6 @@ export function ReportsPage() {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Monthly Contributions Bar Chart */}
           <Card>
             <CardHeader>
               <h3 className="text-base font-semibold text-gray-900">Monthly Contributions (last 12 months)</h3>
@@ -313,7 +357,6 @@ export function ReportsPage() {
             </CardBody>
           </Card>
 
-          {/* New Member Growth Line Chart */}
           <Card>
             <CardHeader>
               <h3 className="text-base font-semibold text-gray-900">New Member Growth (last 12 months)</h3>
@@ -363,7 +406,7 @@ export function ReportsPage() {
                           style={{ width: totalMembers > 0 ? `${(count / totalMembers) * 100}%` : '0%' }}
                         />
                       </div>
-                      <span className="text-sm font-semibold text-gray-900 w-8 text-right">{count}</span>
+                      <span className="text-sm font-semibold text-gray-900 w-8 text-right">{formatNumber(count)}</span>
                     </div>
                   </div>
                 ))}
@@ -405,13 +448,13 @@ export function ReportsPage() {
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm text-gray-500">Active Loans</span>
                     <span className="text-sm font-semibold text-gray-900">
-                      {loanStats?.activeLoans ?? 0}
+                      {formatNumber(loanStats?.activeLoans ?? 0)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-sm text-gray-500">Defaulted Loans</span>
                     <span className="text-sm font-semibold text-red-600">
-                      {loanStats?.defaultedLoans ?? 0}
+                      {formatNumber(loanStats?.defaultedLoans ?? 0)}
                     </span>
                   </div>
                 </div>
@@ -424,8 +467,12 @@ export function ReportsPage() {
         <Card>
           <CardHeader>
             <div>
-              <h3 className="text-base font-semibold text-gray-900">Recent Members</h3>
-              <p className="text-sm text-gray-500">Showing {filteredMembers.length} of {members.length} members</p>
+              <h3 className="text-base font-semibold text-gray-900">
+                Members{hasDateFilter ? ' (filtered by date)' : ''}
+              </h3>
+              <p className="text-sm text-gray-500">
+                Showing {filteredMembers.length} of {members.length} member{members.length !== 1 ? 's' : ''}
+              </p>
             </div>
           </CardHeader>
           <CardBody className="p-0">
@@ -458,7 +505,7 @@ export function ReportsPage() {
                         <Td>
                           <StatusBadge status={ms?.status ?? 'pending'} />
                         </Td>
-                        <Td>{ms?.completed_shares ?? 0}</Td>
+                        <Td>{formatNumber(ms?.completed_shares ?? 0)}</Td>
                       </Tr>
                     )
                   })}
