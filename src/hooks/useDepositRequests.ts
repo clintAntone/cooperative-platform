@@ -232,3 +232,51 @@ export function useRejectDepositRequest() {
     },
   })
 }
+
+export function useBulkApproveDepositRequests() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (requestIds: string[]) => {
+      const results = await Promise.allSettled(
+        requestIds.map(id => supabase.rpc('approve_deposit_request', { p_request_id: id }))
+      )
+      const failed = results.filter(r => r.status === 'rejected').length
+      if (failed > 0) throw new Error(`${failed} request(s) could not be approved`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_shares'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_summary'] })
+      queryClient.invalidateQueries({ queryKey: ['membership_status'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast({ title: 'Selected deposits approved', variant: 'success' })
+    },
+    onError: (err: any) => {
+      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      toast({ title: err.message ?? 'Bulk approve partially failed', variant: 'error' })
+    },
+  })
+}
+
+export function useBulkRejectDepositRequests() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ requestIds, reason }: { requestIds: string[]; reason: string }) => {
+      const results = await Promise.allSettled(
+        requestIds.map(id =>
+          supabase.rpc('reject_deposit_request', { p_request_id: id, p_reason: reason })
+        )
+      )
+      const failed = results.filter(r => r.status === 'rejected').length
+      if (failed > 0) throw new Error(`${failed} request(s) could not be rejected`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      toast({ title: 'Selected deposits rejected', variant: 'info' })
+    },
+    onError: (err: any) => {
+      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      toast({ title: err.message ?? 'Bulk reject partially failed', variant: 'error' })
+    },
+  })
+}

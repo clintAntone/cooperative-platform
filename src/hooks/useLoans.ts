@@ -474,3 +474,35 @@ export function useMyApplicationCoMakers() {
     },
   })
 }
+
+export function useRestructureLoan() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      loanId: string
+      newTerm: number
+      newRate: number
+      newRatePeriod: 'monthly' | 'annual'
+      reason: string
+    }) => {
+      const { error } = await (supabase.rpc as any)('restructure_loan', {
+        p_loan_id:         input.loanId,
+        p_new_term:        input.newTerm,
+        p_new_rate:        input.newRate,
+        p_new_rate_period: input.newRatePeriod,
+        p_reason:          input.reason,
+      })
+      if (error) throw error
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['loan', variables.loanId] })
+      queryClient.invalidateQueries({ queryKey: ['loan_schedule', variables.loanId] })
+      queryClient.invalidateQueries({ queryKey: ['loans'] })
+      queryClient.invalidateQueries({ queryKey: ['loan_portfolio_stats'] })
+      toast({ title: 'Loan restructured successfully', variant: 'success' })
+    },
+    onError: (err: any) => {
+      toast({ title: err.message ?? 'Failed to restructure loan', variant: 'error' })
+    },
+  })
+}

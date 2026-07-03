@@ -81,7 +81,7 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* ── Mobile gradient header (compact, logo + title only) ── */}
-      <div className="lg:hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 px-6 pt-10 pb-8 relative overflow-hidden">
+      <div className="lg:hidden bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 px-6 pt-10 pb-8 relative overflow-hidden">
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full" />
         <div className="absolute bottom-0 left-1/2 w-56 h-56 bg-white/5 rounded-full -translate-x-1/2 translate-y-1/2" />
         <div className="relative z-10 flex items-center gap-3 mb-4">
@@ -103,7 +103,7 @@ export function LoginPage() {
       </div>
 
       {/* ── Desktop branding panel (left side only) ── */}
-      <div className="hidden lg:flex lg:w-[45%] xl:w-1/2 flex-col justify-between bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-[45%] xl:w-1/2 flex-col justify-between bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 p-12 relative overflow-hidden">
         {/* Decorative blobs */}
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-white/5 rounded-full" />
         <div className="absolute -bottom-32 -right-16 w-[28rem] h-[28rem] bg-white/5 rounded-full" />

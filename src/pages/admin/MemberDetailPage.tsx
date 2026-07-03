@@ -68,6 +68,7 @@ export function MemberDetailPage() {
   const deleteShare = useAdminDeleteShare(id!)
   const { data: shareLimit } = useShareLimit(id!)
 
+  const [showOnlyPendingDeposits, setShowOnlyPendingDeposits] = useState(true)
   const [selectedContribution, setSelectedContribution] = useState<EquityContribution | null>(null)
   const [rejectTarget, setRejectTarget] = useState<DepositRequest | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -349,7 +350,18 @@ export function MemberDetailPage() {
 
       {/* Deposit Requests */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Deposit Requests</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Deposit Requests</h2>
+          <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showOnlyPendingDeposits}
+              onChange={e => setShowOnlyPendingDeposits(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            Pending only
+          </label>
+        </div>
         {depositRequests.length === 0 ? (
           <Card className="p-6 text-center text-gray-400 text-sm">No deposit requests yet.</Card>
         ) : (
@@ -367,7 +379,7 @@ export function MemberDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {depositRequests.map(req => {
+                  {(showOnlyPendingDeposits ? depositRequests.filter(r => r.status === 'pending') : depositRequests).map(req => {
                     return (
                       <tr key={req.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(req.created_at)}</td>
@@ -400,25 +412,27 @@ export function MemberDetailPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
+                          {req.status !== 'pending' ? (
+                            <span className="text-xs text-gray-400">No action needed</span>
+                          ) : (
                           <div className="flex gap-2">
                             <Button
                               size="sm"
                               variant="primary"
-                              disabled={req.status !== 'pending'}
-                              loading={req.status === 'pending' && approveRequest.isPending}
-                              onClick={() => req.status === 'pending' && handleApprove(req.id)}
+                              loading={approveRequest.isPending}
+                              onClick={() => handleApprove(req.id)}
                             >
                               Approve
                             </Button>
                             <Button
                               size="sm"
                               variant="danger"
-                              disabled={req.status !== 'pending'}
-                              onClick={() => req.status === 'pending' && setRejectTarget(req)}
+                              onClick={() => setRejectTarget(req)}
                             >
                               Reject
                             </Button>
                           </div>
+                          )}
                           {req.status === 'rejected' && req.rejection_reason && (
                             <span className="text-xs text-red-600 mt-1 block">{req.rejection_reason}</span>
                           )}

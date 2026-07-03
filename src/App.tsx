@@ -17,6 +17,7 @@ function RootRedirect() {
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { EquityPage } from './pages/equity/EquityPage'
 import { DepositRequestPage } from './pages/equity/DepositRequestPage'
@@ -34,6 +35,8 @@ import { MemberDetailPage } from './pages/admin/MemberDetailPage'
 import { DepositRequestsPage } from './pages/admin/DepositRequestsPage'
 import { LoanApplicationsPage } from './pages/admin/LoanApplicationsPage'
 import { LoanProductsPage } from './pages/admin/LoanProductsPage'
+import { AdminLoanDetailPage } from './pages/admin/AdminLoanDetailPage'
+import { PermissionsPage } from './pages/admin/PermissionsPage'
 import { FaqPage } from './pages/FaqPage'
 import { ActivityPage } from './pages/activity/ActivityPage'
 
@@ -60,6 +63,7 @@ export default function App() {
             <Route path="/login" element={<ErrorBoundary><LoginPage /></ErrorBoundary>} />
             <Route path="/register" element={<ErrorBoundary><RegisterPage /></ErrorBoundary>} />
             <Route path="/forgot-password" element={<ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
+            <Route path="/reset-password" element={<ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
 
             {/* Root redirect — authenticated only, role-aware */}
             <Route element={<AppLayout />}>
@@ -91,6 +95,7 @@ export default function App() {
               <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
               <Route path="/admin/deposit-requests" element={<ErrorBoundary><DepositRequestsPage /></ErrorBoundary>} />
               <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
+              <Route path="/admin/loans/:id" element={<ErrorBoundary><AdminLoanDetailPage /></ErrorBoundary>} />
               <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
             </Route>
 
@@ -99,6 +104,7 @@ export default function App() {
               <Route path="/admin" element={<ErrorBoundary><AdminPage /></ErrorBoundary>} />
               <Route path="/admin/config" element={<ErrorBoundary><ConfigPage /></ErrorBoundary>} />
               <Route path="/admin/settings" element={<ErrorBoundary><AppSettingsPage /></ErrorBoundary>} />
+              <Route path="/admin/permissions" element={<ErrorBoundary><PermissionsPage /></ErrorBoundary>} />
             </Route>
 
             {/* Fallback — redirect based on role */}

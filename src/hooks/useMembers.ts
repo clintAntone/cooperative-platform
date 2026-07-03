@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { toast } from '../lib/toast'
 import type { Profile, EquityShare, EquityContribution, MembershipStatus, DepositRequest } from '../types'
 
 // ─── Member row (includes membership summary fields) ─────────────────────────
@@ -137,5 +138,41 @@ export function useMemberDetail(userId: string) {
       } as MemberDetail
     },
     enabled: !!userId,
+  })
+}
+
+export function useBulkUpdateMembershipStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      userIds,
+      status,
+      reason,
+    }: {
+      userIds: string[]
+      status: 'active' | 'suspended'
+      reason: string
+    }) => {
+      const results = await Promise.allSettled(
+        userIds.map(id =>
+          supabase.rpc('admin_set_membership_status', {
+            p_user_id: id,
+            p_status: status,
+            p_reason: reason,
+          })
+        )
+      )
+      const failed = results.filter(r => r.status === 'rejected').length
+      if (failed > 0) throw new Error(`${failed} member(s) failed to update`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['members_list'] })
+      queryClient.invalidateQueries({ queryKey: ['member_list_report'] })
+      toast({ title: 'Member statuses updated', variant: 'success' })
+    },
+    onError: (err: any) => {
+      queryClient.invalidateQueries({ queryKey: ['members_list'] })
+      toast({ title: err.message ?? 'Bulk update partially failed', variant: 'error' })
+    },
   })
 }

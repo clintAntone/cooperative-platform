@@ -11,6 +11,8 @@ import {
   useAllDepositRequests,
   useApproveDepositRequest,
   useRejectDepositRequest,
+  useBulkApproveDepositRequests,
+  useBulkRejectDepositRequests,
   type DepositRequestWithMeta,
 } from '../../hooks/useDepositRequests'
 import { useCurrency } from '../../hooks/useCurrency'
@@ -56,9 +58,16 @@ export function DepositRequestsPage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBulkRejectModal, setShowBulkRejectModal] = useState(false)
+  const [bulkRejectReason, setBulkRejectReason] = useState('')
+
   const { format: currency } = useCurrency()
   const approveRequest = useApproveDepositRequest()
   const rejectRequest = useRejectDepositRequest()
+  const bulkApprove = useBulkApproveDepositRequests()
+  const bulkReject = useBulkRejectDepositRequests()
 
   const [inlineRejectId, setInlineRejectId] = useState<string | null>(null)
   const [inlineReason, setInlineReason] = useState('')
@@ -70,7 +79,10 @@ export function DepositRequestsPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  useEffect(() => { setPage(0) }, [activeTab, dateFrom, dateTo, sortKey, sortDir, debouncedSearch])
+  useEffect(() => {
+    setPage(0)
+    setSelectedIds(new Set())
+  }, [activeTab, dateFrom, dateTo, sortKey, sortDir, debouncedSearch])
 
   const { data: requestsPage, isLoading } = useAllDepositRequests({
     statusFilter: activeTab,
@@ -85,7 +97,34 @@ export function DepositRequestsPage() {
 
   const paged = requestsPage?.rows ?? []
   const totalRequests = requestsPage?.total ?? 0
-  const dateFiltered = paged // kept for export reference
+  const dateFiltered = paged
+
+  const pendingOnPage = paged.filter(r => r.status === 'pending')
+  const allPendingSelected = pendingOnPage.length > 0 && pendingOnPage.every(r => selectedIds.has(r.id))
+
+  const toggleSelectAll = () => {
+    if (allPendingSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        pendingOnPage.forEach(r => next.delete(r.id))
+        return next
+      })
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        pendingOnPage.forEach(r => next.add(r.id))
+        return next
+      })
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   const handleApprove = (requestId: string) => {
     approveRequest.mutate(requestId)
@@ -104,9 +143,30 @@ export function DepositRequestsPage() {
     )
   }
 
+  const handleBulkApprove = () => {
+    bulkApprove.mutate([...selectedIds], {
+      onSuccess: () => setSelectedIds(new Set()),
+    })
+  }
+
+  const handleBulkReject = () => {
+    if (!bulkRejectReason.trim()) return
+    bulkReject.mutate(
+      { requestIds: [...selectedIds], reason: bulkRejectReason },
+      {
+        onSuccess: () => {
+          setSelectedIds(new Set())
+          setShowBulkRejectModal(false)
+          setBulkRejectReason('')
+        },
+      }
+    )
+  }
+
   if (isLoading) return <SkeletonPage cards={0} rows={8} />
 
   const hasDateFilter = !!(dateFrom || dateTo)
+  const showCheckboxes = activeTab === 'pending' || activeTab === 'all'
 
   return (
     <div>
@@ -206,6 +266,37 @@ export function DepositRequestsPage() {
           )}
         </div>
 
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
+            <span className="text-sm font-medium text-blue-800">{selectedIds.size} selected</span>
+            <div className="flex gap-2 ml-auto">
+              <Button
+                size="sm"
+                variant="primary"
+                loading={bulkApprove.isPending}
+                onClick={handleBulkApprove}
+              >
+                Approve Selected
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={() => { setShowBulkRejectModal(true); setBulkRejectReason('') }}
+              >
+                Reject Selected
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Requests table */}
         <Card className="overflow-hidden">
           {/* Mobile cards */}
@@ -215,11 +306,22 @@ export function DepositRequestsPage() {
               <div key={req.id} className="p-4 space-y-3">
                 {/* Header row */}
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">{req.profiles?.full_name ?? '—'}</p>
-                    {req.profiles?.employee_id && (
-                      <p className="font-mono text-xs text-gray-400 mt-0.5">{req.profiles.employee_id}</p>
+                  <div className="flex items-start gap-2">
+                    {showCheckboxes && req.status === 'pending' && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(req.id)}
+                        onChange={() => toggleSelect(req.id)}
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        onClick={e => e.stopPropagation()}
+                      />
                     )}
+                    <div>
+                      <p className="font-medium text-sm text-gray-900">{req.profiles?.full_name ?? '—'}</p>
+                      {req.profiles?.employee_id && (
+                        <p className="font-mono text-xs text-gray-400 mt-0.5">{req.profiles.employee_id}</p>
+                      )}
+                    </div>
                   </div>
                   <StatusBadge status={req.status} />
                 </div>
@@ -289,6 +391,17 @@ export function DepositRequestsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  {showCheckboxes && (
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allPendingSelected}
+                        onChange={toggleSelectAll}
+                        disabled={pendingOnPage.length === 0}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
+                  )}
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Member</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Employee ID</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Share #</th>
@@ -310,7 +423,7 @@ export function DepositRequestsPage() {
               <tbody className="divide-y divide-gray-100">
                 {paged.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center py-10 text-gray-400">
+                    <td colSpan={showCheckboxes ? 11 : 10} className="text-center py-10 text-gray-400">
                       No deposit requests found
                     </td>
                   </tr>
@@ -318,6 +431,18 @@ export function DepositRequestsPage() {
                 {paged.map(req => (
                   <React.Fragment key={req.id}>
                     <tr className="hover:bg-gray-50">
+                      {showCheckboxes && (
+                        <td className="px-4 py-3 w-10">
+                          {req.status === 'pending' && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(req.id)}
+                              onChange={() => toggleSelect(req.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{req.profiles?.full_name ?? '—'}</p>
                       </td>
@@ -409,7 +534,7 @@ export function DepositRequestsPage() {
                     </tr>
                     {inlineRejectId === req.id && (
                       <tr key={`${req.id}-reject`} className="bg-red-50">
-                        <td colSpan={10} className="px-4 py-3">
+                        <td colSpan={showCheckboxes ? 11 : 10} className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <input
                               type="text"
@@ -446,8 +571,8 @@ export function DepositRequestsPage() {
                 ))}
               </tbody>
             </table>
-          </div>{/* end overflow-x-auto */}
-          </div>{/* end hidden sm:block */}
+          </div>
+          </div>
           <Pagination
             page={page}
             pageSize={PAGE_SIZE}
@@ -494,6 +619,49 @@ export function DepositRequestsPage() {
               }}
             >
               Confirm Approve
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Bulk Reject Modal */}
+      <Modal
+        isOpen={showBulkRejectModal}
+        onClose={() => setShowBulkRejectModal(false)}
+        title={`Reject ${selectedIds.size} Deposit${selectedIds.size > 1 ? 's' : ''}`}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            This rejection reason will apply to all selected deposits.
+          </p>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">Rejection Reason</label>
+            <textarea
+              value={bulkRejectReason}
+              onChange={e => setBulkRejectReason(e.target.value)}
+              placeholder="Enter reason for rejection..."
+              rows={3}
+              className="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowBulkRejectModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              loading={bulkReject.isPending}
+              disabled={!bulkRejectReason.trim()}
+              onClick={handleBulkReject}
+            >
+              Confirm Reject
             </Button>
           </div>
         </div>

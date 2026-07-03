@@ -8,7 +8,7 @@ import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { SkeletonPage } from '../../components/shared/Skeleton'
 import { Pagination } from '../../components/shared/Pagination'
-import { useMembers } from '../../hooks/useMembers'
+import { useMembers, useBulkUpdateMembershipStatus } from '../../hooks/useMembers'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate } from '../../lib/utils'
 import { supabase } from '../../lib/supabase'
@@ -77,12 +77,20 @@ export function MembersPage() {
   const [addError, setAddError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
 
+  // Bulk selection
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
+  const [showBulkModal, setShowBulkModal] = useState<'activate' | 'suspend' | null>(null)
+  const [bulkReason, setBulkReason] = useState('')
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
     return () => clearTimeout(timer)
   }, [search])
 
-  useEffect(() => { setPage(0) }, [debouncedSearch, statusFilter, sortKey, sortDir])
+  useEffect(() => {
+    setPage(0)
+    setSelectedMemberIds(new Set())
+  }, [debouncedSearch, statusFilter, sortKey, sortDir])
 
   // Server-sortable keys; computed fields (completed_shares, total_invested) sorted client-side
   const serverSortKey = (sortKey === 'full_name' || sortKey === 'created_at') ? sortKey : 'created_at'
@@ -99,6 +107,7 @@ export function MembersPage() {
 
   const { data: nonMembers = [], isLoading: loadingNonMembers } = useNonMemberUsers()
   const approveMember = useApproveMember()
+  const bulkUpdateStatus = useBulkUpdateMembershipStatus()
   const [approveError, setApproveError] = useState<string | null>(null)
 
   const addMember = useMutation({
@@ -209,6 +218,24 @@ export function MembersPage() {
                   </div>
                 )}
 
+                {/* Bulk action bar */}
+                {selectedMemberIds.size > 0 && (
+                  <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-blue-800">{selectedMemberIds.size} selected</span>
+                    <div className="flex gap-2 ml-auto">
+                      <Button size="sm" variant="primary" onClick={() => { setShowBulkModal('activate'); setBulkReason('') }}>
+                        Activate Selected
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => { setShowBulkModal('suspend'); setBulkReason('') }}>
+                        Suspend Selected
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedMemberIds(new Set())}>
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Search + filters + actions */}
                 <div className="flex flex-col gap-2">
                   {/* Row 1: search + add member */}
@@ -307,6 +334,20 @@ export function MembersPage() {
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
+                          <th className="px-4 py-3 w-10">
+                            <input
+                              type="checkbox"
+                              checked={paged.length > 0 && paged.every(m => selectedMemberIds.has(m.id))}
+                              onChange={() => {
+                                if (paged.every(m => selectedMemberIds.has(m.id))) {
+                                  setSelectedMemberIds(prev => { const s = new Set(prev); paged.forEach(m => s.delete(m.id)); return s })
+                                } else {
+                                  setSelectedMemberIds(prev => { const s = new Set(prev); paged.forEach(m => s.add(m.id)); return s })
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900"
                               onClick={() => handleSort('full_name')}>
                             Name <SortIcon active={sortKey === 'full_name'} dir={sortDir} />
@@ -331,7 +372,7 @@ export function MembersPage() {
                       <tbody className="divide-y divide-gray-100">
                         {totalMembers === 0 && (
                           <tr>
-                            <td colSpan={7} className="text-center py-10 text-gray-400">
+                            <td colSpan={8} className="text-center py-10 text-gray-400">
                               No members found
                             </td>
                           </tr>
@@ -345,6 +386,14 @@ export function MembersPage() {
                             className="hover:bg-gray-50 cursor-pointer"
                             onClick={() => navigate(`/admin/members/${member.id}`)}
                           >
+                            <td className="px-4 py-3 w-10" onClick={e => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedMemberIds.has(member.id)}
+                                onChange={() => setSelectedMemberIds(prev => { const s = new Set(prev); s.has(member.id) ? s.delete(member.id) : s.add(member.id); return s })}
+                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                            </td>
                             <td className="px-4 py-3">
                               <p className="font-medium text-gray-900">{member.full_name}</p>
                               {member.phone && <p className="text-xs text-gray-400">{member.phone}</p>}
@@ -407,6 +456,57 @@ export function MembersPage() {
 
         {activeTab === 'employees' && <EmployeesTab />}
       </div>
+
+      {/* Bulk Activate/Suspend Modal */}
+      <Modal
+        isOpen={!!showBulkModal}
+        onClose={() => setShowBulkModal(null)}
+        title={showBulkModal === 'activate' ? `Activate ${selectedMemberIds.size} Member${selectedMemberIds.size > 1 ? 's' : ''}` : `Suspend ${selectedMemberIds.size} Member${selectedMemberIds.size > 1 ? 's' : ''}`}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            {showBulkModal === 'activate'
+              ? 'This will activate membership for all selected members.'
+              : 'This will suspend membership for all selected members. They will lose access to member features.'}
+          </p>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">Reason (optional)</label>
+            <textarea
+              value={bulkReason}
+              onChange={e => setBulkReason(e.target.value)}
+              placeholder={showBulkModal === 'activate' ? 'Approved by admin' : 'Reason for suspension...'}
+              rows={2}
+              className="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => setShowBulkModal(null)}>Cancel</Button>
+            <Button
+              variant={showBulkModal === 'activate' ? 'primary' : 'danger'}
+              className="flex-1"
+              loading={bulkUpdateStatus.isPending}
+              onClick={() => {
+                bulkUpdateStatus.mutate(
+                  {
+                    userIds: [...selectedMemberIds],
+                    status: showBulkModal === 'activate' ? 'active' : 'suspended',
+                    reason: bulkReason || (showBulkModal === 'activate' ? 'Approved by admin' : 'Suspended by admin'),
+                  },
+                  {
+                    onSuccess: () => {
+                      setSelectedMemberIds(new Set())
+                      setShowBulkModal(null)
+                    },
+                  }
+                )
+              }}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Add Member Modal */}
       <Modal
