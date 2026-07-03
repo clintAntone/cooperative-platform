@@ -86,14 +86,13 @@ export function RegisterPage() {
         return
       }
 
-      // Check if an account already exists for this employee ID
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('employee_id', trimmed)
-        .maybeSingle()
+      // Check if an account already exists for this employee ID.
+      // Uses an RPC with SECURITY DEFINER so RLS doesn't block the anon read.
+      const { data: available, error: availErr } = await supabase
+        .rpc('is_employee_id_available', { p_employee_id: trimmed })
 
-      if (existing) {
+      if (availErr) throw new Error('Could not verify employee ID. Please try again.')
+      if (!available) {
         setLookupError('An account already exists for this Employee ID. Please sign in instead.')
         return
       }
