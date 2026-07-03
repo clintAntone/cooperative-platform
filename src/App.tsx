@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './context/AuthContext'
+import { ImpersonationProvider } from './context/ImpersonationContext'
 import { ToastProvider } from './context/ToastContext'
 import { AppLayout } from './components/layout/AppLayout'
 import { useAuth } from './context/AuthContext'
@@ -50,6 +51,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <ImpersonationProvider>
         <ToastProvider>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <OfflineBanner />
@@ -104,6 +106,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
         </ToastProvider>
+        </ImpersonationProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

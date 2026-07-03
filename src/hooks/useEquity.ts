@@ -2,10 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { EquityShare, EquityContribution } from '../types'
 import { useAuth } from '../context/AuthContext'
+import { useEffectiveUserId } from '../context/ImpersonationContext'
 
 export function useEquityShares(userId?: string) {
-  const { user } = useAuth()
-  const targetId = userId ?? user?.id
+  const effectiveUserId = useEffectiveUserId()
+  const targetId = userId ?? effectiveUserId
 
   return useQuery({
     queryKey: ['equity_shares', targetId],
@@ -41,8 +42,8 @@ export function useEquityContributions(shareId: string) {
 }
 
 export function useAllContributions(userId?: string) {
-  const { user } = useAuth()
-  const targetId = userId ?? user?.id
+  const effectiveUserId = useEffectiveUserId()
+  const targetId = userId ?? effectiveUserId
 
   return useQuery({
     queryKey: ['equity_contributions_all', targetId],
@@ -200,15 +201,15 @@ export function useAdminCreateShare(memberId: string) {
 }
 
 export function useEquitySummary() {
-  const { user } = useAuth()
+  const effectiveUserId = useEffectiveUserId()
 
   return useQuery({
-    queryKey: ['equity_summary', user?.id],
+    queryKey: ['equity_summary', effectiveUserId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equity_shares')
         .select('paid_amount, target_amount, status')
-        .eq('user_id', user!.id)
+        .eq('user_id', effectiveUserId!)
 
       if (error) throw error
 
@@ -219,6 +220,6 @@ export function useEquitySummary() {
 
       return { totalInvested, completedShares, totalShares }
     },
-    enabled: !!user?.id,
+    enabled: !!effectiveUserId,
   })
 }

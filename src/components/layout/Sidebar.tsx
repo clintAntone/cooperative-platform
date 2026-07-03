@@ -2,6 +2,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useImpersonation } from '../../context/ImpersonationContext'
 import { usePendingCoMakerCount } from '../../hooks/useLoans'
 import { usePendingDepositCount } from '../../hooks/useDepositRequests'
 import { useAppBranding } from '../../hooks/useAppBranding'
@@ -197,15 +198,19 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { profile, signOut } = useAuth()
+  const { impersonatedUser } = useImpersonation()
   const { data: branding } = useAppBranding()
   const { data: pendingCoMakerCount = 0 } = usePendingCoMakerCount()
   const { data: pendingDepositCount = 0 } = usePendingDepositCount()
   const [confirmSignOut, setConfirmSignOut] = React.useState(false)
 
+  // When impersonating, show the nav for the impersonated user's role
+  const effectiveRole = impersonatedUser?.role ?? profile?.role
+
   const visibleGroups = navGroups
     .filter(group => {
       if (!group.roles) return true
-      return profile && group.roles.includes(profile.role)
+      return effectiveRole && group.roles.includes(effectiveRole)
     })
     .map(group => ({
       ...group,

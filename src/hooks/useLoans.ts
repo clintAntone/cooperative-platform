@@ -2,11 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { LoanApplication, Loan, LoanRepaymentSchedule, LoanRepayment, EligibleCoMaker, CoMakerRequest, LoanProduct } from '../types'
 import { useAuth } from '../context/AuthContext'
+import { useEffectiveUserId } from '../context/ImpersonationContext'
 import { toast } from '../lib/toast'
 
 export function useLoanApplications(userId?: string) {
-  const { user } = useAuth()
-  const targetId = userId ?? user?.id
+  const effectiveUserId = useEffectiveUserId()
+  const targetId = userId ?? effectiveUserId
 
   return useQuery({
     queryKey: ['loan_applications', targetId],
@@ -40,8 +41,8 @@ export function useAllLoanApplications() {
 }
 
 export function useLoans(userId?: string) {
-  const { user } = useAuth()
-  const targetId = userId ?? user?.id
+  const effectiveUserId = useEffectiveUserId()
+  const targetId = userId ?? effectiveUserId
 
   return useQuery({
     queryKey: ['loans', targetId],

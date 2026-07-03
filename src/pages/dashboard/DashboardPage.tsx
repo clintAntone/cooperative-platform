@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useEffectiveUserId } from '../../context/ImpersonationContext'
 import { useEquitySummary } from '../../hooks/useEquity'
 import { useMembershipStatus } from '../../hooks/useMembership'
 import { useLoans } from '../../hooks/useLoans'
@@ -14,20 +15,20 @@ import { useCurrency } from '../../hooks/useCurrency'
 import type { LedgerEntry } from '../../types'
 
 function useDashboardLedger(limit: number) {
-  const { user } = useAuth()
+  const effectiveUserId = useEffectiveUserId()
   return useQuery({
-    queryKey: ['dashboard_ledger', user?.id, limit],
+    queryKey: ['dashboard_ledger', effectiveUserId, limit],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ledger_entries')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', effectiveUserId!)
         .order('created_at', { ascending: false })
         .limit(limit)
       if (error) throw error
       return data as LedgerEntry[]
     },
-    enabled: !!user?.id,
+    enabled: !!effectiveUserId,
   })
 }
 

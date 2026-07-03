@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { useEffectiveUserId } from '../context/ImpersonationContext'
 
 /**
  * Returns the member's maximum eligible loan amount based on:
@@ -9,12 +9,12 @@ import { useAuth } from '../context/AuthContext'
  * Returns null while loading.
  */
 export function useLoanEligibility() {
-  const { user } = useAuth()
+  const effectiveUserId = useEffectiveUserId()
 
   return useQuery({
-    queryKey: ['loan_eligibility', user?.id],
+    queryKey: ['loan_eligibility', effectiveUserId],
     queryFn: async () => {
-      if (!user) return null
+      if (!effectiveUserId) return null
 
       const [configRes, profileRes, sharesRes] = await Promise.all([
         supabase
@@ -29,12 +29,12 @@ export function useLoanEligibility() {
         supabase
           .from('profiles')
           .select('created_at')
-          .eq('id', user.id)
+          .eq('id', effectiveUserId)
           .single(),
         supabase
           .from('equity_shares')
           .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId)
           .eq('status', 'completed'),
       ])
 
@@ -59,7 +59,7 @@ export function useLoanEligibility() {
       const completedShares = sharesRes.count ?? 0
       return completedShares * sharePrice * ratio
     },
-    enabled: !!user?.id,
+    enabled: !!effectiveUserId,
     staleTime: 60_000,
   })
 }

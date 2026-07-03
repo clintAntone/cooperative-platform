@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { useEffectiveUserId } from '../context/ImpersonationContext'
 import { toast } from '../lib/toast'
 import type { DepositRequest, PaymentMethod } from '../types'
 
@@ -28,21 +29,21 @@ export async function uploadReceipt(userId: string, file: File): Promise<string>
 // ─── Member: own requests ─────────────────────────────────────────────────────
 
 export function useMyDepositRequests() {
-  const { user } = useAuth()
+  const effectiveUserId = useEffectiveUserId()
 
   return useQuery({
-    queryKey: ['deposit_requests_mine', user?.id],
+    queryKey: ['deposit_requests_mine', effectiveUserId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('deposit_requests')
         .select('*')
-        .eq('user_id', user!.id)
+        .eq('user_id', effectiveUserId!)
         .order('created_at', { ascending: false })
 
       if (error) throw error
       return data as DepositRequest[]
     },
-    enabled: !!user?.id,
+    enabled: !!effectiveUserId,
   })
 }
 

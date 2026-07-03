@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { useImpersonation } from '../../context/ImpersonationContext'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
@@ -55,6 +57,8 @@ function ContributionDetailModal({ contribution, onClose, format }: Contribution
 export function MemberDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { profile: adminProfile } = useAuth()
+  const { startImpersonation } = useImpersonation()
   const { data, isLoading } = useMemberDetail(id!)
   const { data: loans = [] } = useLoans(id!)
   const { format: currency } = useCurrency()
@@ -108,8 +112,8 @@ export function MemberDetailPage() {
     <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div className="space-y-3">
-        {/* Nav row: back + export */}
-        <div className="flex items-center justify-between">
+        {/* Nav row: back + actions */}
+        <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => navigate('/admin/members')}
             title="Back to Members"
@@ -119,6 +123,27 @@ export function MemberDetailPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
+          <div className="flex items-center gap-2 ml-auto">
+          {adminProfile?.role === 'admin' && (
+            <button
+              title="View as this member"
+              onClick={async () => {
+                await startImpersonation({
+                  id: profile.id,
+                  full_name: profile.full_name,
+                  role: profile.role,
+                })
+                navigate('/dashboard')
+              }}
+              className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span className="hidden sm:inline">View as Member</span>
+            </button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -145,6 +170,7 @@ export function MemberDetailPage() {
             </svg>
             <span className="hidden sm:inline">Export Statement PDF</span>
           </Button>
+          </div>
         </div>
         {/* Member info */}
         <div>

@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { MembershipStatus, MembershipHistory } from '../types'
-import { useAuth } from '../context/AuthContext'
+import { useEffectiveUserId } from '../context/ImpersonationContext'
 
 export function useMembershipStatus(userId?: string) {
-  const { user } = useAuth()
-  const targetId = userId ?? user?.id
+  const effectiveUserId = useEffectiveUserId()
+  const targetId = userId ?? effectiveUserId
 
   return useQuery({
     queryKey: ['membership_status', targetId],
@@ -24,8 +24,8 @@ export function useMembershipStatus(userId?: string) {
 }
 
 export function useMembershipHistory(userId?: string) {
-  const { user } = useAuth()
-  const targetId = userId ?? user?.id
+  const effectiveUserId = useEffectiveUserId()
+  const targetId = userId ?? effectiveUserId
 
   return useQuery({
     queryKey: ['membership_history', targetId],
