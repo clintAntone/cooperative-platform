@@ -62,7 +62,11 @@ export function RegisterPage() {
     setLookupError(null)
     try {
       const headers: Record<string, string> = {}
-      if (!import.meta.env.DEV) headers['apikey'] = import.meta.env.VITE_SUPABASE_ANON_KEY
+      if (!import.meta.env.DEV) {
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+        headers['apikey'] = anonKey
+        headers['Authorization'] = `Bearer ${anonKey}`
+      }
       const res = await fetch(EMPLOYEE_API_URL, { headers })
       if (!res.ok) throw new Error('Could not reach the employee directory. Please try again.')
       const employees: PosEmployee[] = await res.json()
