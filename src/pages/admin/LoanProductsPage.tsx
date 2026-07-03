@@ -302,7 +302,7 @@ export function LoanProductsPage() {
                       </div>
                       <div className="px-3 py-2">
                         <p className="text-xs text-gray-400">Loanable</p>
-                        <p className="text-sm font-semibold text-gray-800 mt-0.5 truncate">
+                        <p className="text-sm font-semibold text-gray-800 mt-0.5 truncate" title={p.max_amount ? currency(p.max_amount) : 'Unlimited'}>
                           {p.max_amount ? currency(p.max_amount) : 'Unlimited'}
                         </p>
                       </div>

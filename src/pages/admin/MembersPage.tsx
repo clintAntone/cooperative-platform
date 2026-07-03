@@ -66,8 +66,6 @@ function useNonMemberUsers() {
 export function MembersPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: members = [], isLoading } = useMembers()
-  const { format: currency } = useCurrency()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -84,7 +82,20 @@ export function MembersPage() {
     return () => clearTimeout(timer)
   }, [search])
 
-  useEffect(() => { setPage(0) }, [debouncedSearch, statusFilter])
+  useEffect(() => { setPage(0) }, [debouncedSearch, statusFilter, sortKey, sortDir])
+
+  // Server-sortable keys; computed fields (completed_shares, total_invested) sorted client-side
+  const serverSortKey = (sortKey === 'full_name' || sortKey === 'created_at') ? sortKey : 'created_at'
+  const { data: membersPage, isLoading } = useMembers({
+    page,
+    pageSize: PAGE_SIZE,
+    search: debouncedSearch,
+    sortKey: serverSortKey,
+    sortDir,
+  })
+  const members = membersPage?.rows ?? []
+  const totalMembers = membersPage?.total ?? 0
+  const { format: currency } = useCurrency()
 
   const { data: nonMembers = [], isLoading: loadingNonMembers } = useNonMemberUsers()
   const approveMember = useApproveMember()
@@ -116,26 +127,20 @@ export function MembersPage() {
     else { setSortKey(key); setSortDir('asc') }
   }
 
+  // Status filter applied client-side on the server-returned page
   const filtered = members.filter(m => {
-    const q = debouncedSearch.toLowerCase()
-    const matchesText =
-      m.full_name.toLowerCase().includes(q) ||
-      (m.employee_id?.toLowerCase().includes(q) ?? false)
     const memberStatus = (m.membership_status as any)?.status ?? 'pending'
-    const matchesStatus = statusFilter === 'all' || memberStatus === statusFilter
-    return matchesText && matchesStatus
+    return statusFilter === 'all' || memberStatus === statusFilter
   })
 
-  const sorted = [...filtered].sort((a, b) => {
-    const dir = sortDir === 'asc' ? 1 : -1
-    if (sortKey === 'full_name') return a.full_name.localeCompare(b.full_name) * dir
-    if (sortKey === 'completed_shares') return (a.completed_shares - b.completed_shares) * dir
-    if (sortKey === 'total_invested') return (a.total_invested - b.total_invested) * dir
-    if (sortKey === 'created_at') return (a.created_at > b.created_at ? 1 : -1) * dir
-    return 0
-  })
-
-  const paged = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  // Client-side sort only for computed fields; DB fields already sorted by server
+  const paged = (sortKey === 'completed_shares' || sortKey === 'total_invested')
+    ? [...filtered].sort((a, b) => {
+        const dir = sortDir === 'asc' ? 1 : -1
+        if (sortKey === 'completed_shares') return (a.completed_shares - b.completed_shares) * dir
+        return (a.total_invested - b.total_invested) * dir
+      })
+    : filtered
   const selectedUser = nonMembers.find(u => u.id === selectedUserId)
 
   return (
@@ -324,7 +329,7 @@ export function MembersPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {sorted.length === 0 && (
+                        {totalMembers === 0 && (
                           <tr>
                             <td colSpan={7} className="text-center py-10 text-gray-400">
                               No members found
@@ -392,7 +397,7 @@ export function MembersPage() {
                   <Pagination
                     page={page}
                     pageSize={PAGE_SIZE}
-                    total={sorted.length}
+                    total={totalMembers}
                     onChange={setPage}
                   />
               </>

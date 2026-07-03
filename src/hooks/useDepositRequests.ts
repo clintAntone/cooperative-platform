@@ -58,24 +58,70 @@ export interface DepositRequestWithMeta extends DepositRequest {
   } | null
 }
 
-export function useAllDepositRequests(statusFilter?: string) {
+export interface DepositRequestsPage {
+  rows: DepositRequestWithMeta[]
+  total: number
+}
+
+export function useAllDepositRequests(params?: {
+  statusFilter?: string
+  page?: number
+  pageSize?: number
+  search?: string
+  sortKey?: 'amount' | 'created_at'
+  sortDir?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
+}) {
+  const statusFilter = params?.statusFilter
+  const page = params?.page ?? 0
+  const pageSize = params?.pageSize ?? 25
+  const search = params?.search ?? ''
+  const sortKey = params?.sortKey ?? 'created_at'
+  const sortDir = params?.sortDir ?? 'desc'
+  const dateFrom = params?.dateFrom ?? ''
+  const dateTo = params?.dateTo ?? ''
+
   return useQuery({
-    queryKey: ['deposit_requests_all', statusFilter],
-    queryFn: async () => {
+    queryKey: ['deposit_requests_all', statusFilter, page, pageSize, search, sortKey, sortDir, dateFrom, dateTo],
+    queryFn: async (): Promise<DepositRequestsPage> => {
+      const from = page * pageSize
+      const to = from + pageSize - 1
+
       let query = supabase
         .from('deposit_requests')
         .select(
-          `*, profiles!deposit_requests_user_id_fkey(full_name, employee_id), equity_shares!deposit_requests_share_id_fkey(share_number)`
+          `*, profiles!deposit_requests_user_id_fkey(full_name, employee_id), equity_shares!deposit_requests_share_id_fkey(share_number)`,
+          { count: 'exact' }
         )
-        .order('created_at', { ascending: false })
+        .order(sortKey, { ascending: sortDir === 'asc' })
+        .range(from, to)
 
       if (statusFilter && statusFilter !== 'all') {
         query = query.eq('status', statusFilter)
       }
+      if (dateFrom) {
+        query = query.gte('created_at', dateFrom)
+      }
+      if (dateTo) {
+        query = query.lte('created_at', dateTo + 'T23:59:59')
+      }
 
-      const { data, error } = await query
+      const { data, error, count } = await query
       if (error) throw error
-      return data as DepositRequestWithMeta[]
+
+      let rows = (data ?? []) as DepositRequestWithMeta[]
+
+      // Search by member name (client-side after server fetch since it's a join field)
+      if (search) {
+        const q = search.toLowerCase()
+        rows = rows.filter(r =>
+          (r.profiles?.full_name ?? '').toLowerCase().includes(q) ||
+          (r.profiles?.employee_id ?? '').toLowerCase().includes(q)
+        )
+      }
+
+      return { rows, total: count ?? 0 }
     },
   })
 }

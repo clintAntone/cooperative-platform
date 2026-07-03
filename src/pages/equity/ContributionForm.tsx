@@ -4,13 +4,14 @@ import { z } from 'zod'
 import { Button } from '../../components/ui/Button'
 import { Input, Select } from '../../components/ui/Input'
 import { useAddContribution } from '../../hooks/useEquity'
+import { useCurrency } from '../../hooks/useCurrency'
 import type { EquityShare } from '../../types'
 
 const schema = z.object({
   amount: z
     .number({ invalid_type_error: 'Please enter a valid amount' })
     .positive('Amount must be greater than 0')
-    .min(100, 'Minimum contribution is $100'),
+    .min(100, 'Minimum contribution is 100'),
   payment_method: z.enum(['cash', 'bank_transfer', 'mobile_money']),
   reference: z.string().optional(),
 })
@@ -31,6 +32,7 @@ const paymentMethodOptions = [
 
 export function ContributionForm({ share, onSuccess, onCancel }: ContributionFormProps) {
   const addContribution = useAddContribution()
+  const { format: currency } = useCurrency()
 
   const remaining = share.target_amount - share.paid_amount
 
@@ -59,7 +61,7 @@ export function ContributionForm({ share, onSuccess, onCancel }: ContributionFor
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
         <p className="font-medium">Share #{share.share_number}</p>
-        <p className="mt-1">Remaining balance: <span className="font-semibold">${remaining.toFixed(2)}</span></p>
+        <p className="mt-1">Remaining balance: <span className="font-semibold">{currency(remaining)}</span></p>
       </div>
 
       <Input
@@ -70,7 +72,7 @@ export function ContributionForm({ share, onSuccess, onCancel }: ContributionFor
         max={remaining}
         placeholder="0.00"
         error={errors.amount?.message}
-        hint={`Max: $${remaining.toFixed(2)}`}
+        hint={`Max: ${currency(remaining)}`}
         required
         {...register('amount', { valueAsNumber: true })}
       />

@@ -10,23 +10,49 @@ export interface MemberRow extends Profile {
   completed_shares: number
 }
 
-export function useMembers() {
+export interface MembersPage {
+  rows: MemberRow[]
+  total: number
+}
+
+export function useMembers(params?: {
+  page?: number
+  pageSize?: number
+  search?: string
+  sortKey?: 'full_name' | 'created_at'
+  sortDir?: 'asc' | 'desc'
+}) {
+  const page = params?.page ?? 0
+  const pageSize = params?.pageSize ?? 20
+  const search = params?.search ?? ''
+  const sortKey = params?.sortKey ?? 'full_name'
+  const sortDir = params?.sortDir ?? 'asc'
+
   return useQuery({
-    queryKey: ['members_list'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryKey: ['members_list', page, pageSize, search, sortKey, sortDir],
+    queryFn: async (): Promise<MembersPage> => {
+      const from = page * pageSize
+      const to = from + pageSize - 1
+
+      let query = supabase
         .from('profiles')
         .select(
-          `*, membership_status(status, completed_shares, last_evaluated_at, reason, updated_at)`
+          `*, membership_status(status, completed_shares, last_evaluated_at, reason, updated_at)`,
+          { count: 'exact' }
         )
         .eq('role', 'member')
-        .order('full_name', { ascending: true })
+        .order(sortKey, { ascending: sortDir === 'asc' })
+        .range(from, to)
 
+      if (search) {
+        query = query.or(`full_name.ilike.%${search}%,employee_id.ilike.%${search}%`)
+      }
+
+      const { data, error, count } = await query
       if (error) throw error
 
-      // Also fetch equity summary per user
       const profileIds = (data ?? []).map((p: any) => p.id)
-      if (profileIds.length === 0) return [] as MemberRow[]
+      if (profileIds.length === 0) return { rows: [], total: count ?? 0 }
 
       const { data: shares } = await supabase
         .from('equity_shares')
@@ -43,12 +69,15 @@ export function useMembers() {
         }
       }
 
-      return (data ?? []).map((p: any) => ({
-        ...p,
-        membership_status: p.membership_status ?? null,
-        total_invested: equityMap[p.id]?.totalInvested ?? 0,
-        completed_shares: equityMap[p.id]?.completedShares ?? 0,
-      })) as MemberRow[]
+      return {
+        rows: (data ?? []).map((p: any) => ({
+          ...p,
+          membership_status: p.membership_status ?? null,
+          total_invested: equityMap[p.id]?.totalInvested ?? 0,
+          completed_shares: equityMap[p.id]?.completedShares ?? 0,
+        })) as MemberRow[],
+        total: count ?? 0,
+      }
     },
   })
 }
