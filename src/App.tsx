@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './context/AuthContext'
@@ -7,6 +8,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { useAuth } from './context/AuthContext'
 import { ErrorBoundary } from './components/shared/ErrorBoundary'
 import { OfflineBanner } from './components/shared/OfflineBanner'
+import { LoadingSpinner } from './components/shared/LoadingSpinner'
 
 function RootRedirect() {
   const { profile, loading } = useAuth()
@@ -14,34 +16,49 @@ function RootRedirect() {
   return <Navigate to={profile?.role === 'member' ? '/dashboard' : '/reports'} replace />
 }
 
-import { LoginPage } from './pages/auth/LoginPage'
-import { RegisterPage } from './pages/auth/RegisterPage'
-import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
-import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
-import { DashboardPage } from './pages/dashboard/DashboardPage'
-import { EquityPage } from './pages/equity/EquityPage'
-import { DepositRequestPage } from './pages/equity/DepositRequestPage'
-import { MembershipPage } from './pages/membership/MembershipPage'
-import { LendingPage } from './pages/lending/LendingPage'
-import { LoanDetailPage } from './pages/lending/LoanDetailPage'
-import { LoanCalculatorPage } from './pages/lending/LoanCalculatorPage'
-import { ReportsPage } from './pages/reports/ReportsPage'
-import { AdminPage } from './pages/admin/AdminPage'
-import { ConfigPage } from './pages/admin/ConfigPage'
-import { AppSettingsPage } from './pages/admin/AppSettingsPage'
-import { UsersPage } from './pages/admin/UsersPage'
-import { MembersPage } from './pages/admin/MembersPage'
-import { MemberDetailPage } from './pages/admin/MemberDetailPage'
-import { DepositRequestsPage } from './pages/admin/DepositRequestsPage'
-import { LoanApplicationsPage } from './pages/admin/LoanApplicationsPage'
-import { LoanProductsPage } from './pages/admin/LoanProductsPage'
-import { AdminLoanDetailPage } from './pages/admin/AdminLoanDetailPage'
-import { PermissionsPage } from './pages/admin/PermissionsPage'
-import { UserDetailPage } from './pages/admin/UserDetailPage'
-import { FaqPage } from './pages/FaqPage'
-import { ActivityPage } from './pages/activity/ActivityPage'
-import { ProfilePage } from './pages/profile/ProfilePage'
-import { ProfileCompletionPage } from './pages/auth/ProfileCompletionPage'
+function PageFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <LoadingSpinner size="lg" label="Loading…" />
+    </div>
+  )
+}
+
+// Auth pages
+const LoginPage = lazy(() => import('./pages/auth/LoginPage').then(m => ({ default: m.LoginPage })))
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage').then(m => ({ default: m.RegisterPage })))
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })))
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })))
+const ProfileCompletionPage = lazy(() => import('./pages/auth/ProfileCompletionPage').then(m => ({ default: m.ProfileCompletionPage })))
+
+// Member pages
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })))
+const EquityPage = lazy(() => import('./pages/equity/EquityPage').then(m => ({ default: m.EquityPage })))
+const DepositRequestPage = lazy(() => import('./pages/equity/DepositRequestPage').then(m => ({ default: m.DepositRequestPage })))
+const MembershipPage = lazy(() => import('./pages/membership/MembershipPage').then(m => ({ default: m.MembershipPage })))
+const LendingPage = lazy(() => import('./pages/lending/LendingPage').then(m => ({ default: m.LendingPage })))
+const LoanDetailPage = lazy(() => import('./pages/lending/LoanDetailPage').then(m => ({ default: m.LoanDetailPage })))
+const LoanCalculatorPage = lazy(() => import('./pages/lending/LoanCalculatorPage').then(m => ({ default: m.LoanCalculatorPage })))
+const ActivityPage = lazy(() => import('./pages/activity/ActivityPage').then(m => ({ default: m.ActivityPage })))
+const ProfilePage = lazy(() => import('./pages/profile/ProfilePage').then(m => ({ default: m.ProfilePage })))
+const FaqPage = lazy(() => import('./pages/FaqPage').then(m => ({ default: m.FaqPage })))
+
+// Admin / Staff pages
+const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })))
+const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
+const MembersPage = lazy(() => import('./pages/admin/MembersPage').then(m => ({ default: m.MembersPage })))
+const MemberDetailPage = lazy(() => import('./pages/admin/MemberDetailPage').then(m => ({ default: m.MemberDetailPage })))
+const DepositRequestsPage = lazy(() => import('./pages/admin/DepositRequestsPage').then(m => ({ default: m.DepositRequestsPage })))
+const LoanApplicationsPage = lazy(() => import('./pages/admin/LoanApplicationsPage').then(m => ({ default: m.LoanApplicationsPage })))
+const LoanProductsPage = lazy(() => import('./pages/admin/LoanProductsPage').then(m => ({ default: m.LoanProductsPage })))
+const AdminLoanDetailPage = lazy(() => import('./pages/admin/AdminLoanDetailPage').then(m => ({ default: m.AdminLoanDetailPage })))
+
+// Admin-only pages
+const AdminPage = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })))
+const ConfigPage = lazy(() => import('./pages/admin/ConfigPage').then(m => ({ default: m.ConfigPage })))
+const AppSettingsPage = lazy(() => import('./pages/admin/AppSettingsPage').then(m => ({ default: m.AppSettingsPage })))
+const PermissionsPage = lazy(() => import('./pages/admin/PermissionsPage').then(m => ({ default: m.PermissionsPage })))
+const UserDetailPage = lazy(() => import('./pages/admin/UserDetailPage').then(m => ({ default: m.UserDetailPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,63 +78,65 @@ export default function App() {
         <ToastProvider>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <OfflineBanner />
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<ErrorBoundary><LoginPage /></ErrorBoundary>} />
-            <Route path="/register" element={<ErrorBoundary><RegisterPage /></ErrorBoundary>} />
-            <Route path="/forgot-password" element={<ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
-            <Route path="/reset-password" element={<ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<ErrorBoundary><LoginPage /></ErrorBoundary>} />
+              <Route path="/register" element={<ErrorBoundary><RegisterPage /></ErrorBoundary>} />
+              <Route path="/forgot-password" element={<ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
+              <Route path="/reset-password" element={<ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
 
-            {/* Profile completion — no sidebar, same layout as auth pages */}
-            <Route path="/complete-profile" element={<ErrorBoundary><ProfileCompletionPage /></ErrorBoundary>} />
+              {/* Profile completion — no sidebar, same layout as auth pages */}
+              <Route path="/complete-profile" element={<ErrorBoundary><ProfileCompletionPage /></ErrorBoundary>} />
 
-            {/* Root redirect — authenticated only, role-aware */}
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<RootRedirect />} />
-            </Route>
+              {/* Root redirect — authenticated only, role-aware */}
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<RootRedirect />} />
+              </Route>
 
-            {/* FAQ — all authenticated users */}
-            <Route element={<AppLayout />}>
-              <Route path="/faq" element={<ErrorBoundary><FaqPage /></ErrorBoundary>} />
-            </Route>
+              {/* FAQ — all authenticated users */}
+              <Route element={<AppLayout />}>
+                <Route path="/faq" element={<ErrorBoundary><FaqPage /></ErrorBoundary>} />
+              </Route>
 
-            {/* Member only */}
-            <Route element={<AppLayout requiredRoles={['member']} />}>
-              <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-              <Route path="/equity" element={<ErrorBoundary><EquityPage /></ErrorBoundary>} />
-              <Route path="/equity/deposit-request" element={<ErrorBoundary><DepositRequestPage /></ErrorBoundary>} />
-              <Route path="/membership" element={<ErrorBoundary><MembershipPage /></ErrorBoundary>} />
-              <Route path="/lending" element={<ErrorBoundary><LendingPage /></ErrorBoundary>} />
-              <Route path="/lending/calculator" element={<ErrorBoundary><LoanCalculatorPage /></ErrorBoundary>} />
-              <Route path="/lending/:id" element={<ErrorBoundary><LoanDetailPage /></ErrorBoundary>} />
-              <Route path="/activity" element={<ErrorBoundary><ActivityPage /></ErrorBoundary>} />
-              <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
-            </Route>
+              {/* Member only */}
+              <Route element={<AppLayout requiredRoles={['member']} />}>
+                <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
+                <Route path="/equity" element={<ErrorBoundary><EquityPage /></ErrorBoundary>} />
+                <Route path="/equity/deposit-request" element={<ErrorBoundary><DepositRequestPage /></ErrorBoundary>} />
+                <Route path="/membership" element={<ErrorBoundary><MembershipPage /></ErrorBoundary>} />
+                <Route path="/lending" element={<ErrorBoundary><LendingPage /></ErrorBoundary>} />
+                <Route path="/lending/calculator" element={<ErrorBoundary><LoanCalculatorPage /></ErrorBoundary>} />
+                <Route path="/lending/:id" element={<ErrorBoundary><LoanDetailPage /></ErrorBoundary>} />
+                <Route path="/activity" element={<ErrorBoundary><ActivityPage /></ErrorBoundary>} />
+                <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
+              </Route>
 
-            {/* Admin + Staff */}
-            <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
-              <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
-              <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
-              <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
-              <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
-              <Route path="/admin/deposit-requests" element={<ErrorBoundary><DepositRequestsPage /></ErrorBoundary>} />
-              <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
-              <Route path="/admin/loans/:id" element={<ErrorBoundary><AdminLoanDetailPage /></ErrorBoundary>} />
-              <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
-            </Route>
+              {/* Admin + Staff */}
+              <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
+                <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
+                <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
+                <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
+                <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
+                <Route path="/admin/deposit-requests" element={<ErrorBoundary><DepositRequestsPage /></ErrorBoundary>} />
+                <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
+                <Route path="/admin/loans/:id" element={<ErrorBoundary><AdminLoanDetailPage /></ErrorBoundary>} />
+                <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
+              </Route>
 
-            {/* Admin only */}
-            <Route element={<AppLayout requiredRoles={['admin']} />}>
-              <Route path="/admin" element={<ErrorBoundary><AdminPage /></ErrorBoundary>} />
-              <Route path="/admin/config" element={<ErrorBoundary><ConfigPage /></ErrorBoundary>} />
-              <Route path="/admin/settings" element={<ErrorBoundary><AppSettingsPage /></ErrorBoundary>} />
-              <Route path="/admin/permissions" element={<ErrorBoundary><PermissionsPage /></ErrorBoundary>} />
-              <Route path="/admin/users/:id" element={<ErrorBoundary><UserDetailPage /></ErrorBoundary>} />
-            </Route>
+              {/* Admin only */}
+              <Route element={<AppLayout requiredRoles={['admin']} />}>
+                <Route path="/admin" element={<ErrorBoundary><AdminPage /></ErrorBoundary>} />
+                <Route path="/admin/config" element={<ErrorBoundary><ConfigPage /></ErrorBoundary>} />
+                <Route path="/admin/settings" element={<ErrorBoundary><AppSettingsPage /></ErrorBoundary>} />
+                <Route path="/admin/permissions" element={<ErrorBoundary><PermissionsPage /></ErrorBoundary>} />
+                <Route path="/admin/users/:id" element={<ErrorBoundary><UserDetailPage /></ErrorBoundary>} />
+              </Route>
 
-            {/* Fallback — redirect based on role */}
-            <Route path="*" element={<RootRedirect />} />
-          </Routes>
+              {/* Fallback — redirect based on role */}
+              <Route path="*" element={<RootRedirect />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
         </ToastProvider>
         </ImpersonationProvider>

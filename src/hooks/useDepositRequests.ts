@@ -175,7 +175,12 @@ export function useSubmitDepositRequest() {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        if (error.code === '23505' && error.message.includes('reference')) {
+          throw new Error('This reference number has already been used in a previous deposit request.')
+        }
+        throw error
+      }
       return data
     },
     onSuccess: () => {

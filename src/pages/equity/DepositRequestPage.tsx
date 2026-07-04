@@ -89,6 +89,7 @@ export function DepositRequestPage() {
     register,
     handleSubmit,
     watch,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -120,6 +121,22 @@ export function DepositRequestPage() {
 
   const onSubmit = async (values: FormValues) => {
     setUploadError(null)
+
+    // Check for duplicate reference number before uploading or submitting
+    if (values.reference && values.reference.trim() !== '') {
+      const { data: existing } = await supabase
+        .from('deposit_requests')
+        .select('id')
+        .eq('reference', values.reference.trim())
+        .limit(1)
+
+      if (existing && existing.length > 0) {
+        setError('reference', {
+          message: 'This reference number has already been used in a previous deposit request.',
+        })
+        return
+      }
+    }
 
     if (!selectedFile) {
       setUploadError('Please upload a receipt or deposit slip before submitting.')

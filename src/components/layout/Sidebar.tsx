@@ -214,9 +214,10 @@ const navGroups: NavGroup[] = [
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
+  onSearchOpen?: () => void
 }
 
-export function Sidebar({ isOpen, onClose }: SidebarProps) {
+export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
   const { profile, signOut } = useAuth()
   const { impersonatedUser } = useImpersonation()
   const { data: branding } = useAppBranding()
@@ -269,6 +270,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </svg>
         </button>
       </div>
+
+      {/* Search — admin/staff only, desktop */}
+      {onSearchOpen && (
+        <div className="px-3 pt-3 pb-1">
+          <button
+            onClick={onSearchOpen}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors text-sm"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span className="flex-1 text-left">Search…</span>
+            <kbd className="text-xs bg-gray-700 px-1.5 py-0.5 rounded text-gray-400">⌘K</kbd>
+          </button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-4">

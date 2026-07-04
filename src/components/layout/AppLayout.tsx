@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useImpersonation } from '../../context/ImpersonationContext'
 import { LoadingSpinner } from '../shared/LoadingSpinner'
 import { OfflineBanner } from '../shared/OfflineBanner'
+import { GlobalSearch } from '../shared/GlobalSearch'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 
@@ -34,11 +35,26 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
   const navigate = useNavigate()
   const { data: branding } = useAppBranding()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const isAdminOrStaff = profile?.role === 'admin' || profile?.role === 'staff'
 
   // Close sidebar on navigation
   useEffect(() => {
     setSidebarOpen(false)
   }, [location.pathname])
+
+  // Cmd+K / Ctrl+K global search shortcut (admin/staff only)
+  useEffect(() => {
+    if (!isAdminOrStaff) return
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(prev => !prev)
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [isAdminOrStaff])
 
   if (loading) {
     return (
@@ -59,6 +75,9 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <OfflineBanner />
+      {isAdminOrStaff && (
+        <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      )}
 
       {/* Mobile top bar */}
       <div className="fixed top-0 left-0 right-0 z-20 h-14 bg-gray-900 flex items-center px-4 gap-3 lg:hidden">
@@ -71,7 +90,7 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
             {branding?.logoUrl ? (
               <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-contain" />
@@ -82,8 +101,20 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
               </svg>
             )}
           </div>
-          <span className="text-white font-semibold text-sm">{branding?.name ?? 'CoopFinance'}</span>
+          <span className="text-white font-semibold text-sm truncate">{branding?.name ?? 'CoopFinance'}</span>
         </div>
+        {isAdminOrStaff && (
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="text-gray-300 hover:text-white p-1 rounded-md flex-shrink-0"
+            aria-label="Search"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Overlay backdrop for mobile sidebar */}
@@ -94,7 +125,11 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
         />
       )}
 
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onSearchOpen={isAdminOrStaff ? () => setSearchOpen(true) : undefined}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
         {isImpersonating && (

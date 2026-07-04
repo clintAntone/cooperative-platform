@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useAuth } from '../../context/AuthContext'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { useEffectiveUserId } from '../../context/ImpersonationContext'
 import { Header } from '../../components/layout/Header'
 import { Card, CardBody } from '../../components/ui/Card'
 import { SkeletonList } from '../../components/shared/Skeleton'
@@ -22,9 +22,9 @@ const entryTypeLabel: Record<string, string> = {
 }
 
 function useActivityLog(page: number) {
-  const { user } = useAuth()
+  const userId = useEffectiveUserId()
   return useQuery({
-    queryKey: ['activity_log', user?.id, page],
+    queryKey: ['activity_log', userId, page],
     queryFn: async () => {
       const from = page * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
@@ -32,14 +32,14 @@ function useActivityLog(page: number) {
       const { data, error, count } = await supabase
         .from('ledger_entries')
         .select('*', { count: 'exact' })
-        .eq('user_id', user!.id)
+        .eq('user_id', userId!)
         .order('created_at', { ascending: false })
         .range(from, to)
 
       if (error) throw error
       return { entries: (data ?? []) as LedgerEntry[], total: count ?? 0 }
     },
-    enabled: !!user?.id,
+    enabled: !!userId,
   })
 }
 

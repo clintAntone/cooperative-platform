@@ -35,7 +35,7 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 - [x] Add file size limit check in `uploadReceipt` before attempting upload (current behavior: hangs on large files)
 - [x] Add accepted file type validation in `uploadReceipt` (currently accepts anything)
 - [x] Add `debounce` to search inputs on Members and Users pages — currently fires a query on every keystroke
-- [ ] Add a brief description label next to each config key in the System Config page
+- [x] Add a brief description label next to each config key in the System Config page
 - [x] Add a "Clear" button to search/filter inputs
 
 ### Database
@@ -65,19 +65,19 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 - [x] **Toast notification system** — build a global `<ToastProvider>` with `useToast()` hook so any page can fire success/error toasts; wire up to all mutations
 - [x] **Error boundaries** — add a React error boundary around each page route so one broken component doesn't crash the whole app
 - [x] **Offline/network detection** — detect when the browser goes offline and show a banner; disable form submissions
-- [ ] **Pagination** — add page-based or cursor-based pagination to Members, Deposit Requests, Loan Applications, and Ledger lists (all currently cut off silently at a limit)
+- [x] **Pagination** — add page-based or cursor-based pagination to Members, Deposit Requests, Loan Applications, and Ledger lists (all currently cut off silently at a limit)
 - [x] **Forgot password flow** — add a `/forgot-password` page that calls `supabase.auth.resetPasswordForEmail()`
 - [ ] **Email verification** — require email verification on signup before the account can be activated
 - [x] **Loan amortization export** — add "Export Schedule" button on LoanDetailPage that downloads the repayment schedule as CSV/Excel
 - [ ] **Admin notes on members** — add an internal `notes` text field to the member detail page (stored in profiles or a separate table); only visible to staff/admin
 - [ ] **Overdue loan detection** — add a SQL function `get_overdue_loans()` that returns loans where the next scheduled installment date has passed and no payment was recorded; surface these prominently in admin Reports
-- [ ] **Date range filter on Reports** — let admin filter the member list, loan portfolio, and ledger by a date range
-- [ ] **Activity log page for members** — show member their own ledger/contribution history in a dedicated page (not just on Dashboard)
+- [x] **Date range filter on Reports** — let admin filter the member list, loan portfolio, and ledger by a date range
+- [x] **Activity log page for members** — show member their own ledger/contribution history in a dedicated page (not just on Dashboard)
 - [ ] **Audit log page for admin** — show a paginated list of all admin actions (approvals, rejections, config changes) pulled from a new `admin_audit_log` table
-- [ ] **Mobile-friendly tables** — on small screens, switch from horizontal-scroll tables to stacked card rows (one card per record with label: value layout)
+- [x] **Mobile-friendly tables** — on small screens, switch from horizontal-scroll tables to stacked card rows (one card per record with label: value layout)
 - [x] **Skeleton loading placeholders** — replace `PageLoader` full-screen spinners with skeleton cards so the layout doesn't jump
 - [x] **Loan calculator standalone page** — a page where any active member can enter an amount/term and see projected monthly payment without starting an application
-- [ ] **Config change audit trail** — display `system_config_history` in the System Config page so admin can see previous values and who changed them
+- [x] **Config change audit trail** — display `system_config_history` in the System Config page so admin can see previous values and who changed them
 - [ ] **Session timeout warning** — detect Supabase session expiry and show a "Your session is about to expire" banner with a refresh option
 - [ ] **Member document upload** — allow members to attach a government ID or proof of address during registration or from their profile
 - [x] **Refetch interval on co-maker requests** — `useMyCoMakerRequests` has no polling; add `refetchInterval: 60_000` so the badge updates without page refresh
@@ -99,7 +99,7 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 - [ ] **Full mobile layout audit** — go through every page and ensure touch target sizes are at least 44×44px, spacing is comfortable, and no content is cut off
 
 ### Search & Discovery
-- [ ] **Global search** — add a search bar in the top header that searches across members, loan applications, deposit requests, and transactions simultaneously (Supabase full-text search or a client-side filter on cached data)
+- [x] **Global search** — add a search bar in the top header that searches across members, loan applications, deposit requests, and transactions simultaneously (Supabase full-text search or a client-side filter on cached data)
 - [ ] **Faceted filtering** — allow filtering lists by multiple criteria at once (e.g., status + date range + amount range)
 
 ### Notifications
@@ -118,13 +118,13 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 - [ ] **IP-based anomaly detection** — flag logins from unusual locations (requires Edge Function + logging)
 
 ### Admin Power Features
-- [ ] **Bulk actions** — bulk approve/reject deposit requests; bulk activate/suspend members
-- [ ] **User impersonation** — allow admin to log in as a member to debug their experience (requires careful RLS and audit logging)
+- [x] **Bulk actions** — bulk approve/reject deposit requests; bulk activate/suspend members
+- [x] **User impersonation** — allow admin to log in as a member to debug their experience (requires careful RLS and audit logging)
 - [ ] **Customizable member fields** — allow admin to add custom profile fields (e.g., department, branch) without code changes
 - [ ] **Loan restructuring** — allow admin to modify an existing active loan's term or interest rate and regenerate the schedule
 
 ### Performance
-- [ ] **Code splitting** — split the ~966KB JS bundle by route using dynamic `import()` so each page only loads what it needs; this is the single biggest performance improvement
+- [x] **Code splitting** — split the ~966KB JS bundle by route using dynamic `import()` so each page only loads what it needs; this is the single biggest performance improvement
 - [ ] **Virtual scrolling** — use a library like `react-virtual` for tables with hundreds of rows
 - [ ] **Selective column fetching** — audit all Supabase `.select('*')` calls and replace with only the columns actually needed
 
@@ -134,13 +134,31 @@ Items are grouped by effort level. Within each group, higher-impact items are li
 
 | Group | Count | Done | Remaining |
 |---|---|---|---|
-| 🟢 Quick wins | 34 | 34 | 0 |
-| 🟡 Medium effort | 21 | 9 | 12 |
-| 🔴 Large effort | 20 | 4 | 16 |
+| 🟢 Quick wins | 33 | 33 | 0 |
+| 🟡 Medium effort | 21 | 16 | 5 |
+| 🔴 Large effort | 20 | 6 | 14 |
 
 **All quick wins complete!** Remaining medium-effort items to tackle next:
-- Pagination on Members, Deposit Requests, Loan Applications, Ledger
-- Config key description labels in System Config
+- Email verification on signup
+- Admin notes on members
+- Overdue loan detection (partial — status exists in data model, no dedicated admin view)
+- Audit log page for admin (logging exists, no dedicated page yet)
+- Session timeout warning
+- Member document upload
+- Password strength indicator
+
+Remaining large-effort items:
 - CSV export option alongside Excel
-- Overdue loan detection
-- Date range filter on Reports page
+- Global search
+- Faceted filtering
+- In-app notification center
+- Email notifications via Edge Functions
+- Scheduled report emails
+- Two-factor authentication (2FA)
+- GDPR data export
+- IP-based anomaly detection
+- Customizable member fields
+- Loan restructuring
+- Code splitting
+- Virtual scrolling
+- Selective column fetching
