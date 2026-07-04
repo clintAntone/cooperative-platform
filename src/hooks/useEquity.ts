@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { EquityShare, EquityContribution } from '../types'
 import { useAuth } from '../context/AuthContext'
 import { useEffectiveUserId } from '../context/ImpersonationContext'
+import { toast } from '../lib/toast'
 
 export function useEquityShares(userId?: string) {
   const effectiveUserId = useEffectiveUserId()
@@ -134,16 +135,15 @@ export function useAdminDeleteShare(memberId: string) {
 
   return useMutation({
     mutationFn: async (shareId: string) => {
-      const { error } = await supabase
-        .from('equity_shares')
-        .delete()
-        .eq('id', shareId)
-        .eq('paid_amount', 0)
+      const { error } = await (supabase.rpc as any)('admin_delete_share', { p_share_id: shareId })
       if (error) throw error
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equity_shares', memberId] })
       queryClient.invalidateQueries({ queryKey: ['member_detail', memberId] })
+    },
+    onError: (err: any) => {
+      toast({ title: err.message ?? 'Cannot delete share', variant: 'error' })
     },
   })
 }

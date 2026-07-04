@@ -1,6 +1,7 @@
 export type UserRole = 'admin' | 'member' | 'staff'
 export type AccountStatus = 'active' | 'suspended' | 'inactive'
 export type MembershipStatusValue = 'pending' | 'active' | 'suspended' | 'inactive'
+export type CivilStatus = 'single' | 'married' | 'widowed' | 'separated' | 'divorced'
 export type EquityShareStatus = 'in_progress' | 'completed' | 'cancelled'
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'mobile_money'
 export type LoanApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'cancelled'
@@ -41,6 +42,13 @@ export interface Profile {
   role: UserRole
   account_status: AccountStatus
   employee_id: string | null
+  avatar_url: string | null
+  date_of_birth: string | null
+  address: string | null
+  civil_status: CivilStatus | null
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
+  profile_completed_at: string | null
   created_at: string
   updated_at: string
 }

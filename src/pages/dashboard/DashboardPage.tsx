@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useEffectiveUserId } from '../../context/ImpersonationContext'
 import { useEquitySummary } from '../../hooks/useEquity'
@@ -61,9 +62,33 @@ export function DashboardPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-6">
+        {/* Profile completion banner */}
+        {!profile?.profile_completed_at && (
+          <Link
+            to="/complete-profile"
+            className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100 transition-colors group"
+          >
+            <div className="flex-shrink-0 w-9 h-9 bg-amber-100 group-hover:bg-amber-200 rounded-full flex items-center justify-center transition-colors">
+              <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800">Action required: Complete your profile</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                You need to fill in your personal details before you can submit deposit requests or apply for loans.
+              </p>
+            </div>
+            <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        )}
+
         {/* Stats grid */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
+            href="/equity"
             title="Total Equity Invested"
             value={currency(equitySummary?.totalInvested ?? 0)}
             subtitle={`${equitySummary?.totalShares ?? 0} share(s) total`}
@@ -76,6 +101,7 @@ export function DashboardPage() {
           />
 
           <StatCard
+            href="/equity"
             title="Completed Shares"
             value={equitySummary?.completedShares ?? 0}
             subtitle="Fully paid shares"
@@ -88,6 +114,7 @@ export function DashboardPage() {
           />
 
           <StatCard
+            href="/membership"
             title="Membership Status"
             value={membershipStatus?.status ? (
               membershipStatus.status.charAt(0).toUpperCase() + membershipStatus.status.slice(1)
@@ -102,6 +129,7 @@ export function DashboardPage() {
           />
 
           <StatCard
+            href="/lending"
             title="Loan Outstanding"
             value={currency(totalOutstanding)}
             subtitle={nextDueDate ? `Next due: ${formatDate(nextDueDate)}` : activeLoans.length === 0 ? 'No active loans' : ''}

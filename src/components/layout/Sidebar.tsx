@@ -79,6 +79,16 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
+      {
+        path: '/profile',
+        label: 'My Profile',
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        ),
+      },
     ],
   },
 
@@ -293,6 +303,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     <span className="relative flex h-2.5 w-2.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400" />
+                    </span>
+                  )}
+                  {item.path === '/profile' && !profile?.profile_completed_at && (
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
                     </span>
                   )}
                 </NavLink>

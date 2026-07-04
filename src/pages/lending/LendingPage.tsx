@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, NavLink } from 'react-router-dom'
+import { useNavigate, NavLink, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
@@ -11,6 +11,7 @@ import { Table, Thead, Tbody, Th, Tr, Td } from '../../components/ui/Table'
 import { LoanApplicationForm } from './LoanApplicationForm'
 import { useLoanApplications, useLoans, useMyCoMakerRequests, useRespondToCoMakerRequest, useMyApplicationCoMakers } from '../../hooks/useLoans'
 import { useMembershipStatus } from '../../hooks/useMembership'
+import { useAuth } from '../../context/AuthContext'
 import { formatDate } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
 import { supabase } from '../../lib/supabase'
@@ -32,6 +33,8 @@ function useLoanConfigured() {
 
 export function LendingPage() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const profileIncomplete = !profile?.profile_completed_at
   const { data: membershipStatus, isLoading: membershipLoading } = useMembershipStatus()
   const { data: applications, isLoading: applicationsLoading } = useLoanApplications()
   const { data: loans, isLoading: loansLoading } = useLoans()
@@ -106,7 +109,8 @@ export function LendingPage() {
               <Button
                 size="sm"
                 onClick={() => setIsApplyModalOpen(true)}
-                disabled={!canApply}
+                disabled={!canApply || profileIncomplete}
+                title={profileIncomplete ? 'Complete your profile before applying for a loan' : undefined}
               >
                 Apply for Loan
               </Button>
@@ -114,6 +118,22 @@ export function LendingPage() {
           </div>
         }
       />
+
+      {/* Profile incomplete notice */}
+      {profileIncomplete && (
+        <div className="mx-4 sm:mx-6 mt-4 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Profile incomplete</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              You must complete your personal details before applying for a loan.{' '}
+              <Link to="/complete-profile" className="underline font-medium">Complete now →</Link>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200 px-4 sm:px-6">

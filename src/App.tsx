@@ -37,8 +37,11 @@ import { LoanApplicationsPage } from './pages/admin/LoanApplicationsPage'
 import { LoanProductsPage } from './pages/admin/LoanProductsPage'
 import { AdminLoanDetailPage } from './pages/admin/AdminLoanDetailPage'
 import { PermissionsPage } from './pages/admin/PermissionsPage'
+import { UserDetailPage } from './pages/admin/UserDetailPage'
 import { FaqPage } from './pages/FaqPage'
 import { ActivityPage } from './pages/activity/ActivityPage'
+import { ProfilePage } from './pages/profile/ProfilePage'
+import { ProfileCompletionPage } from './pages/auth/ProfileCompletionPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,6 +68,9 @@ export default function App() {
             <Route path="/forgot-password" element={<ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
             <Route path="/reset-password" element={<ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
 
+            {/* Profile completion — no sidebar, same layout as auth pages */}
+            <Route path="/complete-profile" element={<ErrorBoundary><ProfileCompletionPage /></ErrorBoundary>} />
+
             {/* Root redirect — authenticated only, role-aware */}
             <Route element={<AppLayout />}>
               <Route path="/" element={<RootRedirect />} />
@@ -85,6 +91,7 @@ export default function App() {
               <Route path="/lending/calculator" element={<ErrorBoundary><LoanCalculatorPage /></ErrorBoundary>} />
               <Route path="/lending/:id" element={<ErrorBoundary><LoanDetailPage /></ErrorBoundary>} />
               <Route path="/activity" element={<ErrorBoundary><ActivityPage /></ErrorBoundary>} />
+              <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
             </Route>
 
             {/* Admin + Staff */}
@@ -105,6 +112,7 @@ export default function App() {
               <Route path="/admin/config" element={<ErrorBoundary><ConfigPage /></ErrorBoundary>} />
               <Route path="/admin/settings" element={<ErrorBoundary><AppSettingsPage /></ErrorBoundary>} />
               <Route path="/admin/permissions" element={<ErrorBoundary><PermissionsPage /></ErrorBoundary>} />
+              <Route path="/admin/users/:id" element={<ErrorBoundary><UserDetailPage /></ErrorBoundary>} />
             </Route>
 
             {/* Fallback — redirect based on role */}

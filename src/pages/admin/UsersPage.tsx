@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
@@ -7,7 +8,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { SkeletonPage } from '../../components/shared/Skeleton'
 import { exportToExcel } from '../../lib/exportExcel'
-import type { UserRole, AccountStatus, MembershipStatusValue } from '../../types'
+import type { UserRole, AccountStatus } from '../../types'
 
 interface UserRow {
   id: string
@@ -16,7 +17,7 @@ interface UserRow {
   phone: string | null
   role: UserRole
   account_status: AccountStatus
-  membership_status: MembershipStatusValue | null
+  membership_status: string | null
   completed_shares: number | null
   created_at: string
   deleted_at?: string | null
@@ -53,15 +54,10 @@ const statusColors: Record<AccountStatus, string> = {
   inactive: 'bg-gray-100 text-gray-500',
 }
 
-const membershipColors: Record<MembershipStatusValue, string> = {
-  active: 'bg-green-100 text-green-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  suspended: 'bg-red-100 text-red-800',
-  inactive: 'bg-gray-100 text-gray-500',
-}
 
 export function UsersPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [editState, setEditState] = useState<EditState | null>(null)
@@ -81,6 +77,14 @@ export function UsersPage() {
   const cancelLongPress = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
     setPressingId(null)
+  }
+
+  const handleRowClick = (user: UserRow) => {
+    if (user.role === 'member') {
+      navigate(`/admin/members/${user.id}`)
+    } else {
+      navigate(`/admin/users/${user.id}`)
+    }
   }
 
   const { data: users = [], isLoading } = useQuery({
@@ -239,11 +243,12 @@ export function UsersPage() {
           {filtered.map(user => (
             <div
               key={user.id}
-              className={`bg-white rounded-xl border px-4 py-3.5 space-y-2.5 select-none transition-colors ${
+              className={`bg-white rounded-xl border px-4 py-3.5 space-y-2.5 select-none transition-colors cursor-pointer ${
                 pressingId === user.id
                   ? 'border-red-300 bg-red-50'
-                  : 'border-gray-200'
+                  : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
               }`}
+              onClick={() => handleRowClick(user)}
               onTouchStart={() => startLongPress(user.id)}
               onTouchEnd={cancelLongPress}
               onTouchCancel={cancelLongPress}
@@ -265,11 +270,6 @@ export function UsersPage() {
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[user.account_status]}`}>
                   {user.account_status}
                 </span>
-                {user.membership_status && (
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${membershipColors[user.membership_status]}`}>
-                    {user.membership_status} membership
-                  </span>
-                )}
               </div>
 
               {/* Meta row */}
@@ -283,6 +283,7 @@ export function UsersPage() {
               <div
                 className="flex items-center gap-2 pt-0.5 border-t border-gray-100"
                 onTouchStart={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
               >
                 <button
                   onClick={() => setEditState({ user, field: 'role', newValue: user.role })}
@@ -309,7 +310,6 @@ export function UsersPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Account Status</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Membership</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Shares</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Joined</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
@@ -318,13 +318,17 @@ export function UsersPage() {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-gray-400">
+                  <td colSpan={6} className="text-center py-10 text-gray-400">
                     No users found
                   </td>
                 </tr>
               )}
               {filtered.map(user => (
-                <tr key={user.id} className="hover:bg-gray-50">
+                <tr
+                  key={user.id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => handleRowClick(user)}
+                >
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{user.full_name}</p>
                     {user.phone && <p className="text-xs text-gray-400">{user.phone}</p>}
@@ -339,22 +343,13 @@ export function UsersPage() {
                       {user.account_status}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    {user.membership_status ? (
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${membershipColors[user.membership_status]}`}>
-                        {user.membership_status}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">—</span>
-                    )}
-                  </td>
                   <td className="px-4 py-3 text-gray-700">
                     {user.completed_shares ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setEditState({ user, field: 'role', newValue: user.role })}
