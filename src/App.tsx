@@ -13,7 +13,9 @@ import { LoadingSpinner } from './components/shared/LoadingSpinner'
 function RootRedirect() {
   const { profile, loading } = useAuth()
   if (loading) return null
-  return <Navigate to={profile?.role === 'member' ? '/dashboard' : '/reports'} replace />
+  const role = profile?.role
+  if (role === 'member' || role === 'collector') return <Navigate to="/dashboard" replace />
+  return <Navigate to="/reports" replace />
 }
 
 function PageFallback() {
@@ -52,6 +54,10 @@ const DepositRequestsPage = lazy(() => import('./pages/admin/DepositRequestsPage
 const LoanApplicationsPage = lazy(() => import('./pages/admin/LoanApplicationsPage').then(m => ({ default: m.LoanApplicationsPage })))
 const LoanProductsPage = lazy(() => import('./pages/admin/LoanProductsPage').then(m => ({ default: m.LoanProductsPage })))
 const AdminLoanDetailPage = lazy(() => import('./pages/admin/AdminLoanDetailPage').then(m => ({ default: m.AdminLoanDetailPage })))
+
+// Collector pages
+const BatchDepositPage = lazy(() => import('./pages/collector/BatchDepositPage').then(m => ({ default: m.BatchDepositPage })))
+const BatchDepositsPage = lazy(() => import('./pages/admin/BatchDepositsPage').then(m => ({ default: m.BatchDepositsPage })))
 
 // Admin-only pages
 const AdminPage = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })))
@@ -99,8 +105,8 @@ export default function App() {
                 <Route path="/faq" element={<ErrorBoundary><FaqPage /></ErrorBoundary>} />
               </Route>
 
-              {/* Member only */}
-              <Route element={<AppLayout requiredRoles={['member']} />}>
+              {/* Member + Collector */}
+              <Route element={<AppLayout requiredRoles={['member', 'collector']} />}>
                 <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
                 <Route path="/equity" element={<ErrorBoundary><EquityPage /></ErrorBoundary>} />
                 <Route path="/equity/deposit-request" element={<ErrorBoundary><DepositRequestPage /></ErrorBoundary>} />
@@ -112,6 +118,12 @@ export default function App() {
                 <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
               </Route>
 
+              {/* Collector only */}
+              <Route element={<AppLayout requiredRoles={['collector']} />}>
+                <Route path="/batch-deposit" element={<ErrorBoundary><BatchDepositPage /></ErrorBoundary>} />
+                <Route path="/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
+              </Route>
+
               {/* Admin + Staff */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
                 <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
@@ -119,6 +131,7 @@ export default function App() {
                 <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
                 <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
                 <Route path="/admin/deposit-requests" element={<ErrorBoundary><DepositRequestsPage /></ErrorBoundary>} />
+                <Route path="/admin/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
                 <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
                 <Route path="/admin/loans/:id" element={<ErrorBoundary><AdminLoanDetailPage /></ErrorBoundary>} />
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />

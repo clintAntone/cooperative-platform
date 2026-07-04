@@ -26,7 +26,7 @@ const navGroups: NavGroup[] = [
   // Member nav
   {
     label: 'My Account',
-    roles: ['member'],
+    roles: ['member', 'collector'],
     items: [
       {
         path: '/dashboard',
@@ -60,7 +60,7 @@ const navGroups: NavGroup[] = [
       },
       {
         path: '/lending',
-        label: 'Lending',
+        label: 'Loan',
         end: true,
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -79,13 +79,31 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
+    ],
+  },
+
+  // Collector nav
+  {
+    label: 'Collector',
+    roles: ['collector'],
+    items: [
       {
-        path: '/profile',
-        label: 'My Profile',
+        path: '/batch-deposit',
+        label: 'Batch Deposit',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
+      },
+      {
+        path: '/batch-deposits',
+        label: 'My Batches',
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         ),
       },
@@ -166,6 +184,16 @@ const navGroups: NavGroup[] = [
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        ),
+      },
+      {
+        path: '/admin/batch-deposits',
+        label: 'Batch Deposits',
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
         ),
       },
@@ -323,12 +351,6 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400" />
                     </span>
                   )}
-                  {item.path === '/profile' && !profile?.profile_completed_at && (
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
-                    </span>
-                  )}
                 </NavLink>
               ))}
             </div>
@@ -336,35 +358,38 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Help link — visible to all */}
-      <div className="px-3 pb-2">
-        <NavLink
-          to="/faq"
-          className={({ isActive }) =>
-            cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-              isActive
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-            )
-          }
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Help & FAQ
-        </NavLink>
-      </div>
-
       {/* User info and sign out */}
       <div className="px-4 py-4 border-t border-gray-700">
         {profile && (
-          <div className="mb-3 px-2">
-            <p className="text-sm font-medium text-white truncate">{profile.full_name}</p>
-            <p className="text-xs text-gray-400 capitalize">{profile.role}</p>
-          </div>
+          <NavLink
+            to="/profile"
+            onClick={onClose}
+            className={({ isActive }) =>
+              cn(
+                'mb-3 flex items-center gap-3 px-2 py-1.5 rounded-lg transition-colors',
+                isActive ? 'bg-gray-700' : 'hover:bg-gray-700'
+              )
+            }
+          >
+            <div className="w-9 h-9 rounded-full bg-gray-700 flex-shrink-0 overflow-hidden">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm font-semibold">
+                  {profile.full_name?.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white truncate">{profile.full_name}</p>
+              <p className="text-xs text-gray-400 capitalize">{profile.role}</p>
+            </div>
+            <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </NavLink>
         )}
+        <div className="border-t border-gray-700 mb-2" />
         <button
           onClick={() => setConfirmSignOut(true)}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"

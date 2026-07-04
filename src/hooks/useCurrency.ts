@@ -10,7 +10,7 @@ export function useCurrency() {
         .from('system_config')
         .select('config_value')
         .eq('config_key', 'currency_symbol')
-        .single()
+        .maybeSingle()
       return data?.config_value ?? '₱'
     },
     staleTime: Infinity, // currency rarely changes — cached for the session

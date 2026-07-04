@@ -6,6 +6,8 @@ import { useImpersonation } from '../../context/ImpersonationContext'
 import { LoadingSpinner } from '../shared/LoadingSpinner'
 import { OfflineBanner } from '../shared/OfflineBanner'
 import { GlobalSearch } from '../shared/GlobalSearch'
+import { ProfileCompletionModal } from '../shared/ProfileCompletionModal'
+import { HelpModal } from '../shared/HelpModal'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 
@@ -36,6 +38,7 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
   const { data: branding } = useAppBranding()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const isAdminOrStaff = profile?.role === 'admin' || profile?.role === 'staff'
 
   // Close sidebar on navigation
@@ -77,6 +80,9 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
       <OfflineBanner />
       {isAdminOrStaff && (
         <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      )}
+      {profile && !profile.profile_completed_at && (profile.role === 'member' || profile.role === 'collector') && (
+        <ProfileCompletionModal />
       )}
 
       {/* Mobile top bar */}
@@ -159,6 +165,24 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
         <main className={`flex-1 overflow-auto ${isImpersonating ? '' : 'pt-14 lg:pt-0'}`}>
           <Outlet />
         </main>
+
+        {/* Floating Help button */}
+        <button
+          onClick={() => setHelpOpen(o => !o)}
+          className="fixed bottom-5 right-5 z-40 w-11 h-11 rounded-full bg-white border border-gray-200 shadow-lg flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-300 hover:shadow-xl transition-all"
+          aria-label="Help & FAQ"
+        >
+          {helpOpen ? (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+        </button>
+        <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
       </div>
     </div>
   )

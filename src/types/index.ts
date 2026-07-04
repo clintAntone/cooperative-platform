@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'member' | 'staff'
+export type UserRole = 'admin' | 'member' | 'staff' | 'collector'
 export type AccountStatus = 'active' | 'suspended' | 'inactive'
 export type MembershipStatusValue = 'pending' | 'active' | 'suspended' | 'inactive'
 export type CivilStatus = 'single' | 'married' | 'widowed' | 'separated' | 'divorced'

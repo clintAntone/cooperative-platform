@@ -218,23 +218,6 @@ export function MembersPage() {
                   </div>
                 )}
 
-                {/* Bulk action bar */}
-                {selectedMemberIds.size > 0 && (
-                  <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
-                    <span className="text-sm font-medium text-blue-800">{selectedMemberIds.size} selected</span>
-                    <div className="flex gap-2 ml-auto">
-                      <Button size="sm" variant="primary" onClick={() => { setShowBulkModal('activate'); setBulkReason('') }}>
-                        Activate Selected
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => { setShowBulkModal('suspend'); setBulkReason('') }}>
-                        Suspend Selected
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setSelectedMemberIds(new Set())}>
-                        Clear
-                      </Button>
-                    </div>
-                  </div>
-                )}
 
                 {/* Search + filters + actions */}
                 <div className="flex flex-col gap-2">
@@ -295,8 +278,15 @@ export function MembersPage() {
                           className="bg-white rounded-xl border border-gray-200 px-4 py-3 cursor-pointer active:bg-gray-50"
                           onClick={() => navigate(`/admin/members/${member.id}`)}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm text-gray-900">{member.full_name}</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium text-sm text-gray-900 truncate">{member.full_name}</span>
+                              {member.role === 'collector' && (
+                                <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
+                                  Collector
+                                </span>
+                              )}
+                            </div>
                             {msStatus ? <StatusBadge status={msStatus} /> : <StatusBadge status="pending" />}
                           </div>
                           {member.employee_id && <p className="font-mono text-xs text-gray-400 mt-0.5">{member.employee_id}</p>}
@@ -395,7 +385,14 @@ export function MembersPage() {
                               />
                             </td>
                             <td className="px-4 py-3">
-                              <p className="font-medium text-gray-900">{member.full_name}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-gray-900">{member.full_name}</p>
+                                {member.role === 'collector' && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
+                                    Collector
+                                  </span>
+                                )}
+                              </div>
                               {member.phone && <p className="text-xs text-gray-400">{member.phone}</p>}
                             </td>
                             <td className="px-4 py-3 text-gray-600">
@@ -456,6 +453,24 @@ export function MembersPage() {
 
         {activeTab === 'employees' && <EmployeesTab />}
       </div>
+
+      {/* Bulk action bar — fixed at bottom, only visible when items are selected */}
+      {selectedMemberIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center gap-3 bg-white border-t border-gray-200 shadow-lg px-4 py-3 lg:left-64">
+          <span className="text-sm font-medium text-gray-700">{selectedMemberIds.size} selected</span>
+          <div className="flex gap-2 ml-auto">
+            <Button size="sm" variant="primary" onClick={() => { setShowBulkModal('activate'); setBulkReason('') }}>
+              Activate Selected
+            </Button>
+            <Button size="sm" variant="danger" onClick={() => { setShowBulkModal('suspend'); setBulkReason('') }}>
+              Suspend Selected
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedMemberIds(new Set())}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Bulk Activate/Suspend Modal */}
       <Modal

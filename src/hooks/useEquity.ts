@@ -114,7 +114,7 @@ export function useShareLimit(overrideUserId?: string) {
           .from('system_config')
           .select('config_value')
           .eq('config_key', 'max_shares_per_member')
-          .single(),
+          .maybeSingle(),
         supabase
           .from('equity_shares')
           .select('id', { count: 'exact', head: true })

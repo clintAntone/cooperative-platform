@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import { useImpersonation } from '../../context/ImpersonationContext'
 import { Card } from '../../components/ui/Card'
@@ -15,6 +16,8 @@ import { useLoans } from '../../hooks/useLoans'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, formatDateTime, getProgressPercent } from '../../lib/utils'
 import { exportMemberStatementPdf } from '../../lib/exportPdf'
+import { supabase } from '../../lib/supabase'
+import { toast } from '../../lib/toast'
 import type { EquityContribution, DepositRequest } from '../../types'
 
 interface ContributionDetailModalProps {
@@ -75,6 +78,29 @@ export function MemberDetailPage() {
   const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
   const [shareError, setShareError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [promoteConfirm, setPromoteConfirm] = useState(false)
+  const [demoteConfirm, setDemoteConfirm] = useState(false)
+
+  const queryClient = useQueryClient()
+
+  const changeRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: 'collector' | 'member' }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role })
+        .eq('id', userId)
+      if (error) throw error
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['member_detail', variables.userId] })
+      queryClient.invalidateQueries({ queryKey: ['members_list'] })
+      const action = variables.role === 'collector' ? 'promoted to Collector' : 'demoted to Member'
+      toast({ title: `Member ${action}`, variant: 'success' })
+    },
+    onError: (err: any) => {
+      toast({ title: err.message ?? 'Failed to update role', variant: 'error' })
+    },
+  })
 
   if (isLoading) return <SkeletonDetailPage />
   if (!data) return <div className="p-6 text-gray-500">Member not found.</div>
@@ -125,6 +151,30 @@ export function MemberDetailPage() {
             </svg>
           </button>
           <div className="flex items-center gap-2 ml-auto">
+          {adminProfile?.role === 'admin' && profile.role === 'member' && (
+            <button
+              title="Promote to Collector"
+              onClick={() => setPromoteConfirm(true)}
+              className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 11l5-5m0 0l5 5m-5-5v12" />
+              </svg>
+              <span className="hidden sm:inline">Promote to Collector</span>
+            </button>
+          )}
+          {adminProfile?.role === 'admin' && profile.role === 'collector' && (
+            <button
+              title="Demote to Member"
+              onClick={() => setDemoteConfirm(true)}
+              className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+              </svg>
+              <span className="hidden sm:inline">Demote to Member</span>
+            </button>
+          )}
           {adminProfile?.role === 'admin' && (
             <button
               title="View as this member"
@@ -578,6 +628,66 @@ export function MemberDetailPage() {
               onClick={handleReject}
             >
               Reject
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Promote to Collector modal */}
+      <Modal
+        isOpen={promoteConfirm}
+        onClose={() => setPromoteConfirm(false)}
+        title="Promote to Collector"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Promote <span className="font-semibold">{profile.full_name}</span> to Collector?
+            They will be able to submit batch deposits on behalf of other members.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setPromoteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={changeRoleMutation.isPending}
+              onClick={async () => {
+                await changeRoleMutation.mutateAsync({ userId: profile.id, role: 'collector' })
+                setPromoteConfirm(false)
+              }}
+            >
+              Promote to Collector
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Demote to Member modal */}
+      <Modal
+        isOpen={demoteConfirm}
+        onClose={() => setDemoteConfirm(false)}
+        title="Demote to Member"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Demote <span className="font-semibold">{profile.full_name}</span> back to Member?
+            They will no longer be able to submit batch deposits.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setDemoteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={changeRoleMutation.isPending}
+              onClick={async () => {
+                await changeRoleMutation.mutateAsync({ userId: profile.id, role: 'member' })
+                setDemoteConfirm(false)
+              }}
+            >
+              Demote to Member
             </Button>
           </div>
         </div>

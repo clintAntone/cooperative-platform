@@ -41,7 +41,7 @@ export function useMembers(params?: {
           `*, membership_status(status, completed_shares, last_evaluated_at, reason, updated_at)`,
           { count: 'exact' }
         )
-        .eq('role', 'member')
+        .in('role', ['member', 'collector'])
         .order(sortKey, { ascending: sortDir === 'asc' })
         .range(from, to)
 

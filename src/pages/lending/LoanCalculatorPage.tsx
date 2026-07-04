@@ -90,7 +90,7 @@ export function LoanCalculatorPage() {
   return (
     <div>
       <Header
-        title="Lending"
+        title="Loan"
         subtitle="Loan applications and active loans"
       />
 
