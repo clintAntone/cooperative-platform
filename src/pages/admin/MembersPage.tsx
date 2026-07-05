@@ -282,9 +282,10 @@ export function MembersPage() {
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="font-medium text-sm text-gray-900 truncate">{member.full_name}</span>
                               {member.role === 'collector' && (
-                                <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
-                                  Collector
-                                </span>
+                                <svg className="flex-shrink-0 w-3.5 h-3.5 text-indigo-500" fill="currentColor" viewBox="0 0 24 24">
+                                  <title>Collector</title>
+                                  <path d="M5 3a2 2 0 00-2 2v16l7-3 7 3V5a2 2 0 00-2-2H5z" />
+                                </svg>
                               )}
                             </div>
                             {msStatus ? <StatusBadge status={msStatus} /> : <StatusBadge status="pending" />}
@@ -388,9 +389,9 @@ export function MembersPage() {
                               <div className="flex items-center gap-2">
                                 <p className="font-medium text-gray-900">{member.full_name}</p>
                                 {member.role === 'collector' && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 uppercase tracking-wide">
-                                    Collector
-                                  </span>
+                                  <svg className="flex-shrink-0 w-3.5 h-3.5 text-indigo-500" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M5 3a2 2 0 00-2 2v16l7-3 7 3V5a2 2 0 00-2-2H5z" />
+                                  </svg>
                                 )}
                               </div>
                               {member.phone && <p className="text-xs text-gray-400">{member.phone}</p>}
@@ -455,22 +456,31 @@ export function MembersPage() {
       </div>
 
       {/* Bulk action bar — fixed at bottom, only visible when items are selected */}
-      {selectedMemberIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center gap-3 bg-white border-t border-gray-200 shadow-lg px-4 py-3 lg:left-64">
-          <span className="text-sm font-medium text-gray-700">{selectedMemberIds.size} selected</span>
-          <div className="flex gap-2 ml-auto">
-            <Button size="sm" variant="primary" onClick={() => { setShowBulkModal('activate'); setBulkReason('') }}>
-              Activate Selected
-            </Button>
-            <Button size="sm" variant="danger" onClick={() => { setShowBulkModal('suspend'); setBulkReason('') }}>
-              Suspend Selected
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelectedMemberIds(new Set())}>
-              Clear
-            </Button>
+      {selectedMemberIds.size > 0 && (() => {
+        const selected = members.filter(m => selectedMemberIds.has(m.id))
+        const allActive = selected.every(m => m.membership_status?.status === 'active')
+        const allSuspended = selected.every(m => m.membership_status?.status === 'suspended')
+        return (
+          <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center gap-3 bg-white border-t border-gray-200 shadow-lg px-4 py-3 lg:left-64">
+            <span className="text-sm font-medium text-gray-700">{selectedMemberIds.size} selected</span>
+            <div className="flex gap-2 ml-auto">
+              {!allActive && (
+                <Button size="sm" variant="primary" onClick={() => { setShowBulkModal('activate'); setBulkReason('') }}>
+                  Activate Selected
+                </Button>
+              )}
+              {!allSuspended && (
+                <Button size="sm" variant="danger" onClick={() => { setShowBulkModal('suspend'); setBulkReason('') }}>
+                  Suspend Selected
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setSelectedMemberIds(new Set())}>
+                Clear
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Bulk Activate/Suspend Modal */}
       <Modal

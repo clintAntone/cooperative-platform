@@ -146,7 +146,7 @@ export function UsersPage() {
     total: users.length,
     admin: users.filter(u => u.role === 'admin').length,
     staff: users.filter(u => u.role === 'staff').length,
-    member: users.filter(u => u.role === 'member').length,
+    member: users.filter(u => u.role === 'member' || u.role === 'collector').length,
     active: users.filter(u => u.account_status === 'active').length,
     suspended: users.filter(u => u.account_status === 'suspended').length,
   }

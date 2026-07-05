@@ -43,6 +43,7 @@ export function RegisterPage() {
   const [employeeId, setEmployeeId] = useState('')
   const [lookupLoading, setLookupLoading] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
+  const [matches, setMatches] = useState<PosEmployee[] | null>(null)
   const [verifiedEmployee, setVerifiedEmployee] = useState<PosEmployee | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -57,9 +58,10 @@ export function RegisterPage() {
 
   const handleLookup = async () => {
     const trimmed = employeeId.trim().toUpperCase()
-    if (!trimmed) { setLookupError('Please enter your Employee ID.'); return }
+    if (!trimmed) { setLookupError('Please enter your Employee ID or unique code.'); return }
     setLookupLoading(true)
     setLookupError(null)
+    setMatches(null)
     try {
       const headers: Record<string, string> = {}
       if (!import.meta.env.DEV) {
@@ -69,25 +71,40 @@ export function RegisterPage() {
       }
       const res = await fetch(EMPLOYEE_API_URL, { headers })
       if (!res.ok) throw new Error('Could not reach the employee directory. Please try again.')
-      const employees: PosEmployee[] = await res.json()
-      const match = employees.find(e => e.employee_id === trimmed)
-      if (!match) {
-        setLookupError('Employee ID not found. Please check your ID and try again.')
+      const raw = await res.json()
+      // POS API may return a plain array or a wrapped object like { data: [...] }
+      const employees: PosEmployee[] = Array.isArray(raw)
+        ? raw
+        : (raw.data ?? raw.employees ?? raw.items ?? [])
+      // Match against full ID or any segment (e.g. just the unique code "LMDYZVCFN")
+      const found = employees.filter(e => e.employee_id.includes(trimmed))
+      if (found.length === 0) {
+        setLookupError('No employee found. Please check your ID or unique code and try again.')
         return
       }
-      const { data: available, error: availErr } = await supabase
-        .rpc('is_employee_id_available', { p_employee_id: trimmed })
-      if (availErr) throw new Error('Could not verify employee ID. Please try again.')
-      if (!available) {
-        setLookupError('An account already exists for this Employee ID. Please sign in instead.')
-        return
+      if (found.length === 1) {
+        await selectEmployee(found[0])
+      } else {
+        setMatches(found)
       }
-      setVerifiedEmployee(match)
     } catch (err: any) {
       setLookupError(err.message ?? 'Something went wrong. Please try again.')
     } finally {
       setLookupLoading(false)
     }
+  }
+
+  const selectEmployee = async (emp: PosEmployee) => {
+    const { data: available, error: availErr } = await supabase
+      .rpc('is_employee_id_available', { p_employee_id: emp.employee_id })
+    if (availErr) throw new Error('Could not verify employee ID. Please try again.')
+    if (!available) {
+      setLookupError('An account already exists for this Employee ID. Please sign in instead.')
+      setMatches(null)
+      return
+    }
+    setMatches(null)
+    setVerifiedEmployee(emp)
   }
 
   const onSubmit = async (values: RegistrationValues) => {
@@ -224,20 +241,45 @@ export function RegisterPage() {
                   <input
                     type="text"
                     value={employeeId}
-                    onChange={e => { setEmployeeId(e.target.value); setLookupError(null) }}
+                    onChange={e => { setEmployeeId(e.target.value); setLookupError(null); setMatches(null) }}
                     onKeyDown={e => e.key === 'Enter' && handleLookup()}
-                    placeholder="e.g. EMP-04-04-ZAPQ1IPHG"
+                    placeholder="Full ID or unique code (e.g. ZAPQ1IPHG)"
                     className={`block w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${lookupError ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'}`}
                   />
                 </div>
                 {lookupError
                   ? <p className="text-xs text-red-600">{lookupError}</p>
-                  : <p className="text-xs text-gray-400">Found on your company ID card or payslip</p>
+                  : <p className="text-xs text-gray-400">Enter your full ID or just the unique code from your ID card</p>
                 }
               </div>
 
+              {/* Matches list */}
+              {matches && matches.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-gray-600">{matches.length} employee{matches.length > 1 ? 's' : ''} found — select yours:</p>
+                  <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+                    {matches.map(emp => (
+                      <button
+                        key={emp.employee_id}
+                        type="button"
+                        onClick={() => selectEmployee(emp)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-blue-50 transition-colors"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{buildFullName(emp)}</p>
+                          <p className="text-xs text-gray-400 font-mono mt-0.5">{emp.employee_id}</p>
+                        </div>
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Button className="w-full" size="lg" onClick={handleLookup} loading={lookupLoading}>
-                Verify Employee ID
+                Search Employee
               </Button>
 
               <p className="text-center text-sm text-gray-500">
