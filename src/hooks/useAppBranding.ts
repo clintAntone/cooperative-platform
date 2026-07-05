@@ -1,8 +1,9 @@
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 
 export function useAppBranding() {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['app_branding'],
     queryFn: async () => {
       const { data } = await supabase
@@ -14,4 +15,12 @@ export function useAppBranding() {
     },
     staleTime: 60_000,
   })
+
+  useEffect(() => {
+    if (query.data?.name) {
+      document.title = query.data.name
+    }
+  }, [query.data?.name])
+
+  return query
 }

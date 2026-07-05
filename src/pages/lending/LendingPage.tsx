@@ -110,7 +110,6 @@ export function LendingPage() {
                 size="sm"
                 onClick={() => setIsApplyModalOpen(true)}
                 disabled={!canApply || profileIncomplete}
-                title={profileIncomplete ? 'Complete your profile before applying for a loan' : undefined}
               >
                 Apply for Loan
               </Button>
@@ -244,8 +243,8 @@ export function LendingPage() {
           <Card>
             <CardHeader>
               <div>
-                <h3 className="text-base font-semibold text-gray-900">Guarantor Requests</h3>
-                <p className="text-sm text-gray-500">Members who added you as a co-maker</p>
+                <h3 className="text-base font-semibold text-gray-900">Co-maker Requests</h3>
+                <p className="text-sm text-gray-500">Members who added you as a co-maker on their loan application</p>
               </div>
             </CardHeader>
             <CardBody className="divide-y divide-gray-100">
@@ -406,7 +405,7 @@ export function LendingPage() {
                           <span className="font-bold text-gray-900">{currency(app.amount_requested)}</span>
                           {app.status === 'draft' ? (
                             <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">
-                              Awaiting co-makers
+                              Awaiting co-maker confirmation
                             </span>
                           ) : (
                             <StatusBadge status={app.status} />
@@ -477,7 +476,7 @@ export function LendingPage() {
                             <Td>
                               {app.status === 'draft' ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">
-                                  Awaiting co-makers
+                                  Awaiting co-maker confirmation
                                 </span>
                               ) : (
                                 <div className="space-y-1">

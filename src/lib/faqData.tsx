@@ -184,7 +184,7 @@ export const faqSections: FaqSection[] = [
         ),
       },
       {
-        question: 'What is a co-maker / guarantor?',
+        question: 'What is a co-maker?',
         answer: (
           <div className="space-y-2">
             <p>A co-maker is a fellow member who guarantees your loan. They are responsible if you fail to repay. To be eligible as a co-maker, the member must:</p>
@@ -204,7 +204,7 @@ export const faqSections: FaqSection[] = [
             <ol className="list-decimal list-inside text-sm space-y-1">
               <li>You submit a loan application and select your co-maker(s).</li>
               <li>Your application is saved as a <strong>Draft</strong> while co-makers are notified.</li>
-              <li>Each co-maker logs in, goes to <strong>Lending</strong>, and confirms or declines.</li>
+              <li>Each co-maker logs in, goes to <strong>Loan</strong>, and confirms or declines.</li>
               <li>Once <strong>all co-makers confirm</strong>, your application is automatically submitted to the admin.</li>
               <li>The admin reviews, may set it to <strong>Under Review</strong>, then approves or rejects it.</li>
               <li>If approved, your loan is disbursed and a repayment schedule is generated.</li>

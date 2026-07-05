@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -23,6 +23,14 @@ type FormValues = z.infer<typeof schema>
 export function ProfileCompletionModal() {
   const { user, profile, refreshProfile } = useAuth()
   const [dismissed, setDismissed] = useState(false)
+
+  // Allow external triggers (e.g. "Complete your profile" links) to re-open the modal
+  useEffect(() => {
+    const handler = () => setDismissed(false)
+    window.addEventListener('open-profile-completion', handler)
+    return () => window.removeEventListener('open-profile-completion', handler)
+  }, [])
+
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatar_url ?? null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)

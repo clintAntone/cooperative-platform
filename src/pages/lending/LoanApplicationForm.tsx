@@ -282,7 +282,7 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
       {/* Co-makers */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Co-makers / Guarantors <span className="text-red-500">*</span>
+          Co-makers <span className="text-red-500">*</span>
           <span className="text-xs font-normal text-gray-400 ml-1">(min {minCoMakers})</span>
         </label>
         <p className="text-xs text-gray-400 mb-2">

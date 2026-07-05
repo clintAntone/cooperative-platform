@@ -11,15 +11,18 @@ import { useMyDepositRequests } from '../../hooks/useDepositRequests'
 import { formatDate, getProgressPercent } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
 import { exportToExcel } from '../../lib/exportExcel'
+import { useAuth } from '../../context/AuthContext'
 import type { EquityShare } from '../../types'
 
 export function EquityPage() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const { data: shares, isLoading } = useEquityShares()
   const { data: summary } = useEquitySummary()
   const { data: myDepositRequests = [] } = useMyDepositRequests()
   const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
 
+  const profileIncomplete = !profile?.profile_completed_at
   const { format: currency } = useCurrency()
   if (isLoading) return <SkeletonPage cards={3} rows={4} />
 
@@ -168,9 +171,20 @@ export function EquityPage() {
                           variant="outline"
                           className="w-full"
                           onClick={() => handleRequestDeposit(share)}
+                          disabled={profileIncomplete}
+                          title={profileIncomplete ? 'Complete your profile first' : undefined}
                         >
                           Request Deposit
                         </Button>
+                        {profileIncomplete && (
+                          <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new Event('open-profile-completion'))}
+                            className="text-xs text-amber-600 text-center underline font-medium w-full"
+                          >
+                            Complete your profile to submit deposits.
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-gray-400 italic">Share cancelled</p>

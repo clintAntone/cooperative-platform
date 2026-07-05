@@ -187,7 +187,7 @@ export function LoanDetailPage() {
         {coMakers.length > 0 && (
           <Card>
             <CardHeader>
-              <h3 className="text-base font-semibold text-gray-900">Co-makers / Guarantors</h3>
+              <h3 className="text-base font-semibold text-gray-900">Co-makers</h3>
             </CardHeader>
             <CardBody>
               <div className="flex flex-wrap gap-3">

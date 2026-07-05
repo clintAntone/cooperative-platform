@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -167,6 +167,35 @@ export function DepositRequestPage() {
     setTimeout(() => navigate('/equity'), 2000)
   }
 
+  if (profileIncomplete) {
+    return (
+      <div>
+        <Header title="Request Deposit" subtitle="Submit a deposit for admin review" />
+        <div className="p-4 sm:p-6">
+          <Card className="max-w-lg mx-auto p-8 text-center">
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Profile Incomplete</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              You need to complete your profile before you can submit a deposit request.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => navigate('/equity')} variant="outline" size="sm">
+                Go Back
+              </Button>
+              <Button onClick={() => window.dispatchEvent(new Event('open-profile-completion'))} size="sm">
+                Complete Profile
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   if (success) {
     return (
       <div>
@@ -210,20 +239,6 @@ export function DepositRequestPage() {
             </p>
           </CardHeader>
           <CardBody>
-            {profileIncomplete && (
-              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
-                <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-semibold text-amber-800">Profile incomplete</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    You must complete your personal details before submitting a deposit request.{' '}
-                    <Link to="/complete-profile" className="underline font-medium">Complete now →</Link>
-                  </p>
-                </div>
-              </div>
-            )}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {/* Share selector */}
               {inProgressShares.length === 0 ? (
