@@ -14,7 +14,7 @@ export function useLoanApplications(userId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loan_applications')
-        .select('*')
+        .select('id, user_id, amount_requested, purpose, term_months, status, reviewed_by, decision_at, rejection_reason, loan_product_id, created_at, updated_at')
         .eq('user_id', targetId!)
         .order('created_at', { ascending: false })
 
@@ -49,7 +49,7 @@ export function useLoans(userId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loans')
-        .select('*')
+        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at, updated_at')
         .eq('user_id', targetId!)
         .order('created_at', { ascending: false })
 
@@ -66,7 +66,7 @@ export function useLoan(loanId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loans')
-        .select('*')
+        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at, updated_at')
         .eq('id', loanId)
         .single()
 
@@ -83,7 +83,7 @@ export function useLoanSchedule(loanId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loan_repayment_schedule')
-        .select('*')
+        .select('id, loan_id, installment_no, due_date, principal_due, interest_due, total_due, amount_paid, status, paid_at')
         .eq('loan_id', loanId)
         .order('installment_no', { ascending: true })
 
@@ -100,7 +100,7 @@ export function useLoanRepayments(loanId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loan_repayments')
-        .select('*')
+        .select('id, loan_id, schedule_id, amount, payment_method, reference, recorded_by, payment_at, created_at')
         .eq('loan_id', loanId)
         .order('payment_at', { ascending: false })
 
@@ -373,7 +373,7 @@ export function useLoanProducts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loan_products')
-        .select('*')
+        .select('id, name, description, interest_rate, min_amount, max_amount, min_term_months, max_term_months, calculation_method, is_active, created_at, created_by')
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as LoanProduct[]

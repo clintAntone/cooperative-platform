@@ -19,7 +19,7 @@ function useSystemConfig() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('system_config')
-        .select('*')
+        .select('id, config_key, config_value, value_type, description, updated_by, updated_at')
         .not('config_key', 'in', `(${APP_SETTINGS_KEYS.join(',')})`)
         .order('config_key', { ascending: true })
       if (error) throw error
@@ -34,7 +34,7 @@ function useConfigHistory() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('system_config_history')
-        .select('*')
+        .select('id, config_key, old_value, new_value, changed_by, changed_at')
         .order('changed_at', { ascending: false })
         .limit(20)
       if (error) throw error

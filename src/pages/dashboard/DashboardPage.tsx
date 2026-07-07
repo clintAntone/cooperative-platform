@@ -22,7 +22,7 @@ function useDashboardLedger(limit: number) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ledger_entries')
-        .select('*')
+        .select('id, user_id, entry_type, reference_id, reference_table, amount, direction, notes, created_by, created_at')
         .eq('user_id', effectiveUserId!)
         .order('created_at', { ascending: false })
         .limit(limit)

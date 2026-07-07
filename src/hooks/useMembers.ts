@@ -100,12 +100,12 @@ export function useMemberDetail(userId: string) {
       const [profileRes, sharesRes, contribRes, depositsRes] = await Promise.all([
         supabase
           .from('profiles')
-          .select('*')
+          .select('id, full_name, phone, role, account_status, employee_id, avatar_url, date_of_birth, address, civil_status, emergency_contact_name, emergency_contact_phone, profile_completed_at, created_at, updated_at, deleted_at')
           .eq('id', userId)
           .single(),
         supabase
           .from('equity_shares')
-          .select('*')
+          .select('id, user_id, share_number, target_amount, paid_amount, status, completed_at, created_at, updated_at')
           .eq('user_id', userId)
           .order('share_number', { ascending: true }),
         supabase
@@ -115,7 +115,7 @@ export function useMemberDetail(userId: string) {
           .order('contribution_at', { ascending: false }),
         supabase
           .from('deposit_requests')
-          .select('*')
+          .select('id, user_id, share_id, amount, payment_method, reference, receipt_url, notes, status, reviewed_by, reviewed_at, rejection_reason, created_at, updated_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false }),
       ])
@@ -125,7 +125,7 @@ export function useMemberDetail(userId: string) {
       // Fetch membership status separately (best effort)
       const { data: ms } = await supabase
         .from('membership_status')
-        .select('*')
+        .select('id, user_id, status, completed_shares, last_evaluated_at, reason, updated_at')
         .eq('user_id', userId)
         .maybeSingle()
 

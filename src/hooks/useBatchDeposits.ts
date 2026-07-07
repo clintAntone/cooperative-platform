@@ -92,7 +92,7 @@ export function useMyBatchDeposits() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('batch_deposits')
-        .select('*')
+        .select('id, reference, payment_method, receipt_url, notes, total_amount, status, submitted_by, reviewed_by, reviewed_at, rejection_reason, created_at, updated_at')
         .eq('submitted_by', user!.id)
         .order('created_at', { ascending: false })
       if (error) throw error

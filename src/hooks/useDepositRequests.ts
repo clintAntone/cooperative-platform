@@ -36,7 +36,7 @@ export function useMyDepositRequests() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('deposit_requests')
-        .select('*')
+        .select('id, user_id, share_id, amount, payment_method, reference, receipt_url, notes, status, reviewed_by, reviewed_at, rejection_reason, created_at, updated_at')
         .eq('user_id', effectiveUserId!)
         .order('created_at', { ascending: false })
 

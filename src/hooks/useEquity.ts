@@ -14,7 +14,7 @@ export function useEquityShares(userId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equity_shares')
-        .select('*')
+        .select('id, user_id, share_number, target_amount, paid_amount, status, completed_at, created_at, updated_at')
         .eq('user_id', targetId!)
         .order('share_number', { ascending: true })
 
@@ -31,7 +31,7 @@ export function useEquityContributions(shareId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equity_contributions')
-        .select('*')
+        .select('id, user_id, share_id, amount, payment_method, reference, recorded_by, contribution_at, created_at')
         .eq('share_id', shareId)
         .order('contribution_at', { ascending: false })
 
@@ -51,7 +51,7 @@ export function useAllContributions(userId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equity_contributions')
-        .select('*')
+        .select('id, user_id, share_id, amount, payment_method, reference, recorded_by, contribution_at, created_at')
         .eq('user_id', targetId!)
         .order('contribution_at', { ascending: false })
 

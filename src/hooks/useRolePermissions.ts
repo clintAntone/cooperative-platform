@@ -17,7 +17,7 @@ export function useRolePermissions() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('role_permissions')
-        .select('*')
+        .select('id, role, permission_key, enabled, updated_by, updated_at')
       if (error) throw error
       return (data ?? []) as RolePermission[]
     },

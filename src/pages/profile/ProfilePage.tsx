@@ -8,6 +8,9 @@ import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { toast } from '../../lib/toast'
+import { formatDate } from '../../lib/utils'
+import { useMyDocuments, useUploadDocument, useDeleteDocument, DOCUMENT_TYPE_LABELS } from '../../hooks/useMemberDocuments'
+import type { DocumentType } from '../../hooks/useMemberDocuments'
 import type { CivilStatus } from '../../types'
 
 const schema = z.object({
@@ -111,6 +114,20 @@ export function ProfilePage() {
     } catch (err: any) {
       toast({ title: err.message ?? 'Failed to update profile', variant: 'error' })
     }
+  }
+
+  const { data: myDocuments = [] } = useMyDocuments()
+  const uploadDocument = useUploadDocument()
+  const deleteDocument = useDeleteDocument()
+  const docInputRef = useRef<HTMLInputElement>(null)
+  const [pendingDocType, setPendingDocType] = useState<DocumentType | null>(null)
+
+  const handleDocFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !pendingDocType) return
+    uploadDocument.mutate({ file, documentType: pendingDocType })
+    e.target.value = ''
+    setPendingDocType(null)
   }
 
   const currentAvatar = avatarPreview ?? profile?.avatar_url ?? null
@@ -338,6 +355,74 @@ export function ProfilePage() {
             </div>
           )}
         </form>
+
+        {/* Documents */}
+        <Card>
+          <CardHeader>
+            <h3 className="text-sm font-semibold text-gray-900">Documents</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Upload your government ID and proof of address for verification.</p>
+          </CardHeader>
+          <CardBody>
+            <div className="space-y-3">
+              {(['government_id', 'proof_of_address', 'other'] as DocumentType[]).map(docType => {
+                const existing = myDocuments.filter(d => d.document_type === docType)
+                return (
+                  <div key={docType} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-gray-600">{DOCUMENT_TYPE_LABELS[docType]}</p>
+                      <button
+                        type="button"
+                        onClick={() => { setPendingDocType(docType); docInputRef.current?.click() }}
+                        disabled={uploadDocument.isPending}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                      >
+                        + Upload
+                      </button>
+                    </div>
+                    {existing.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">None uploaded</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {existing.map(doc => (
+                          <div key={doc.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              <div className="min-w-0">
+                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate block">
+                                  {doc.file_name}
+                                </a>
+                                <p className="text-[10px] text-gray-400">{formatDate(doc.uploaded_at)}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => deleteDocument.mutate(doc.id)}
+                              className="text-gray-400 hover:text-red-600 flex-shrink-0 transition-colors"
+                              title="Remove"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <input
+              ref={docInputRef}
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              className="hidden"
+              onChange={handleDocFileChange}
+            />
+          </CardBody>
+        </Card>
       </div>
     </div>
   )

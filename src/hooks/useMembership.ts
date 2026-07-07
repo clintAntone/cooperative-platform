@@ -12,7 +12,7 @@ export function useMembershipStatus(userId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('membership_status')
-        .select('*')
+        .select('id, user_id, status, completed_shares, last_evaluated_at, reason, updated_at')
         .eq('user_id', targetId!)
         .maybeSingle()
 
@@ -32,7 +32,7 @@ export function useMembershipHistory(userId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('membership_history')
-        .select('*')
+        .select('id, user_id, from_status, to_status, reason, changed_at')
         .eq('user_id', targetId!)
         .order('changed_at', { ascending: false })
 
