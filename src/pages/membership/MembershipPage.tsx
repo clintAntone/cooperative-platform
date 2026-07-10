@@ -36,7 +36,7 @@ export function MembershipPage() {
     staleTime: Infinity,
   })
 
-  const { data: sharePrice = 0 } = useQuery({
+  const { data: sharePrice = 0, isLoading: sharePriceLoading } = useQuery({
     queryKey: ['share_price_config'],
     queryFn: async () => {
       const { data } = await supabase
@@ -49,7 +49,7 @@ export function MembershipPage() {
     staleTime: Infinity,
   })
 
-  if (statusLoading || historyLoading || equityLoading) return <SkeletonPage cards={3} rows={4} />
+  if (statusLoading || historyLoading || equityLoading || sharePriceLoading) return <SkeletonPage cards={3} rows={4} />
 
   const effectiveShares = sharePrice > 0 && equitySummary
     ? Number((equitySummary.totalInvested / sharePrice).toFixed(2))
