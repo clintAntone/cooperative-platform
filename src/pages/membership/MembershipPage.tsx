@@ -117,7 +117,7 @@ export function MembershipPage() {
                       memberName: profile?.full_name ?? 'Member',
                       employeeId: (profile as any)?.employee_id,
                       completedShares: membershipStatus?.completed_shares ?? 0,
-                      totalInvested: equitySummary?.totalInvested ?? 0,
+                      totalInvested: (membershipStatus?.completed_shares ?? 0) * sharePrice,
                       memberSince: membershipStatus?.last_evaluated_at
                         ? formatDate(membershipStatus.last_evaluated_at)
                         : new Date().toLocaleDateString(),

@@ -329,7 +329,7 @@ export function exportMembershipCertificate(params: {
   doc.setFontSize(7.5)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...NAVY)
-  textCentered('TOTAL INVESTED', col2, statsY + 15, 1.5)
+  textCentered('SHARE VALUE', col2, statsY + 15, 1.5)
 
   // ── Decorative rule before footer ─────────────────────────────────────────
   const footerY = H - 30
