@@ -101,7 +101,7 @@ export function SavingsPage() {
     { key: 'overview', label: 'Overview' },
     { key: 'deposits', label: 'Deposits' },
     { key: 'withdrawals', label: 'Withdrawals' },
-    { key: 'interest', label: 'Interest History' },
+    { key: 'interest', label: 'Interest' },
   ]
 
   return (
@@ -109,18 +109,6 @@ export function SavingsPage() {
       <Header
         title="Savings"
         subtitle="Your savings account and transaction history"
-        actions={
-          account.status === 'active' ? (
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => navigate('/savings/deposit-request')}>
-                Deposit
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => navigate('/savings/withdraw')}>
-                Withdraw
-              </Button>
-            </div>
-          ) : undefined
-        }
       />
 
       <div className="p-4 sm:p-6 space-y-6">
@@ -160,8 +148,8 @@ export function SavingsPage() {
         )}
 
         {/* Tabs */}
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <div className="flex gap-1 w-max min-w-full sm:w-fit border-b border-gray-200">
+        <div className="border-b border-gray-200">
+          <div className="flex gap-1">
             {tabs.map(t => (
               <button
                 key={t.key}
