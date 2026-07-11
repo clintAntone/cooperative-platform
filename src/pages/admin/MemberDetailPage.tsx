@@ -15,6 +15,7 @@ import { useApproveDepositRequest, useRejectDepositRequest } from '../../hooks/u
 import { useLoans } from '../../hooks/useLoans'
 import { useMemberDocuments, DOCUMENT_TYPE_LABELS } from '../../hooks/useMemberDocuments'
 import { useMemberNotes, useAddMemberNote, useDeleteMemberNote } from '../../hooks/useMemberNotes'
+import { useSavingsAccount, useSavingsDepositRequests, useSavingsWithdrawalRequests, useSavingsInterestLogs } from '../../hooks/useSavings'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, formatDateTime, getProgressPercent } from '../../lib/utils'
 import { exportMemberStatementPdf } from '../../lib/exportPdf'
@@ -86,6 +87,10 @@ export function MemberDetailPage() {
 
   const { data: memberDocuments = [] } = useMemberDocuments(id!)
   const { data: memberNotes = [] } = useMemberNotes(id!)
+  const { data: savingsAccount } = useSavingsAccount(id!)
+  const { data: savingsDeposits = [] } = useSavingsDepositRequests(id!)
+  const { data: savingsWithdrawals = [] } = useSavingsWithdrawalRequests(id!)
+  const { data: savingsInterestLogs = [] } = useSavingsInterestLogs(savingsAccount?.id)
   const addNote = useAddMemberNote(id!)
   const deleteNote = useDeleteMemberNote(id!)
 
@@ -540,6 +545,104 @@ export function MemberDetailPage() {
                 )}
               </Card>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Savings */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Savings</h2>
+        {!savingsAccount ? (
+          <Card className="p-6 text-center text-gray-400 text-sm">No savings account yet. Opens automatically when first share is completed.</Card>
+        ) : (
+          <div className="space-y-3">
+            {/* Summary */}
+            <div className="grid grid-cols-3 gap-3">
+              <Card className="p-3 text-center">
+                <p className="text-xs text-gray-500">Balance</p>
+                <p className="text-lg font-bold text-gray-900 mt-0.5">{currency(savingsAccount.balance)}</p>
+              </Card>
+              <Card className="p-3 text-center">
+                <p className="text-xs text-gray-500">Interest Earned</p>
+                <p className="text-lg font-bold text-green-600 mt-0.5">{currency(savingsInterestLogs.reduce((s, l) => s + l.interest_earned, 0))}</p>
+              </Card>
+              <Card className="p-3 text-center">
+                <p className="text-xs text-gray-500">Status</p>
+                <p className={`text-sm font-semibold mt-1 capitalize ${savingsAccount.status === 'active' ? 'text-green-600' : 'text-gray-500'}`}>{savingsAccount.status}</p>
+              </Card>
+            </div>
+
+            {/* Recent deposits */}
+            {savingsDeposits.length > 0 && (
+              <Card>
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h3 className="text-sm font-semibold text-gray-900">Deposit Requests</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left px-4 py-2 text-gray-500 font-medium">Date</th>
+                        <th className="text-right px-4 py-2 text-gray-500 font-medium">Amount</th>
+                        <th className="text-left px-4 py-2 text-gray-500 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {savingsDeposits.slice(0, 5).map(req => (
+                        <tr key={req.id}>
+                          <td className="px-4 py-2 text-gray-500">{formatDate(req.created_at)}</td>
+                          <td className="px-4 py-2 text-right font-medium text-gray-900">{currency(req.amount)}</td>
+                          <td className="px-4 py-2">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize ${
+                              req.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              req.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>{req.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            {/* Recent withdrawals */}
+            {savingsWithdrawals.length > 0 && (
+              <Card>
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <h3 className="text-sm font-semibold text-gray-900">Withdrawal Requests</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left px-4 py-2 text-gray-500 font-medium">Date</th>
+                        <th className="text-right px-4 py-2 text-gray-500 font-medium">Amount</th>
+                        <th className="text-left px-4 py-2 text-gray-500 font-medium">Reason</th>
+                        <th className="text-left px-4 py-2 text-gray-500 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {savingsWithdrawals.slice(0, 5).map(req => (
+                        <tr key={req.id}>
+                          <td className="px-4 py-2 text-gray-500">{formatDate(req.created_at)}</td>
+                          <td className="px-4 py-2 text-right font-medium text-gray-900">{currency(req.amount)}</td>
+                          <td className="px-4 py-2 text-gray-600 max-w-xs truncate">{req.reason ?? '—'}</td>
+                          <td className="px-4 py-2">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize ${
+                              req.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              req.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>{req.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
           </div>
         )}
       </div>

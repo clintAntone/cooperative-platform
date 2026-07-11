@@ -216,6 +216,75 @@ export interface SystemConfigHistory {
 }
 
 export type DepositRequestStatus = 'pending' | 'approved' | 'rejected'
+export type SavingsAccountStatus = 'active' | 'closed' | 'dormant'
+export type SavingsRequestStatus = 'pending' | 'approved' | 'rejected'
+
+export interface SavingsAccount {
+  id: string
+  user_id: string
+  balance: number
+  status: SavingsAccountStatus
+  opened_at: string
+  closed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SavingsDepositRequest {
+  id: string
+  user_id: string
+  account_id: string
+  amount: number
+  payment_method: PaymentMethod
+  reference: string | null
+  receipt_url: string | null
+  notes: string | null
+  status: SavingsRequestStatus
+  reviewed_by: string | null
+  reviewed_at: string | null
+  rejection_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SavingsContribution {
+  id: string
+  account_id: string
+  user_id: string
+  request_id: string | null
+  amount: number
+  payment_method: PaymentMethod
+  reference: string | null
+  recorded_by: string | null
+  contributed_at: string
+  created_at: string
+}
+
+export interface SavingsWithdrawalRequest {
+  id: string
+  user_id: string
+  account_id: string
+  amount: number
+  reason: string | null
+  status: SavingsRequestStatus
+  reviewed_by: string | null
+  reviewed_at: string | null
+  rejection_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SavingsInterestLog {
+  id: string
+  account_id: string
+  user_id: string
+  principal_at_time: number
+  interest_earned: number
+  period_start: string
+  period_end: string
+  released_by: string
+  created_at: string
+}
 
 export interface DepositRequest {
   id: string

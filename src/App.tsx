@@ -45,6 +45,13 @@ const ActivityPage = lazy(() => import('./pages/activity/ActivityPage').then(m =
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage').then(m => ({ default: m.ProfilePage })))
 const FaqPage = lazy(() => import('./pages/FaqPage').then(m => ({ default: m.FaqPage })))
 
+// Savings pages
+const SavingsPage = lazy(() => import('./pages/savings/SavingsPage').then(m => ({ default: m.SavingsPage })))
+const SavingsDepositRequestPage = lazy(() => import('./pages/savings/SavingsDepositRequestPage').then(m => ({ default: m.SavingsDepositRequestPage })))
+const SavingsWithdrawPage = lazy(() => import('./pages/savings/SavingsWithdrawPage').then(m => ({ default: m.SavingsWithdrawPage })))
+const SavingsDepositRequestsPage = lazy(() => import('./pages/admin/SavingsDepositRequestsPage').then(m => ({ default: m.SavingsDepositRequestsPage })))
+const SavingsWithdrawalsPage = lazy(() => import('./pages/admin/SavingsWithdrawalsPage').then(m => ({ default: m.SavingsWithdrawalsPage })))
+
 // Admin / Staff pages
 const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })))
 const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
@@ -100,9 +107,10 @@ export default function App() {
                 <Route path="/" element={<RootRedirect />} />
               </Route>
 
-              {/* FAQ — all authenticated users */}
+              {/* All authenticated users */}
               <Route element={<AppLayout />}>
                 <Route path="/faq" element={<ErrorBoundary><FaqPage /></ErrorBoundary>} />
+                <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
               </Route>
 
               {/* Member + Collector */}
@@ -115,7 +123,9 @@ export default function App() {
                 <Route path="/lending/calculator" element={<ErrorBoundary><LoanCalculatorPage /></ErrorBoundary>} />
                 <Route path="/lending/:id" element={<ErrorBoundary><LoanDetailPage /></ErrorBoundary>} />
                 <Route path="/activity" element={<ErrorBoundary><ActivityPage /></ErrorBoundary>} />
-                <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
+                <Route path="/savings" element={<ErrorBoundary><SavingsPage /></ErrorBoundary>} />
+                <Route path="/savings/deposit-request" element={<ErrorBoundary><SavingsDepositRequestPage /></ErrorBoundary>} />
+                <Route path="/savings/withdraw" element={<ErrorBoundary><SavingsWithdrawPage /></ErrorBoundary>} />
               </Route>
 
               {/* Collector only */}
@@ -135,6 +145,8 @@ export default function App() {
                 <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
                 <Route path="/admin/loans/:id" element={<ErrorBoundary><AdminLoanDetailPage /></ErrorBoundary>} />
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
+                <Route path="/admin/savings-deposits" element={<ErrorBoundary><SavingsDepositRequestsPage /></ErrorBoundary>} />
+                <Route path="/admin/savings-withdrawals" element={<ErrorBoundary><SavingsWithdrawalsPage /></ErrorBoundary>} />
               </Route>
 
               {/* Admin only */}
