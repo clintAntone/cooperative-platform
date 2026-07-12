@@ -112,7 +112,12 @@ export function DividendsPage() {
                   <span className="text-green-700">Total: {currency(preview.grandTotal)}</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-500">Amounts will be credited to each member's savings account. This action cannot be undone.</p>
+              <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Dividends are added directly to each member's <strong>savings account balance</strong> — members can withdraw via a savings withdrawal request. This action cannot be undone.</span>
+              </div>
             </div>
           ) : (
             <p className="text-sm text-gray-500 text-center py-4">No members with completed shares found.</p>
