@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { useEffectiveUserId } from '../context/ImpersonationContext'
 import { toast } from '../lib/toast'
-import type { Branch } from '../types'
+import type { Branch, BranchIncome, BranchIncomeDistribution } from '../types'
+
+// ─── Branches ─────────────────────────────────────────────────────────────────
 
 export function useBranches() {
   return useQuery({
@@ -71,20 +74,98 @@ export function useUpdateBranch() {
   })
 }
 
-export function useAssignMemberBranch() {
+// ─── Branch income ────────────────────────────────────────────────────────────
+
+export function useBranchIncome(branchId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['branch_income', branchId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('branch_income')
+        .select('id, branch_id, amount, period_start, period_end, description, distributed, recorded_by, created_at')
+        .eq('branch_id', branchId!)
+        .order('period_end', { ascending: false })
+      if (error) throw error
+      return data as BranchIncome[]
+    },
+    enabled: !!branchId,
+  })
+}
+
+export function useAllBranchIncome() {
+  return useQuery({
+    queryKey: ['branch_income_all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('branch_income')
+        .select('id, branch_id, amount, period_start, period_end, description, distributed, recorded_by, created_at')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as BranchIncome[]
+    },
+  })
+}
+
+export function useRecordBranchIncome() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ userId, branchId }: { userId: string; branchId: string | null }) => {
-      const { error } = await supabase.rpc('assign_member_branch', {
-        p_user_id: userId,
-        p_branch_id: branchId,
+    mutationFn: async (params: {
+      branchId: string
+      amount: number
+      periodStart: string
+      periodEnd: string
+      description?: string
+    }) => {
+      const { error } = await supabase.rpc('record_branch_income', {
+        p_branch_id: params.branchId,
+        p_amount: params.amount,
+        p_period_start: params.periodStart,
+        p_period_end: params.periodEnd,
+        p_description: params.description ?? null,
       })
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['members'] })
-      queryClient.invalidateQueries({ queryKey: ['profile'] })
-      toast({ title: 'Branch assigned', variant: 'success' })
+      queryClient.invalidateQueries({ queryKey: ['branch_income'] })
+      queryClient.invalidateQueries({ queryKey: ['branch_income_all'] })
+      toast({ title: 'Income recorded', variant: 'success' })
     },
+  })
+}
+
+export function useDistributeBranchIncome() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (incomeId: string) => {
+      const { error } = await supabase.rpc('distribute_branch_income', { p_income_id: incomeId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['branch_income'] })
+      queryClient.invalidateQueries({ queryKey: ['branch_income_all'] })
+      queryClient.invalidateQueries({ queryKey: ['savings_account'] })
+      queryClient.invalidateQueries({ queryKey: ['branch_income_distributions'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast({ title: 'Income distributed to all shareholders', variant: 'success' })
+    },
+  })
+}
+
+// ─── Member: my income distributions ─────────────────────────────────────────
+
+export function useMyBranchIncomeDistributions() {
+  const effectiveUserId = useEffectiveUserId()
+  return useQuery({
+    queryKey: ['branch_income_distributions', effectiveUserId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('branch_income_distributions')
+        .select('id, income_id, user_id, share_count, amount, created_at')
+        .eq('user_id', effectiveUserId!)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as BranchIncomeDistribution[]
+    },
+    enabled: !!effectiveUserId,
   })
 }

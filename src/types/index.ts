@@ -49,7 +49,6 @@ export interface Profile {
   emergency_contact_name: string | null
   emergency_contact_phone: string | null
   profile_completed_at: string | null
-  branch_id: string | null
   created_at: string
   updated_at: string
 }
@@ -393,5 +392,28 @@ export interface RebateLog {
   interest_paid: number
   rebate_rate: number
   rebate_amount: number
+  created_at: string
+}
+
+// ─── F5: Branch income ────────────────────────────────────────────────────────
+
+export interface BranchIncome {
+  id: string
+  branch_id: string
+  amount: number
+  period_start: string
+  period_end: string
+  description: string | null
+  distributed: boolean
+  recorded_by: string
+  created_at: string
+}
+
+export interface BranchIncomeDistribution {
+  id: string
+  income_id: string
+  user_id: string
+  share_count: number
+  amount: number
   created_at: string
 }
