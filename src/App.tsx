@@ -44,6 +44,7 @@ const LoanCalculatorPage = lazy(() => import('./pages/lending/LoanCalculatorPage
 const ActivityPage = lazy(() => import('./pages/activity/ActivityPage').then(m => ({ default: m.ActivityPage })))
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage').then(m => ({ default: m.ProfilePage })))
 const FaqPage = lazy(() => import('./pages/FaqPage').then(m => ({ default: m.FaqPage })))
+const RulesPage = lazy(() => import('./pages/RulesPage').then(m => ({ default: m.RulesPage })))
 
 // Savings pages
 const SavingsPage = lazy(() => import('./pages/savings/SavingsPage').then(m => ({ default: m.SavingsPage })))
@@ -110,6 +111,7 @@ export default function App() {
               {/* All authenticated users */}
               <Route element={<AppLayout />}>
                 <Route path="/faq" element={<ErrorBoundary><FaqPage /></ErrorBoundary>} />
+                <Route path="/rules" element={<ErrorBoundary><RulesPage /></ErrorBoundary>} />
                 <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
               </Route>
 
