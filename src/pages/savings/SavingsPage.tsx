@@ -86,8 +86,8 @@ export function SavingsPage() {
 
   const totalDeposited = contributions.reduce((s, c) => s + c.amount, 0)
   const totalInterest = interestLogs.reduce((s, l) => s + l.interest_earned, 0)
-  const pendingCount = depositRequests.filter(r => r.status === 'pending').length +
-                       withdrawalRequests.filter(r => r.status === 'pending').length
+  const pendingDeposits = depositRequests.filter(r => r.status === 'pending').length
+  const pendingWithdrawals = withdrawalRequests.filter(r => r.status === 'pending').length
 
   // Approximate average daily balance for the current period (mirrors the RPC calculation).
   // Period start = last interest log date, or account opening.
@@ -116,10 +116,10 @@ export function SavingsPage() {
     interestPeriodMonths === 12 ? 'annually' :
     `every ${interestPeriodMonths} months`
 
-  const tabs: { key: Tab; label: string }[] = [
+  const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'overview', label: 'Overview' },
-    { key: 'deposits', label: 'Deposits' },
-    { key: 'withdrawals', label: 'Withdrawals' },
+    { key: 'deposits', label: 'Deposits', badge: pendingDeposits },
+    { key: 'withdrawals', label: 'Withdrawals', badge: pendingWithdrawals },
     { key: 'interest', label: 'Interest' },
   ]
 
@@ -129,49 +129,57 @@ export function SavingsPage() {
 
       <div className="p-4 sm:p-6 space-y-5">
 
-        {/* Balance hero card */}
-        <Card className="bg-gradient-to-br from-emerald-600 to-teal-700 border-0 text-white">
-          <CardBody className="py-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm text-emerald-200 font-medium">Current Balance</p>
-                <p className="text-4xl font-bold mt-1">{currency(account.balance)}</p>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                    account.status === 'active' ? 'bg-emerald-500 text-white' : 'bg-teal-800 text-teal-200'
-                  }`}>{account.status}</span>
-                  <span className="text-xs text-emerald-300">· Opened {formatDate(account.opened_at)}</span>
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-emerald-300">Interest rate</p>
-                <p className="text-xl font-bold text-white">{interestRate}%</p>
-                <p className="text-xs text-emerald-300 mt-0.5">{interestPeriodLabel}</p>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-
-        {/* Stat row */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* KPI stat row */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
           <Card>
             <CardBody className="py-3">
-              <p className="text-xs text-gray-500">Total Deposited</p>
-              <p className="text-lg font-bold text-gray-900 mt-0.5">{currency(totalDeposited)}</p>
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                <p className="text-xs text-gray-500">Current Balance</p>
+              </div>
+              <p className="text-lg font-bold text-gray-900">{currency(account.balance)}</p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                  account.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                }`}>{account.status}</span>
+                <span className="text-xs text-gray-400">· Opened {formatDate(account.opened_at)}</span>
+              </div>
             </CardBody>
           </Card>
           <Card>
             <CardBody className="py-3">
-              <p className="text-xs text-gray-500">Interest Earned</p>
-              <p className="text-lg font-bold text-green-600 mt-0.5">{currency(totalInterest)}</p>
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <p className="text-xs text-gray-500">Total Deposited</p>
+              </div>
+              <p className="text-lg font-bold text-gray-900">{currency(totalDeposited)}</p>
             </CardBody>
           </Card>
           <Card>
             <CardBody className="py-3">
-              <p className="text-xs text-gray-500">Pending</p>
-              <p className={`text-lg font-bold mt-0.5 ${pendingCount > 0 ? 'text-yellow-600' : 'text-gray-900'}`}>
-                {pendingCount}
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                <p className="text-xs text-gray-500">Interest Earned</p>
+              </div>
+              <p className="text-lg font-bold text-green-600">{currency(totalInterest)}</p>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardBody className="py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-xs text-gray-500">Interest Rate</p>
+              </div>
+              <p className="text-lg font-bold text-gray-900">{interestRate}%</p>
+              <p className="text-xs text-gray-400 mt-0.5">{interestPeriodLabel}</p>
             </CardBody>
           </Card>
         </div>
@@ -190,13 +198,16 @@ export function SavingsPage() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
                   tab === t.key
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
                 {t.label}
+                {t.badge ? (
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-yellow-400 text-yellow-900 text-[10px] font-bold">{t.badge}</span>
+                ) : null}
               </button>
             ))}
           </div>
