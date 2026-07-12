@@ -117,29 +117,6 @@ export function useSavingsInterestLogs(accountId: string | null | undefined) {
   })
 }
 
-// ─── Member: pending deposit count (weekly cap info) ─────────────────────────
-
-export function useSavingsWeeklyTotal(accountId: string | null | undefined) {
-  return useQuery({
-    queryKey: ['savings_weekly_total', accountId],
-    queryFn: async () => {
-      const weekStart = new Date()
-      weekStart.setHours(0, 0, 0, 0)
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay()) // Sunday start
-
-      const { data, error } = await supabase
-        .from('savings_contributions')
-        .select('amount')
-        .eq('account_id', accountId!)
-        .gte('contributed_at', weekStart.toISOString())
-
-      if (error) throw error
-      return (data ?? []).reduce((sum, r) => sum + r.amount, 0)
-    },
-    enabled: !!accountId,
-  })
-}
-
 // ─── Member: submit savings deposit request ───────────────────────────────────
 
 interface SubmitSavingsDepositInput {

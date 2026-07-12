@@ -16,6 +16,8 @@ import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, formatDateTime } from '../../lib/utils'
 import { supabase } from '../../lib/supabase'
 
+const HOLDOUT_DAYS = 30 // mirrors savings_interest_holdout_days system_config default
+
 const statusColors: Record<string, string> = {
   pending:  'bg-yellow-100 text-yellow-800',
   approved: 'bg-green-100 text-green-800',
@@ -35,24 +37,37 @@ export function SavingsPage() {
   const { data: contributions = [] } = useSavingsContributions(account?.id)
   const { data: interestLogs = [] } = useSavingsInterestLogs(account?.id)
 
-  const { data: weeklyCap = 5000 } = useQuery({
-    queryKey: ['savings_weekly_cap'],
+  const { data: holdoutDays = HOLDOUT_DAYS } = useQuery({
+    queryKey: ['savings_interest_holdout_days'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('system_config')
-        .select('config_value')
-        .eq('config_key', 'savings_weekly_cap')
-        .single()
-      return data ? parseFloat(data.config_value) : 5000
+      const { data } = await supabase.from('system_config').select('config_value').eq('config_key', 'savings_interest_holdout_days').single()
+      return data ? parseInt(data.config_value) : HOLDOUT_DAYS
+    },
+    staleTime: Infinity,
+  })
+
+  const { data: interestRate = 2.5 } = useQuery({
+    queryKey: ['savings_interest_rate'],
+    queryFn: async () => {
+      const { data } = await supabase.from('system_config').select('config_value').eq('config_key', 'savings_interest_rate').single()
+      return data ? parseFloat(data.config_value) : 2.5
+    },
+    staleTime: Infinity,
+  })
+
+  const { data: interestPeriodMonths = 6 } = useQuery({
+    queryKey: ['savings_interest_period_months'],
+    queryFn: async () => {
+      const { data } = await supabase.from('system_config').select('config_value').eq('config_key', 'savings_interest_period_months').single()
+      return data ? parseInt(data.config_value) : 6
     },
     staleTime: Infinity,
   })
 
   if (accountLoading || depositsLoading || withdrawalsLoading) {
-    return <SkeletonPage cards={4} rows={4} />
+    return <SkeletonPage cards={3} rows={4} />
   }
 
-  // No account yet — shares not completed
   if (!account) {
     return (
       <div>
@@ -69,12 +84,7 @@ export function SavingsPage() {
               <p className="text-sm text-gray-500 max-w-xs mx-auto">
                 Your savings account will be automatically opened once you complete your first equity share.
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-5"
-                onClick={() => navigate('/equity')}
-              >
+              <Button variant="outline" size="sm" className="mt-5" onClick={() => navigate('/equity')}>
                 View My Shares
               </Button>
             </CardBody>
@@ -86,16 +96,19 @@ export function SavingsPage() {
 
   const totalDeposited = contributions.reduce((s, c) => s + c.amount, 0)
   const totalInterest = interestLogs.reduce((s, l) => s + l.interest_earned, 0)
-  const pendingDeposits = depositRequests.filter(r => r.status === 'pending').length
-  const pendingWithdrawals = withdrawalRequests.filter(r => r.status === 'pending').length
+  const pendingCount = depositRequests.filter(r => r.status === 'pending').length +
+                       withdrawalRequests.filter(r => r.status === 'pending').length
 
-  const weekStart = new Date()
-  weekStart.setHours(0, 0, 0, 0)
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-  const weeklyTotal = contributions
-    .filter(c => new Date(c.contributed_at) >= weekStart)
+  // Qualifying balance = current balance minus deposits made within the holdout window
+  const holdoutCutoff = new Date(Date.now() - holdoutDays * 24 * 60 * 60 * 1000)
+  const recentDeposits = contributions
+    .filter(c => new Date(c.contributed_at) > holdoutCutoff)
     .reduce((s, c) => s + c.amount, 0)
-  const weeklyRemaining = Math.max(0, weeklyCap - weeklyTotal)
+  const qualifyingBalance = Math.max(0, (account?.balance ?? 0) - recentDeposits)
+
+  const interestPeriodLabel = interestPeriodMonths === 6 ? 'every 6 months' :
+    interestPeriodMonths === 12 ? 'annually' :
+    `every ${interestPeriodMonths} months`
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
@@ -106,36 +119,53 @@ export function SavingsPage() {
 
   return (
     <div>
-      <Header
-        title="Savings"
-        subtitle="Your savings account and transaction history"
-      />
+      <Header title="Savings" subtitle="Your savings account and transaction history" />
 
-      <div className="p-4 sm:p-6 space-y-6">
-        {/* KPI cards */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="p-4 sm:p-6 space-y-5">
+
+        {/* Balance hero card */}
+        <Card className="bg-gradient-to-br from-blue-600 to-blue-700 border-0 text-white">
+          <CardBody className="py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-blue-200 font-medium">Current Balance</p>
+                <p className="text-4xl font-bold mt-1">{currency(account.balance)}</p>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
+                    account.status === 'active' ? 'bg-blue-500 text-white' : 'bg-blue-800 text-blue-200'
+                  }`}>{account.status}</span>
+                  <span className="text-xs text-blue-300">· Opened {formatDate(account.opened_at)}</span>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-xs text-blue-300">Interest rate</p>
+                <p className="text-xl font-bold text-white">{interestRate}%</p>
+                <p className="text-xs text-blue-300 mt-0.5">{interestPeriodLabel}</p>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Stat row */}
+        <div className="grid grid-cols-3 gap-3">
           <Card>
-            <CardBody>
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Balance</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{currency(account.balance)}</p>
+            <CardBody className="py-3">
+              <p className="text-xs text-gray-500">Total Deposited</p>
+              <p className="text-lg font-bold text-gray-900 mt-0.5">{currency(totalDeposited)}</p>
             </CardBody>
           </Card>
           <Card>
-            <CardBody>
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Total Deposited</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{currency(totalDeposited)}</p>
+            <CardBody className="py-3">
+              <p className="text-xs text-gray-500">Interest Earned</p>
+              <p className="text-lg font-bold text-green-600 mt-0.5">{currency(totalInterest)}</p>
             </CardBody>
           </Card>
           <Card>
-            <CardBody>
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Interest Earned</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">{currency(totalInterest)}</p>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardBody>
-              <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Pending Requests</p>
-              <p className="text-2xl font-bold text-yellow-600 mt-1">{pendingDeposits + pendingWithdrawals}</p>
+            <CardBody className="py-3">
+              <p className="text-xs text-gray-500">Pending</p>
+              <p className={`text-lg font-bold mt-0.5 ${pendingCount > 0 ? 'text-yellow-600' : 'text-gray-900'}`}>
+                {pendingCount}
+              </p>
             </CardBody>
           </Card>
         </div>
@@ -169,45 +199,33 @@ export function SavingsPage() {
         {/* Overview tab */}
         {tab === 'overview' && (
           <div className="space-y-4">
+            {/* Qualifying balance for interest */}
             <Card>
-              <CardHeader>
-                <h3 className="text-sm font-semibold text-gray-900">Account Details</h3>
-              </CardHeader>
               <CardBody>
-                <div className="divide-y divide-gray-100">
-                  <div className="flex justify-between py-2.5 text-sm">
-                    <span className="text-gray-500">Status</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                      account.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                    }`}>{account.status}</span>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Qualifying Balance</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-0.5">{currency(qualifyingBalance)}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Amount earning interest · deposits are counted after {holdoutDays} days
+                    </p>
                   </div>
-                  <div className="flex justify-between py-2.5 text-sm">
-                    <span className="text-gray-500">Account opened</span>
-                    <span className="text-gray-900">{formatDate(account.opened_at)}</span>
-                  </div>
-                  <div className="flex justify-between py-2.5 text-sm">
-                    <span className="text-gray-500">Current balance</span>
-                    <span className="font-semibold text-gray-900">{currency(account.balance)}</span>
-                  </div>
-                  <div className="flex justify-between py-2.5 text-sm">
-                    <span className="text-gray-500">Weekly deposited</span>
-                    <span className="text-gray-900">{currency(weeklyTotal)} / {currency(weeklyCap)}</span>
-                  </div>
-                  <div className="flex justify-between py-2.5 text-sm">
-                    <span className="text-gray-500">Weekly remaining cap</span>
-                    <span className={`font-medium ${weeklyRemaining === 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                      {currency(weeklyRemaining)}
-                    </span>
-                  </div>
-                  {interestLogs.length > 0 && (
-                    <div className="flex justify-between py-2.5 text-sm">
-                      <span className="text-gray-500">Last interest credited</span>
-                      <span className="text-gray-900">{formatDate(interestLogs[0].created_at)}</span>
+                  {recentDeposits > 0 && (
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-gray-400">Pending seasoning</p>
+                      <p className="text-sm font-semibold text-amber-600">{currency(recentDeposits)}</p>
                     </div>
                   )}
                 </div>
               </CardBody>
             </Card>
+
+            {interestLogs.length > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between text-sm">
+                <span className="text-green-700">Last interest credited</span>
+                <span className="font-medium text-green-800">{formatDate(interestLogs[0].created_at)}</span>
+              </div>
+            )}
 
             {account.status === 'active' && (
               <div className="flex gap-3">
@@ -312,12 +330,14 @@ export function SavingsPage() {
           </Card>
         )}
 
-        {/* Interest History tab */}
+        {/* Interest tab */}
         {tab === 'interest' && (
           <Card>
             <CardHeader>
               <h3 className="text-sm font-semibold text-gray-900">Interest History</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Interest is credited every 6 months at 2.5%.</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Interest is credited {interestPeriodLabel} at <strong>{interestRate}%</strong>.
+              </p>
             </CardHeader>
             {interestLogs.length === 0 ? (
               <CardBody>
@@ -330,7 +350,7 @@ export function SavingsPage() {
                     <tr className="border-b border-gray-100">
                       <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Period</th>
                       <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Principal</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Interest Earned</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Interest</th>
                       <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Credited</th>
                     </tr>
                   </thead>

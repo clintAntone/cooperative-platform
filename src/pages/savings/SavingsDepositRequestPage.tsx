@@ -8,7 +8,7 @@ import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Input, Select, Textarea } from '../../components/ui/Input'
-import { useSavingsAccount, useSubmitSavingsDeposit, useSavingsWeeklyTotal, uploadSavingsReceipt } from '../../hooks/useSavings'
+import { useSavingsAccount, useSubmitSavingsDeposit, uploadSavingsReceipt } from '../../hooks/useSavings'
 import { useCurrency } from '../../hooks/useCurrency'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -31,7 +31,6 @@ export function SavingsDepositRequestPage() {
   const { user, profile } = useAuth()
   const { format: currency } = useCurrency()
   const { data: account } = useSavingsAccount()
-  const { data: weeklyTotal = 0 } = useSavingsWeeklyTotal(account?.id)
   const submitRequest = useSubmitSavingsDeposit()
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -52,21 +51,6 @@ export function SavingsDepositRequestPage() {
     },
     staleTime: Infinity,
   })
-
-  const { data: weeklyCap = 5000 } = useQuery({
-    queryKey: ['savings_weekly_cap'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('system_config')
-        .select('config_value')
-        .eq('config_key', 'savings_weekly_cap')
-        .single()
-      return data ? parseFloat(data.config_value) : 5000
-    },
-    staleTime: Infinity,
-  })
-
-  const weeklyRemaining = Math.max(0, weeklyCap - weeklyTotal)
 
   const schema = z.object({
     amount: z
@@ -193,36 +177,16 @@ export function SavingsDepositRequestPage() {
       <div className="p-4 sm:p-6 space-y-6">
         {/* Account summary */}
         {account && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
-            <div className="bg-white border border-gray-200 rounded-xl p-3 text-center">
-              <p className="text-xs text-gray-500">Current Balance</p>
-              <p className="text-lg font-bold text-gray-900 mt-0.5">{currency(account.balance)}</p>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-3 text-center">
-              <p className="text-xs text-gray-500">Deposited This Week</p>
-              <p className="text-lg font-bold text-gray-900 mt-0.5">{currency(weeklyTotal)}</p>
-            </div>
-            <div className={`border rounded-xl p-3 text-center col-span-2 sm:col-span-1 ${weeklyRemaining === 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
-              <p className="text-xs text-gray-500">Weekly Cap Remaining</p>
-              <p className={`text-lg font-bold mt-0.5 ${weeklyRemaining === 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                {currency(weeklyRemaining)}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {weeklyRemaining === 0 && (
-          <div className="max-w-2xl mx-auto bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800">
-            You have reached your weekly deposit cap of {currency(weeklyCap)}. You can deposit again next week.
+          <div className="max-w-2xl mx-auto bg-white border border-gray-200 rounded-xl p-3 text-center">
+            <p className="text-xs text-gray-500">Current Balance</p>
+            <p className="text-xl font-bold text-gray-900 mt-0.5">{currency(account.balance)}</p>
           </div>
         )}
 
         <Card className="max-w-2xl mx-auto">
           <CardHeader>
             <h2 className="text-base font-semibold text-gray-900">Savings Deposit Form</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Minimum deposit: {currency(minDeposit)} · Weekly cap: {currency(weeklyCap)}
-            </p>
+            <p className="text-sm text-gray-500 mt-0.5">Minimum deposit: {currency(minDeposit)}</p>
           </CardHeader>
           <CardBody>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -233,7 +197,7 @@ export function SavingsDepositRequestPage() {
                 min={minDeposit}
                 placeholder="0.00"
                 error={errors.amount?.message}
-                hint={`Minimum: ${currency(minDeposit)} · Weekly cap remaining: ${currency(weeklyRemaining)}`}
+                hint={`Minimum deposit: ${currency(minDeposit)}`}
                 required
                 {...register('amount', { valueAsNumber: true })}
               />
@@ -329,7 +293,7 @@ export function SavingsDepositRequestPage() {
                   type="submit"
                   className="flex-1"
                   loading={isSubmitting || submitRequest.isPending}
-                  disabled={!account || weeklyRemaining === 0}
+                  disabled={!account}
                 >
                   Submit Request
                 </Button>
