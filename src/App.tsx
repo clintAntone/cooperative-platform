@@ -124,6 +124,7 @@ export default function App() {
                 <Route path="/faq" element={<ErrorBoundary><FaqPage /></ErrorBoundary>} />
                 <Route path="/rules" element={<ErrorBoundary><RulesPage /></ErrorBoundary>} />
                 <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
+                <Route path="/branches" element={<ErrorBoundary><BranchKPIPage /></ErrorBoundary>} />
               </Route>
 
               {/* Member + Collector */}
@@ -140,7 +141,6 @@ export default function App() {
                 <Route path="/savings/deposit-request" element={<ErrorBoundary><SavingsDepositRequestPage /></ErrorBoundary>} />
                 <Route path="/savings/withdraw" element={<ErrorBoundary><SavingsWithdrawPage /></ErrorBoundary>} />
                 <Route path="/damayan" element={<ErrorBoundary><DamayanPage /></ErrorBoundary>} />
-                <Route path="/branches" element={<ErrorBoundary><BranchKPIPage /></ErrorBoundary>} />
               </Route>
 
               {/* Collector only */}
@@ -152,7 +152,6 @@ export default function App() {
               {/* Admin + Staff */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
                 <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
-                <Route path="/branches" element={<ErrorBoundary><BranchKPIPage /></ErrorBoundary>} />
                 <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
                 <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
                 <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
