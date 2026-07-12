@@ -49,12 +49,14 @@ export function RebatesPage() {
         <PageGuide
           storageKey="rebates"
           steps={[
-            'Rebates return a percentage of the loan interest paid by members back to them as a reward for good standing.',
-            "Select a period (start and end date), then click 'Release Rebates' — the system sums interest paid per member during that period.",
-            "The rebate rate is set in System Config under 'rebate_rate' (default 10% of interest paid).",
-            "Rebates are credited to the member's savings account and recorded in the ledger.",
+            'Rebates give back a portion of loan interest to members as a reward for making payments — e.g., 10% of the interest they paid goes back into their savings.',
+            "Run this at the end of each period (e.g., every 6 months). Set Period Start and End to the window you want — the preview table shows exactly who gets what before you confirm.",
+            "Only members with fully paid installments in the selected date range are included. Members who missed payments get nothing for those months.",
+            "The rebate rate is configured in Admin → System Config under 'rebate_rate'. Change it there before releasing if you want a different rate.",
+            "After release, each member's rebate is added to their savings account balance. They can withdraw it via a savings withdrawal request.",
+            "Tip: avoid overlapping date ranges on separate releases — the system does not prevent double-releasing the same period.",
           ]}
-          note="Only members who made loan repayments during the selected period will receive a rebate. Run this at your chosen cadence (e.g., semi-annually)."
+          note="Typical cadence: semi-annually (Jan–Jun, Jul–Dec) or annually. Coordinate with your fiscal calendar."
         />
         {/* Release history */}
         <Card className="overflow-x-auto">
