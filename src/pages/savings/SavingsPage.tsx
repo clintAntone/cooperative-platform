@@ -16,7 +16,6 @@ import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, formatDateTime } from '../../lib/utils'
 import { supabase } from '../../lib/supabase'
 
-const HOLDOUT_DAYS = 30 // mirrors savings_interest_holdout_days system_config default
 
 const statusColors: Record<string, string> = {
   pending:  'bg-yellow-100 text-yellow-800',
@@ -36,15 +35,6 @@ export function SavingsPage() {
   const { data: withdrawalRequests = [], isLoading: withdrawalsLoading } = useSavingsWithdrawalRequests()
   const { data: contributions = [] } = useSavingsContributions(account?.id)
   const { data: interestLogs = [] } = useSavingsInterestLogs(account?.id)
-
-  const { data: holdoutDays = HOLDOUT_DAYS } = useQuery({
-    queryKey: ['savings_interest_holdout_days'],
-    queryFn: async () => {
-      const { data } = await supabase.from('system_config').select('config_value').eq('config_key', 'savings_interest_holdout_days').single()
-      return data ? parseInt(data.config_value) : HOLDOUT_DAYS
-    },
-    staleTime: Infinity,
-  })
 
   const { data: interestRate = 2.5 } = useQuery({
     queryKey: ['savings_interest_rate'],
@@ -99,12 +89,28 @@ export function SavingsPage() {
   const pendingCount = depositRequests.filter(r => r.status === 'pending').length +
                        withdrawalRequests.filter(r => r.status === 'pending').length
 
-  // Qualifying balance = current balance minus deposits made within the holdout window
-  const holdoutCutoff = new Date(Date.now() - holdoutDays * 24 * 60 * 60 * 1000)
-  const recentDeposits = contributions
-    .filter(c => new Date(c.contributed_at) > holdoutCutoff)
-    .reduce((s, c) => s + c.amount, 0)
-  const qualifyingBalance = Math.max(0, (account?.balance ?? 0) - recentDeposits)
+  // Approximate average daily balance for the current period (mirrors the RPC calculation).
+  // Period start = last interest log date, or account opening.
+  const periodStartTs = interestLogs.length > 0
+    ? new Date(interestLogs[0].created_at)   // interestLogs is ordered desc, so [0] = most recent
+    : account ? new Date(account.opened_at) : new Date()
+  const periodEndTs = new Date()
+  const periodDays = Math.max(1, (periodEndTs.getTime() - periodStartTs.getTime()) / 86400_000)
+
+  // Balance at start of period = current balance minus contributions made during the period
+  const contributionsDuringPeriod = contributions.filter(c => new Date(c.contributed_at) > periodStartTs)
+  const balanceAtStart = Math.max(0,
+    (account?.balance ?? 0) - contributionsDuringPeriod.reduce((s, c) => s + c.amount, 0)
+  )
+
+  // ADB = balance_at_start + SUM(deposit × days_remaining / period_days)
+  const adb = Math.max(0,
+    balanceAtStart +
+    contributionsDuringPeriod.reduce((s, c) => {
+      const daysHeld = Math.max(0, (periodEndTs.getTime() - new Date(c.contributed_at).getTime()) / 86400_000)
+      return s + c.amount * (daysHeld / periodDays)
+    }, 0)
+  )
 
   const interestPeriodLabel = interestPeriodMonths === 6 ? 'every 6 months' :
     interestPeriodMonths === 12 ? 'annually' :
@@ -199,23 +205,21 @@ export function SavingsPage() {
         {/* Overview tab */}
         {tab === 'overview' && (
           <div className="space-y-4">
-            {/* Qualifying balance for interest */}
+            {/* Average daily balance */}
             <Card>
               <CardBody>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Qualifying Balance</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-0.5">{currency(qualifyingBalance)}</p>
+                    <p className="text-sm font-medium text-gray-700">Average Daily Balance</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-0.5">{currency(adb)}</p>
                     <p className="text-xs text-gray-400 mt-1">
-                      Amount earning interest · deposits are counted after {holdoutDays} days
+                      Interest is calculated on this amount — deposits earn proportional to how long they're held
                     </p>
                   </div>
-                  {recentDeposits > 0 && (
-                    <div className="text-right shrink-0">
-                      <p className="text-xs text-gray-400">Pending seasoning</p>
-                      <p className="text-sm font-semibold text-amber-600">{currency(recentDeposits)}</p>
-                    </div>
-                  )}
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-gray-400">Period</p>
+                    <p className="text-xs font-medium text-gray-600">{Math.round(periodDays)}d so far</p>
+                  </div>
                 </div>
               </CardBody>
             </Card>
