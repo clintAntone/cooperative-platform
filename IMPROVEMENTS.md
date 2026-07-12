@@ -162,3 +162,45 @@ Remaining large-effort items:
 - Code splitting
 - Virtual scrolling
 - Selective column fetching
+
+---
+
+## 🔴 Accounting & Flow Gaps (Added 2026-07-12)
+
+Identified via full accountant/manager flow review. Status legend: 🔴 Open · 🟡 In Progress · ✅ Done
+
+### CRITICAL — Will Cause Accounting Errors
+
+| ID | Issue | Status | Fixed In |
+|----|-------|--------|----------|
+| C1 | Savings withdrawal does not enforce minimum balance (₱500) in the RPC — only checks `balance >= amount`, not `balance - amount >= min_balance` | ✅ | 44_critical_fixes.sql |
+| C2 | Loan repayment does not update `loan_repayment_schedule.status/amount_paid` or `loans.amount_paid/outstanding` — schedule stays `pending` forever | ✅ | 44_critical_fixes.sql |
+| C3 | Loan never auto-completes — no trigger sets `status = completed` when `outstanding <= 0`, blocking member from re-applying | ✅ | 44_critical_fixes.sql |
+| C4 | New collateral-based loan amount formula (borrower + co-maker shares + savings) is documented in Rules page but not enforced in `admin_approve_loan_application()` RPC | ✅ | 44_critical_fixes.sql |
+
+### OPERATIONAL — Will Cause Problems in Daily Use
+
+| ID | Issue | Status | Fixed In |
+|----|-------|--------|----------|
+| O1 | No overdue installment detection — past-due schedule rows stay `pending`, no automatic `overdue` transition | ✅ | 44_critical_fixes.sql (`mark_overdue_loan_installments()` + pg_cron daily) |
+| O2 | Interest release has no admin UI — pg_cron must be manually configured; no button to trigger manually or see last-run date | 🔴 | — |
+| O3 | Co-maker eligibility not reset after application rejection/cancellation — confirmed co-makers on rejected apps stay blocked | ✅ | Already fixed in migration 20 — `get_eligible_co_makers()` correctly scopes to active applications only |
+| O4 | No post-default resolution flow — no RPC or UI to resolve a default, lift suspension, and allow re-application | ✅ | 44_critical_fixes.sql (`admin_resolve_loan_default()`) |
+
+### POLICY — Config Exists But Not Enforced in Code
+
+| ID | Issue | Status | Fixed In |
+|----|-------|--------|----------|
+| P1 | `max_loan_term_months = 6` not enforced in approval RPC — loan product's own `max_term_months` is used instead | ✅ | 44_critical_fixes.sql |
+| P2 | Loan product interest rate may differ from `system_config.loan_interest_rate` (3.33%) — active products may still carry old rate | 🔴 | Manual — review and update active loan products in Supabase dashboard |
+
+### MISSING FEATURES — From Original Plan
+
+| ID | Feature | Status | Notes |
+|----|---------|--------|-------|
+| F1 | Equity share dividends — no `release_equity_dividend()` RPC, no dividend logs table, no member view | 🔴 | Separate 6-month cycle from savings interest |
+| F2 | Loan max amount not computed/shown during application — member sees no cap, admin has no enforcement | 🔴 | Tied to C4 |
+| F3 | Share transfer between members | 🔴 | Future phase |
+| F4 | Damayan (mutual aid fund) | 🔴 | Future phase |
+| F5 | Branch management | 🔴 | Future phase |
+| F6 | Rebates | 🔴 | Future phase |
