@@ -193,10 +193,12 @@ export function BranchesPage() {
             {branches.map(branch => {
               const income = incomeByBranch(branch.id)
               const expenses = expensesByBranch(branch.id)
+              const totalGrossSales = income.reduce((s, i) => s + (i.gross_sales ?? i.amount), 0)
+              const totalSalary = income.reduce((s, i) => s + (i.salary ?? 0), 0)
+              const totalOtherExpenses = expenses.reduce((s, e) => s + e.amount, 0)
               const totalIncome = income.reduce((s, i) => s + i.amount, 0)
-              const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
-              const netProfit = totalIncome - totalExpenses
-              const profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : null
+              const netProfit = totalIncome - totalOtherExpenses
+              const profitMargin = totalGrossSales > 0 ? (netProfit / totalGrossSales) * 100 : null
               const activeTab = getTab(branch.id)
 
               return (
@@ -240,14 +242,18 @@ export function BranchesPage() {
                   </div>
 
                   {/* KPI summary row */}
-                  <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 border-b border-gray-100 bg-gray-50 text-xs">
+                  <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-5 gap-3 border-b border-gray-100 bg-gray-50 text-xs">
                     <div>
-                      <p className="text-gray-500">Gross Revenue</p>
-                      <p className="font-semibold text-gray-900">{currency(totalIncome)}</p>
+                      <p className="text-gray-500">Gross Sales</p>
+                      <p className="font-semibold text-gray-900">{currency(totalGrossSales)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Total Expenses</p>
-                      <p className="font-semibold text-red-600">{currency(totalExpenses)}</p>
+                      <p className="text-gray-500">Salary</p>
+                      <p className="font-semibold text-orange-600">{currency(totalSalary)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Other Expenses</p>
+                      <p className="font-semibold text-red-600">{currency(totalOtherExpenses)}</p>
                     </div>
                     <div>
                       <p className="text-gray-500">Net Profit</p>
