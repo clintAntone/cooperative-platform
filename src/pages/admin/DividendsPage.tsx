@@ -3,7 +3,7 @@ import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
-import { useLastDividendRelease, useReleaseDividends } from '../../hooks/useEquityDividends'
+import { useLastDividendRelease, useReleaseDividends, useDividendPreview } from '../../hooks/useEquityDividends'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDateTime } from '../../lib/utils'
 import { PageGuide } from '../../components/shared/PageGuide'
@@ -13,6 +13,7 @@ export function DividendsPage() {
   const { data: lastRelease } = useLastDividendRelease()
   const release = useReleaseDividends()
   const [showConfirm, setShowConfirm] = useState(false)
+  const { data: preview, isLoading: previewLoading } = useDividendPreview()
 
   return (
     <div>
@@ -67,23 +68,62 @@ export function DividendsPage() {
         </Card>
       </div>
 
-      <Modal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Release Equity Dividends" size="sm">
+      <Modal isOpen={showConfirm} onClose={() => setShowConfirm(false)} title="Release Equity Dividends" size="md">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            This will credit dividends to <strong>all members with completed equity shares</strong>.
-            The dividend is calculated based on each share's target value × the configured rate.
-            This action cannot be undone.
-          </p>
           {lastRelease && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
-              Last release was on <strong>{formatDateTime(lastRelease.released_at)}</strong>.
+              Last release was on <strong>{formatDateTime(lastRelease.released_at)}</strong>. Releasing again will add another dividend on top.
             </div>
           )}
-          <div className="flex gap-3">
+
+          {previewLoading ? (
+            <p className="text-sm text-gray-500 text-center py-4">Loading preview…</p>
+          ) : preview && preview.rows.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">Dividend rate</span>
+                <span className="font-semibold text-gray-900">{preview.rate}%</span>
+              </div>
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="max-h-56 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-600">Member</th>
+                        <th className="px-3 py-2 text-center font-semibold text-gray-600">Shares</th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-600">Share Value</th>
+                        <th className="px-3 py-2 text-right font-semibold text-green-700">Dividend</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {preview.rows.map(row => (
+                        <tr key={row.userId} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-gray-900 font-medium">{row.fullName}</td>
+                          <td className="px-3 py-2 text-center text-gray-600">{row.shareCount}</td>
+                          <td className="px-3 py-2 text-right text-gray-600">{currency(row.totalShareValue)}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-green-700">{currency(row.dividendAmount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="bg-gray-50 border-t border-gray-200 px-3 py-2 flex justify-between text-xs font-semibold">
+                  <span className="text-gray-700">{preview.rows.length} member{preview.rows.length !== 1 ? 's' : ''}</span>
+                  <span className="text-green-700">Total: {currency(preview.grandTotal)}</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">Amounts will be credited to each member's savings account. This action cannot be undone.</p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">No members with completed shares found.</p>
+          )}
+
+          <div className="flex gap-3 pt-1">
             <Button variant="outline" className="flex-1" onClick={() => setShowConfirm(false)}>Cancel</Button>
             <Button
               className="flex-1"
               loading={release.isPending}
+              disabled={!preview || preview.rows.length === 0}
               onClick={() => release.mutate(undefined, {
                 onSuccess: () => setShowConfirm(false),
                 onError: (err: any) => alert(err.message ?? 'Failed to release dividends'),

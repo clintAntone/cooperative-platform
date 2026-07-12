@@ -3,7 +3,7 @@ import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
-import { useRebateReleases, useReleaseRebates } from '../../hooks/useRebates'
+import { useRebateReleases, useReleaseRebates, useRebatePreview } from '../../hooks/useRebates'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, formatDateTime } from '../../lib/utils'
 import { PageGuide } from '../../components/shared/PageGuide'
@@ -22,6 +22,7 @@ export function RebatesPage() {
 
   const [periodStart, setPeriodStart] = useState(defaultStart)
   const [periodEnd, setPeriodEnd] = useState(defaultEnd)
+  const { data: preview, isLoading: previewLoading } = useRebatePreview(periodStart, periodEnd)
 
   const handleRelease = () => {
     if (!periodStart || !periodEnd) return
@@ -87,40 +88,79 @@ export function RebatesPage() {
       </div>
 
       {/* Release modal */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Release Loan Rebates" size="sm">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Release Loan Rebates" size="md">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Select the period over which to compute loan interest paid. Members will receive a rebate
-            (configured as <code>rebate_rate</code> in System Config) of the interest they paid during
-            this period, credited to their savings account.
-          </p>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Period Start <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              value={periodStart}
-              onChange={e => setPeriodStart(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Period Start <span className="text-red-500">*</span></label>
+              <input
+                type="date"
+                value={periodStart}
+                onChange={e => setPeriodStart(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Period End <span className="text-red-500">*</span></label>
+              <input
+                type="date"
+                value={periodEnd}
+                onChange={e => setPeriodEnd(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Period End <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              value={periodEnd}
-              onChange={e => setPeriodEnd(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <p className="text-xs text-gray-400">
-            Rebates are computed from loan repayment schedule rows with status "paid" within this date range.
-          </p>
+
+          {/* Preview */}
+          {periodStart && periodEnd && periodStart < periodEnd && (
+            previewLoading ? (
+              <p className="text-sm text-gray-400 text-center py-3">Computing preview…</p>
+            ) : preview ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Rebate rate</span>
+                  <span className="font-semibold text-gray-900">{preview.rate}% of interest paid</span>
+                </div>
+                {preview.rows.length > 0 ? (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="max-h-52 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold text-gray-600">Member</th>
+                            <th className="px-3 py-2 text-right font-semibold text-gray-600">Interest Paid</th>
+                            <th className="px-3 py-2 text-right font-semibold text-green-700">Rebate</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {preview.rows.map(row => (
+                            <tr key={row.userId} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 text-gray-900 font-medium">{row.fullName}</td>
+                              <td className="px-3 py-2 text-right text-gray-600">{currency(row.interestPaid)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-green-700">{currency(row.rebateAmount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="bg-gray-50 border-t border-gray-200 px-3 py-2 flex justify-between text-xs font-semibold">
+                      <span className="text-gray-700">{preview.rows.length} member{preview.rows.length !== 1 ? 's' : ''}</span>
+                      <span className="text-green-700">Total: {currency(preview.grandTotal)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 text-center py-2 bg-gray-50 rounded-lg">No paid loan repayments found in this period.</p>
+                )}
+              </div>
+            ) : null
+          )}
+
           <div className="flex gap-3 pt-1">
             <Button variant="outline" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button
               className="flex-1"
               loading={releaseRebates.isPending}
-              disabled={!periodStart || !periodEnd || periodStart >= periodEnd}
+              disabled={!periodStart || !periodEnd || periodStart >= periodEnd || !preview || preview.rows.length === 0}
               onClick={handleRelease}
             >
               Release Rebates

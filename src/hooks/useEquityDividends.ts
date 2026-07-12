@@ -4,6 +4,73 @@ import { useEffectiveUserId } from '../context/ImpersonationContext'
 import { toast } from '../lib/toast'
 import type { EquityDividendLog } from '../types'
 
+export interface DividendPreviewRow {
+  userId: string
+  fullName: string
+  shareCount: number
+  totalShareValue: number
+  dividendAmount: number
+}
+
+export interface DividendPreview {
+  rate: number
+  rows: DividendPreviewRow[]
+  grandTotal: number
+}
+
+export function useDividendPreview() {
+  return useQuery({
+    queryKey: ['dividend_preview'],
+    queryFn: async (): Promise<DividendPreview> => {
+      // 1. Fetch dividend rate from system_config
+      const { data: configData } = await supabase
+        .from('system_config')
+        .select('config_key, config_value')
+        .eq('config_key', 'equity_dividend_rate')
+        .single()
+      const rate = parseFloat(configData?.config_value ?? '5')
+
+      // 2. Fetch all completed shares (two-step to avoid auth.users join limitation)
+      const { data: shares, error: sharesError } = await supabase
+        .from('equity_shares')
+        .select('id, user_id, target_amount')
+        .eq('status', 'completed')
+      if (sharesError) throw sharesError
+      if (!shares || shares.length === 0) return { rate, rows: [], grandTotal: 0 }
+
+      // 3. Fetch member names
+      const userIds = [...new Set(shares.map((s: any) => s.user_id))]
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds)
+      const nameMap: Record<string, string> = {}
+      for (const p of profiles ?? []) nameMap[p.id] = p.full_name
+
+      // 4. Group by user
+      const byUser: Record<string, { shareCount: number; totalShareValue: number }> = {}
+      for (const s of shares as any[]) {
+        if (!byUser[s.user_id]) byUser[s.user_id] = { shareCount: 0, totalShareValue: 0 }
+        byUser[s.user_id].shareCount += 1
+        byUser[s.user_id].totalShareValue += s.target_amount
+      }
+
+      const rows: DividendPreviewRow[] = Object.entries(byUser).map(([userId, v]) => ({
+        userId,
+        fullName: nameMap[userId] ?? 'Unknown',
+        shareCount: v.shareCount,
+        totalShareValue: v.totalShareValue,
+        dividendAmount: Math.round(v.totalShareValue * (rate / 100) * 100) / 100,
+      }))
+      rows.sort((a, b) => a.fullName.localeCompare(b.fullName))
+
+      const grandTotal = rows.reduce((s, r) => s + r.dividendAmount, 0)
+      return { rate, rows, grandTotal }
+    },
+    staleTime: 30_000,
+  })
+}
+
 export function useEquityDividendLogs(userId?: string) {
   const effectiveUserId = useEffectiveUserId()
   const targetId = userId ?? effectiveUserId
