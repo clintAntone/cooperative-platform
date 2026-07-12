@@ -127,7 +127,7 @@ export function EquityPage() {
               const remaining = share.target_amount - share.paid_amount
 
               return (
-                <Card key={share.id}>
+                <Card key={share.id} className="flex flex-col">
                   <CardHeader
                     action={<StatusBadge status={share.status} />}
                   >
@@ -136,7 +136,7 @@ export function EquityPage() {
                       Opened {formatDate(share.created_at)}
                     </p>
                   </CardHeader>
-                  <CardBody>
+                  <CardBody className="flex flex-col flex-1">
                     {/* Progress bar */}
                     <div className="mb-4">
                       <div className="flex justify-between text-sm mb-1.5">
@@ -157,7 +157,7 @@ export function EquityPage() {
                     </div>
 
                     {share.status === 'completed' ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 mt-auto">
                         <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -174,7 +174,7 @@ export function EquityPage() {
                         </Button>
                       </div>
                     ) : share.status === 'in_progress' ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 mt-auto">
                         <p className="text-xs text-gray-500">
                           Remaining: <span className="font-medium text-gray-700">{currency(remaining)}</span>
                         </p>
