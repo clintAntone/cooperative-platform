@@ -109,7 +109,7 @@ const navGroups: NavGroup[] = [
       },
       {
         path: '/branches',
-        label: 'Branch Portfolio',
+        label: 'Coop Earnings',
         end: true,
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
