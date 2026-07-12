@@ -362,7 +362,7 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
             </div>
             <div>
               <p className="text-gray-500">Interest Rate</p>
-              <p className="font-semibold text-gray-900">{interestRate}% p.a.</p>
+              <p className="font-semibold text-gray-900">{interestRate}% {ratePeriod === 'monthly' ? '/ mo' : 'p.a.'}</p>
             </div>
             <div>
               <p className="text-gray-500">Method</p>
