@@ -72,11 +72,13 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
 
 function UserDrawer({
   userId,
+  email,
   onClose,
   onChangeRole,
   onChangeStatus,
 }: {
   userId: string
+  email: string | null
   onClose: () => void
   onChangeRole: (user: UserRow) => void
   onChangeStatus: (user: UserRow) => void
@@ -199,6 +201,7 @@ function UserDrawer({
               <div>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Personal Info</p>
                 <div className="bg-gray-50 rounded-xl px-4 py-1">
+                  <DetailRow label="Email" value={email} />
                   <DetailRow label="Phone" value={detail.phone} />
                   <DetailRow label="Employee ID" value={detail.employee_id} />
                   <DetailRow label="Date of Birth" value={detail.date_of_birth ? formatDate(detail.date_of_birth) : null} />
@@ -596,6 +599,7 @@ export function UsersPage() {
       {selectedUserId && (
         <UserDrawer
           userId={selectedUserId}
+          email={users.find(u => u.id === selectedUserId)?.email ?? null}
           onClose={() => setSelectedUserId(null)}
           onChangeRole={user => openEditState({ user, field: 'role', newValue: user.role })}
           onChangeStatus={user => openEditState({ user, field: 'account_status', newValue: user.account_status })}
