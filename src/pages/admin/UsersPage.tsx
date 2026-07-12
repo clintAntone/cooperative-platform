@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
@@ -8,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { SkeletonPage } from '../../components/shared/Skeleton'
 import { exportToExcel } from '../../lib/exportExcel'
+import { formatDate } from '../../lib/utils'
 import type { UserRole, AccountStatus } from '../../types'
 import { PageGuide } from '../../components/shared/PageGuide'
 
@@ -20,6 +20,24 @@ interface UserRow {
   account_status: AccountStatus
   membership_status: string | null
   completed_shares: number | null
+  created_at: string
+}
+
+interface UserDetail {
+  id: string
+  full_name: string
+  email: string | null
+  phone: string | null
+  role: UserRole
+  account_status: AccountStatus
+  employee_id: string | null
+  date_of_birth: string | null
+  address: string | null
+  civil_status: string | null
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
+  avatar_url: string | null
+  profile_completed_at: string | null
   created_at: string
 }
 
@@ -43,22 +61,238 @@ const statusColors: Record<AccountStatus, string> = {
   inactive: 'bg-gray-100 text-gray-500',
 }
 
+function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="py-2.5 border-b border-gray-50 last:border-0">
+      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+      <p className="text-sm text-gray-900">{value || <span className="text-gray-300 italic">Not provided</span>}</p>
+    </div>
+  )
+}
+
+function UserDrawer({
+  userId,
+  onClose,
+  onChangeRole,
+  onChangeStatus,
+}: {
+  userId: string
+  onClose: () => void
+  onChangeRole: (user: UserRow) => void
+  onChangeStatus: (user: UserRow) => void
+}) {
+  const { data: detail, isLoading } = useQuery<UserDetail>({
+    queryKey: ['user_detail_drawer', userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, role, account_status, employee_id, avatar_url, date_of_birth, address, civil_status, emergency_contact_name, emergency_contact_phone, profile_completed_at, created_at')
+        .eq('id', userId)
+        .single()
+      if (error) throw error
+      // Email comes from auth — fetch via admin RPC user list and match
+      return data as UserDetail
+    },
+    enabled: !!userId,
+  })
+
+  // Also fetch membership + share summary
+  const { data: summary } = useQuery({
+    queryKey: ['user_drawer_summary', userId],
+    queryFn: async () => {
+      const [sharesRes, msRes] = await Promise.all([
+        supabase
+          .from('equity_shares')
+          .select('status, paid_amount, target_amount')
+          .eq('user_id', userId),
+        supabase
+          .from('membership_status')
+          .select('status, completed_shares, last_evaluated_at')
+          .eq('user_id', userId)
+          .maybeSingle(),
+      ])
+      const shares = sharesRes.data ?? []
+      const totalInvested = shares.reduce((s: number, r: any) => s + (r.paid_amount ?? 0), 0)
+      const completed = shares.filter((r: any) => r.status === 'completed').length
+      return { totalInvested, completed, total: shares.length, ms: msRes.data }
+    },
+    enabled: !!userId,
+  })
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/30 z-40"
+        onClick={onClose}
+      />
+
+      {/* Drawer */}
+      <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 shadow-2xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">User Details</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {isLoading ? (
+            <div className="space-y-3 animate-pulse">
+              <div className="h-12 w-12 bg-gray-200 rounded-full mx-auto" />
+              <div className="h-4 bg-gray-200 rounded w-2/3 mx-auto" />
+              <div className="h-3 bg-gray-100 rounded w-1/2 mx-auto" />
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-10 bg-gray-100 rounded" />
+              ))}
+            </div>
+          ) : detail ? (
+            <>
+              {/* Avatar + name */}
+              <div className="flex flex-col items-center text-center gap-2 pb-2">
+                <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
+                  {detail.avatar_url ? (
+                    <img src={detail.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xl font-bold text-gray-400">
+                      {detail.full_name?.charAt(0)?.toUpperCase() ?? '?'}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-gray-900">{detail.full_name}</p>
+                  <div className="flex items-center justify-center gap-1.5 mt-1 flex-wrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${roleColors[detail.role]}`}>
+                      {detail.role}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[detail.account_status]}`}>
+                      {detail.account_status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Share summary */}
+              {summary && (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Total Shares', value: summary.total },
+                    { label: 'Completed', value: summary.completed },
+                    { label: 'Total Invested', value: `₱${summary.totalInvested.toLocaleString()}` },
+                  ].map(s => (
+                    <div key={s.label} className="bg-gray-50 rounded-lg px-2 py-2 text-center">
+                      <p className="text-sm font-bold text-gray-900">{s.value}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Personal info */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Personal Info</p>
+                <div className="bg-gray-50 rounded-xl px-4 py-1">
+                  <DetailRow label="Phone" value={detail.phone} />
+                  <DetailRow label="Employee ID" value={detail.employee_id} />
+                  <DetailRow label="Date of Birth" value={detail.date_of_birth ? formatDate(detail.date_of_birth) : null} />
+                  <DetailRow label="Civil Status" value={detail.civil_status} />
+                  <DetailRow label="Address" value={detail.address} />
+                </div>
+              </div>
+
+              {/* Emergency contact */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Emergency Contact</p>
+                <div className="bg-gray-50 rounded-xl px-4 py-1">
+                  <DetailRow label="Name" value={detail.emergency_contact_name} />
+                  <DetailRow label="Phone" value={detail.emergency_contact_phone} />
+                </div>
+              </div>
+
+              {/* Account info */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Account</p>
+                <div className="bg-gray-50 rounded-xl px-4 py-1">
+                  <DetailRow label="Joined" value={formatDate(detail.created_at)} />
+                  <DetailRow label="Profile Completed" value={detail.profile_completed_at ? formatDate(detail.profile_completed_at) : null} />
+                  {summary?.ms && (
+                    <DetailRow label="Membership Status" value={summary.ms.status} />
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-10">Could not load user details.</p>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        {detail && (
+          <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                const row: UserRow = {
+                  id: detail.id,
+                  full_name: detail.full_name,
+                  email: detail.email,
+                  phone: detail.phone,
+                  role: detail.role,
+                  account_status: detail.account_status,
+                  membership_status: summary?.ms?.status ?? null,
+                  completed_shares: summary?.completed ?? null,
+                  created_at: detail.created_at,
+                }
+                onChangeRole(row)
+              }}
+            >
+              Change Role
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => {
+                const row: UserRow = {
+                  id: detail.id,
+                  full_name: detail.full_name,
+                  email: detail.email,
+                  phone: detail.phone,
+                  role: detail.role,
+                  account_status: detail.account_status,
+                  membership_status: summary?.ms?.status ?? null,
+                  completed_shares: summary?.completed ?? null,
+                  created_at: detail.created_at,
+                }
+                onChangeStatus(row)
+              }}
+            >
+              Change Status
+            </Button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 export function UsersPage() {
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [editState, setEditState] = useState<EditState | null>(null)
   const [disableReason, setDisableReason] = useState('')
   const [reasonError, setReasonError] = useState('')
-
-  const handleRowClick = (user: UserRow) => {
-    if (user.role === 'member' || user.role === 'collector') {
-      navigate(`/admin/members/${user.id}`)
-    } else {
-      navigate(`/admin/users/${user.id}`)
-    }
-  }
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin-users'],
@@ -79,6 +313,7 @@ export function UsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      queryClient.invalidateQueries({ queryKey: ['user_detail_drawer'] })
       setEditState(null)
     },
   })
@@ -90,7 +325,6 @@ export function UsersPage() {
         p_new_status: status,
       })
       if (error) throw error
-      // Log the action with reason if provided
       if (reason) {
         await supabase.rpc('log_admin_action', {
           p_action: `account_status_changed_to_${status}`,
@@ -101,14 +335,13 @@ export function UsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      queryClient.invalidateQueries({ queryKey: ['user_detail_drawer'] })
       setEditState(null)
       setDisableReason('')
       setReasonError('')
     },
   })
 
-  // Whether the current status change requires a reason:
-  // member/collector being suspended or set inactive
   const requiresReason =
     editState?.field === 'account_status' &&
     (editState.newValue === 'suspended' || editState.newValue === 'inactive') &&
@@ -194,11 +427,12 @@ export function UsersPage() {
           storageKey="manage-users"
           steps={[
             'This page manages system user accounts — roles, status, and employee ID assignment.',
-            "Change a user's role (member, staff, collector, admin) or account status here.",
-            'Assign an Employee ID to link the user to payroll/HR records.',
+            "Click any row to view the user's personal details in a side panel.",
+            "Use Change Role or Change Status buttons to update a user's access.",
           ]}
           note="Changing a user's role takes effect immediately. Be careful assigning 'admin' — admins have full access to all data."
         />
+
         {/* Summary cards */}
         <div className="grid grid-cols-4 gap-2">
           {[
@@ -257,10 +491,11 @@ export function UsersPage() {
           {filtered.map(user => (
             <div
               key={user.id}
-              className="bg-white rounded-xl border border-gray-200 hover:border-blue-200 hover:bg-blue-50/30 px-4 py-3.5 space-y-2.5 cursor-pointer transition-colors"
-              onClick={() => handleRowClick(user)}
+              className={`bg-white rounded-xl border px-4 py-3.5 space-y-2.5 cursor-pointer transition-colors ${
+                selectedUserId === user.id ? 'border-blue-300 bg-blue-50/40' : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30'
+              }`}
+              onClick={() => setSelectedUserId(user.id)}
             >
-              {/* Name + role */}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-sm text-gray-900 leading-snug">{user.full_name}</p>
@@ -270,40 +505,16 @@ export function UsersPage() {
                   {user.role}
                 </span>
               </div>
-
-              {/* Status badge */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusColors[user.account_status]}`}>
                   {user.account_status}
                 </span>
               </div>
-
-              {/* Meta row */}
               <p className="text-xs text-gray-400">
                 {user.completed_shares ?? 0} {(user.completed_shares ?? 0) === 1 ? 'share' : 'shares'}
                 {' · '}
                 Joined {new Date(user.created_at).toLocaleDateString()}
               </p>
-
-              {/* Actions */}
-              <div
-                className="flex items-center gap-2 pt-0.5 border-t border-gray-100"
-                onClick={e => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => openEditState({ user, field: 'role', newValue: user.role })}
-                  className="flex-1 text-xs text-center py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-medium transition-colors"
-                >
-                  Change Role
-                </button>
-                <div className="w-px h-4 bg-gray-200" />
-                <button
-                  onClick={() => openEditState({ user, field: 'account_status', newValue: user.account_status })}
-                  className="flex-1 text-xs text-center py-1.5 rounded-lg text-orange-600 hover:bg-orange-50 font-medium transition-colors"
-                >
-                  Change Status
-                </button>
-              </div>
             </div>
           ))}
         </div>
@@ -332,8 +543,10 @@ export function UsersPage() {
               {filtered.map(user => (
                 <tr
                   key={user.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => handleRowClick(user)}
+                  className={`cursor-pointer transition-colors ${
+                    selectedUserId === user.id ? 'bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => setSelectedUserId(user.id)}
                 >
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{user.full_name}</p>
@@ -379,6 +592,16 @@ export function UsersPage() {
         </Card>
       </div>
 
+      {/* User detail drawer */}
+      {selectedUserId && (
+        <UserDrawer
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+          onChangeRole={user => openEditState({ user, field: 'role', newValue: user.role })}
+          onChangeStatus={user => openEditState({ user, field: 'account_status', newValue: user.account_status })}
+        />
+      )}
+
       {/* Edit modal */}
       {editState && (
         <Modal
@@ -405,6 +628,7 @@ export function UsersPage() {
                     <option value="member">Member</option>
                     <option value="collector">Collector</option>
                     <option value="staff">Staff</option>
+                    <option value="board">Board of Directors</option>
                     <option value="admin">Admin</option>
                   </>
                 ) : (
@@ -429,7 +653,6 @@ export function UsersPage() {
               </div>
             )}
 
-            {/* Reason — required when disabling a member/collector with shares */}
             {editState.field === 'account_status' &&
               (editState.newValue === 'suspended' || editState.newValue === 'inactive') &&
               (editState.user.role === 'member' || editState.user.role === 'collector') && (
