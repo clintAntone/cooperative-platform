@@ -130,23 +130,23 @@ export function SavingsPage() {
       <div className="p-4 sm:p-6 space-y-5">
 
         {/* Balance hero card */}
-        <Card className="bg-gradient-to-br from-blue-600 to-blue-700 border-0 text-white">
+        <Card className="bg-gradient-to-br from-emerald-600 to-teal-700 border-0 text-white">
           <CardBody className="py-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-blue-200 font-medium">Current Balance</p>
+                <p className="text-sm text-emerald-200 font-medium">Current Balance</p>
                 <p className="text-4xl font-bold mt-1">{currency(account.balance)}</p>
                 <div className="flex items-center gap-1.5 mt-2">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${
-                    account.status === 'active' ? 'bg-blue-500 text-white' : 'bg-blue-800 text-blue-200'
+                    account.status === 'active' ? 'bg-emerald-500 text-white' : 'bg-teal-800 text-teal-200'
                   }`}>{account.status}</span>
-                  <span className="text-xs text-blue-300">· Opened {formatDate(account.opened_at)}</span>
+                  <span className="text-xs text-emerald-300">· Opened {formatDate(account.opened_at)}</span>
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-xs text-blue-300">Interest rate</p>
+                <p className="text-xs text-emerald-300">Interest rate</p>
                 <p className="text-xl font-bold text-white">{interestRate}%</p>
-                <p className="text-xs text-blue-300 mt-0.5">{interestPeriodLabel}</p>
+                <p className="text-xs text-emerald-300 mt-0.5">{interestPeriodLabel}</p>
               </div>
             </div>
           </CardBody>
