@@ -15,6 +15,7 @@ function RootRedirect() {
   if (loading) return null
   const role = profile?.role
   if (role === 'member' || role === 'collector') return <Navigate to="/dashboard" replace />
+  if (role === 'board') return <Navigate to="/reports" replace />
   return <Navigate to="/reports" replace />
 }
 
@@ -149,16 +150,20 @@ export default function App() {
                 <Route path="/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
               </Route>
 
-              {/* Admin + Staff */}
-              <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
+              {/* Board of Directors + Admin + Staff — read views */}
+              <Route element={<AppLayout requiredRoles={['admin', 'staff', 'board']} />}>
                 <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
-                <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
                 <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
                 <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
-                <Route path="/admin/deposit-requests" element={<ErrorBoundary><DepositRequestsPage /></ErrorBoundary>} />
-                <Route path="/admin/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
                 <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
                 <Route path="/admin/loans/:id" element={<ErrorBoundary><AdminLoanDetailPage /></ErrorBoundary>} />
+              </Route>
+
+              {/* Admin + Staff — operational */}
+              <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
+                <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
+                <Route path="/admin/deposit-requests" element={<ErrorBoundary><DepositRequestsPage /></ErrorBoundary>} />
+                <Route path="/admin/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-deposits" element={<ErrorBoundary><SavingsDepositRequestsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-withdrawals" element={<ErrorBoundary><SavingsWithdrawalsPage /></ErrorBoundary>} />

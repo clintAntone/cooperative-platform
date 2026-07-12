@@ -5,7 +5,7 @@ import type { PermissionKey } from '../lib/permissions'
 
 export interface RolePermission {
   id: string
-  role: 'staff' | 'member'
+  role: 'staff' | 'member' | 'board' | 'collector'
   permission_key: PermissionKey
   enabled: boolean
   updated_at: string
@@ -28,7 +28,7 @@ export function useRolePermissions() {
 /** Returns a function that checks whether a role has a given permission. Admin always returns true. */
 export function useCanPermission() {
   const { data: permissions = [] } = useRolePermissions()
-  return (role: 'staff' | 'member' | 'admin', key: PermissionKey): boolean => {
+  return (role: 'staff' | 'member' | 'board' | 'collector' | 'admin', key: PermissionKey): boolean => {
     if (role === 'admin') return true
     const found = permissions.find(p => p.role === role && p.permission_key === key)
     return found ? found.enabled : true // default to allowed if not configured
@@ -43,7 +43,7 @@ export function useUpdateRolePermission() {
       permission_key,
       enabled,
     }: {
-      role: 'staff' | 'member'
+      role: 'staff' | 'member' | 'board' | 'collector'
       permission_key: PermissionKey
       enabled: boolean
     }) => {
