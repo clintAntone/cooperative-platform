@@ -29,6 +29,6 @@ ON CONFLICT (config_key) DO NOTHING;
 -- Max = borrower completed shares value + borrower savings balance
 --       + co-maker completed shares value + co-maker savings balance
 INSERT INTO system_config (config_key, config_value, value_type, description) VALUES
-  ('loan_amount_formula', 'collateral', 'text',
+  ('loan_amount_formula', 'collateral', 'enum',
    'How max loan is computed: collateral = (borrower shares + savings) + (co-maker shares + savings)')
 ON CONFLICT (config_key) DO NOTHING;
