@@ -63,21 +63,26 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION change_user_role(UUID, TEXT) TO authenticated;
 
 -- ─── 7. RLS: board can read key tables ───────────────────────────────────────
--- Reports / members
-CREATE POLICY IF NOT EXISTS profiles_board_read ON profiles
+DROP POLICY IF EXISTS profiles_board_read ON profiles;
+CREATE POLICY profiles_board_read ON profiles
   FOR SELECT USING (get_user_role(auth.uid()) = 'board');
 
-CREATE POLICY IF NOT EXISTS loans_board_read ON loans
+DROP POLICY IF EXISTS loans_board_read ON loans;
+CREATE POLICY loans_board_read ON loans
   FOR SELECT USING (get_user_role(auth.uid()) = 'board');
 
-CREATE POLICY IF NOT EXISTS loan_applications_board_read ON loan_applications
+DROP POLICY IF EXISTS loan_applications_board_read ON loan_applications;
+CREATE POLICY loan_applications_board_read ON loan_applications
   FOR SELECT USING (get_user_role(auth.uid()) = 'board');
 
-CREATE POLICY IF NOT EXISTS savings_accounts_board_read ON savings_accounts
+DROP POLICY IF EXISTS savings_accounts_board_read ON savings_accounts;
+CREATE POLICY savings_accounts_board_read ON savings_accounts
   FOR SELECT USING (get_user_role(auth.uid()) = 'board');
 
-CREATE POLICY IF NOT EXISTS branch_income_board_read ON branch_income
+DROP POLICY IF EXISTS branch_income_board_read ON branch_income;
+CREATE POLICY branch_income_board_read ON branch_income
   FOR SELECT USING (get_user_role(auth.uid()) = 'board');
 
-CREATE POLICY IF NOT EXISTS branch_expenses_board_read ON branch_expenses
+DROP POLICY IF EXISTS branch_expenses_board_read ON branch_expenses;
+CREATE POLICY branch_expenses_board_read ON branch_expenses
   FOR SELECT USING (get_user_role(auth.uid()) = 'board');
