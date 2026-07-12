@@ -151,6 +151,14 @@ export function RebatesPage() {
                 ) : (
                   <p className="text-sm text-gray-400 text-center py-2 bg-gray-50 rounded-lg">No paid loan repayments found in this period.</p>
                 )}
+                {preview.rows.length > 0 && (
+                  <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800">
+                    <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Rebates are added to each member's <strong>savings account balance</strong> — not deducted from future loan payments. Members can withdraw via a savings withdrawal request.</span>
+                  </div>
+                )}
               </div>
             ) : null
           )}
