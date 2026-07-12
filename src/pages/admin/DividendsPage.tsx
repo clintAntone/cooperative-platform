@@ -17,7 +17,11 @@ export function DividendsPage() {
 
   return (
     <div>
-      <Header title="Equity Dividends" subtitle="Release annual dividends to members with completed shares" />
+      <Header
+        title="Equity Dividends"
+        subtitle="Release annual dividends to members with completed shares"
+        actions={<Button size="sm" onClick={() => setShowConfirm(true)}>Release Dividends</Button>}
+      />
       <div className="p-4 sm:p-6 space-y-4">
         <PageGuide
           storageKey="dividends"
@@ -57,12 +61,11 @@ export function DividendsPage() {
               )}
             </div>
             <div className="pt-2 border-t border-gray-100">
-              <p className="text-xs text-gray-500 mb-3">
+              <p className="text-xs text-gray-500">
                 Dividends are computed as a percentage of each completed share's target value.
                 The rate is configured in System Config (<code>equity_dividend_rate</code>).
                 Dividends are credited directly to each member's savings account.
               </p>
-              <Button onClick={() => setShowConfirm(true)}>Release Dividends Now</Button>
             </div>
           </div>
         </Card>
