@@ -100,7 +100,7 @@ export function useMemberDetail(userId: string) {
       const [profileRes, sharesRes, contribRes, depositsRes] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, full_name, phone, role, account_status, employee_id, avatar_url, date_of_birth, address, civil_status, emergency_contact_name, emergency_contact_phone, profile_completed_at, branch_id, created_at, updated_at, deleted_at')
+          .select('id, full_name, phone, role, account_status, employee_id, avatar_url, date_of_birth, address, civil_status, emergency_contact_name, emergency_contact_phone, profile_completed_at, created_at, updated_at')
           .eq('id', userId)
           .single(),
         supabase
