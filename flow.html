@@ -3,817 +3,989 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Cooperative Platform — Application Flow</title>
+<title>Cooperative Platform — Flow Guide</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#1e293b;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 
-  /* Layout */
-  .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
-  h1 { font-size: 28px; font-weight: 700; color: #0f172a; }
-  .subtitle { color: #64748b; font-size: 15px; margin-top: 4px; }
-  .divider { border: none; border-top: 1px solid #e2e8f0; margin: 40px 0; }
+  /* ── Shell ── */
+  .shell{display:flex;flex:1;overflow:hidden}
 
-  /* Section headers */
-  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin-bottom: 16px; }
-  .section-label { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
-  .section-desc { font-size: 13px; color: #64748b; margin-bottom: 20px; line-height: 1.6; }
+  /* ── Sidebar ── */
+  .sidebar{width:240px;background:#0f172a;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+  .sidebar-header{padding:20px 16px 14px;border-bottom:1px solid #1e293b}
+  .sidebar-logo{font-size:14px;font-weight:700;color:#fff;line-height:1.3}
+  .sidebar-sub{font-size:11px;color:#64748b;margin-top:2px}
+  .nav-group-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;padding:16px 16px 6px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;border-radius:0;transition:background .15s;font-size:13px;color:#94a3b8;border-left:3px solid transparent}
+  .nav-item:hover{background:#1e293b;color:#e2e8f0}
+  .nav-item.active{background:#1e3a5f;color:#60a5fa;border-left-color:#3b82f6}
+  .nav-icon{font-size:15px;flex-shrink:0;width:20px;text-align:center}
 
-  /* Role badges */
-  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 99px; }
-  .badge-admin    { background: #ede9fe; color: #6d28d9; }
-  .badge-staff    { background: #dbeafe; color: #1d4ed8; }
-  .badge-board    { background: #fef3c7; color: #92400e; }
-  .badge-collector{ background: #d1fae5; color: #065f46; }
-  .badge-member   { background: #f1f5f9; color: #475569; }
-  .badge-system   { background: #fce7f3; color: #9d174d; }
+  /* ── Main content ── */
+  .main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
 
-  /* Role legend */
-  .role-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 32px; }
-  .role-card { display: flex; align-items: flex-start; gap: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; flex: 1; min-width: 160px; }
-  .role-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-  .dot-admin     { background: #7c3aed; }
-  .dot-staff     { background: #2563eb; }
-  .dot-board     { background: #d97706; }
-  .dot-collector { background: #059669; }
-  .dot-member    { background: #94a3b8; }
-  .role-name { font-size: 13px; font-weight: 700; color: #0f172a; }
-  .role-desc { font-size: 11px; color: #64748b; margin-top: 2px; line-height: 1.5; }
+  /* ── Page header ── */
+  .page-header{background:#fff;border-bottom:1px solid #e2e8f0;padding:28px 40px 24px;flex-shrink:0}
+  .page-header-inner{max-width:820px}
+  .breadcrumb{font-size:11px;color:#94a3b8;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .page-title{font-size:22px;font-weight:700;color:#0f172a}
+  .page-desc{font-size:13px;color:#64748b;margin-top:6px;line-height:1.6;max-width:600px}
 
-  /* Flow rows */
-  .flow { display: flex; align-items: flex-start; gap: 0; flex-wrap: wrap; margin-bottom: 8px; }
-  .step { display: flex; flex-direction: column; align-items: center; min-width: 130px; max-width: 160px; }
-  .step-box { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; text-align: center; width: 100%; position: relative; }
-  .step-box.highlight { border-color: #3b82f6; background: #eff6ff; }
-  .step-box.success  { border-color: #10b981; background: #f0fdf4; }
-  .step-box.warning  { border-color: #f59e0b; background: #fffbeb; }
-  .step-box.danger   { border-color: #ef4444; background: #fef2f2; }
-  .step-box.purple   { border-color: #8b5cf6; background: #f5f3ff; }
-  .step-box.gray     { border-color: #cbd5e1; background: #f8fafc; }
-  .step-box.pink     { border-color: #ec4899; background: #fdf2f8; }
-  .step-icon { font-size: 22px; margin-bottom: 6px; }
-  .step-title { font-size: 12px; font-weight: 700; color: #0f172a; line-height: 1.3; }
-  .step-detail { font-size: 10px; color: #64748b; margin-top: 4px; line-height: 1.4; }
-  .step-actor { margin-top: 6px; }
+  /* ── Content area ── */
+  .content{padding:32px 40px 60px;max-width:860px}
 
-  .arrow { display: flex; align-items: center; padding: 0 4px; margin-top: 28px; color: #94a3b8; font-size: 18px; flex-shrink: 0; }
-  .arrow-label { font-size: 9px; color: #94a3b8; text-align: center; margin-top: 2px; }
-  .arrow-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 28px; }
+  /* ── Section ── */
+  .section{display:none}
+  .section.active{display:block}
 
-  /* Cards */
-  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; }
-  .card-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
-  .card-subtitle { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+  /* ── Cards ── */
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:22px 24px;margin-bottom:20px}
+  .card-title{font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card-subtitle{font-size:12px;color:#64748b;margin-bottom:16px}
+  .card-divider{border:none;border-top:1px solid #f1f5f9;margin:16px 0}
 
-  /* Two col */
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } .flow { gap: 0; } }
+  /* ── Role grid ── */
+  .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+  .role-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;display:flex;gap:12px}
+  .role-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0}
+  .dot-admin{background:#7c3aed}.dot-staff{background:#2563eb}.dot-board{background:#d97706}.dot-collector{background:#059669}.dot-member{background:#94a3b8}
+  .role-name{font-size:13px;font-weight:700;color:#0f172a}
+  .role-desc{font-size:11px;color:#64748b;margin-top:3px;line-height:1.5}
 
-  /* Decision diamond */
-  .diamond-row { display: flex; align-items: center; gap: 0; }
-  .diamond { width: 90px; height: 90px; background: #fff; border: 1.5px solid #f59e0b; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .diamond-inner { transform: rotate(-45deg); text-align: center; }
-  .diamond-inner span { font-size: 10px; font-weight: 700; color: #92400e; line-height: 1.3; }
+  /* ── Flow ── */
+  .flow{display:flex;align-items:flex-start;flex-wrap:wrap;gap:0;margin:8px 0 16px}
+  .step{display:flex;flex-direction:column;align-items:center;min-width:120px;max-width:145px}
+  .step-box{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:12px 10px;text-align:center;width:100%}
+  .step-box.blue  {border-color:#3b82f6;background:#eff6ff}
+  .step-box.green {border-color:#10b981;background:#f0fdf4}
+  .step-box.amber {border-color:#f59e0b;background:#fffbeb}
+  .step-box.red   {border-color:#ef4444;background:#fef2f2}
+  .step-box.purple{border-color:#8b5cf6;background:#f5f3ff}
+  .step-box.pink  {border-color:#ec4899;background:#fdf2f8}
+  .step-box.gray  {border-color:#cbd5e1;background:#f8fafc}
+  .step-icon{font-size:20px;margin-bottom:5px}
+  .step-title{font-size:11px;font-weight:700;color:#0f172a;line-height:1.3}
+  .step-detail{font-size:10px;color:#64748b;margin-top:3px;line-height:1.4}
+  .step-actor{margin-top:6px;display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+  .arrow-col{display:flex;flex-direction:column;align-items:center;padding-top:26px;flex-shrink:0}
+  .arrow{color:#cbd5e1;font-size:16px;padding:0 3px}
 
-  /* Table */
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { text-align: left; padding: 8px 12px; background: #f8fafc; color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .05em; border-bottom: 1px solid #e2e8f0; }
-  td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
-  tr:last-child td { border-bottom: none; }
-  .check { color: #10b981; font-weight: 700; }
-  .cross { color: #ef4444; }
-  .partial { color: #f59e0b; }
+  /* ── Badges ── */
+  .badge{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px}
+  .badge-admin    {background:#ede9fe;color:#6d28d9}
+  .badge-staff    {background:#dbeafe;color:#1d4ed8}
+  .badge-board    {background:#fef3c7;color:#92400e}
+  .badge-collector{background:#d1fae5;color:#065f46}
+  .badge-member   {background:#f1f5f9;color:#475569}
+  .badge-system   {background:#fce7f3;color:#9d174d}
 
-  /* Note boxes */
-  .note { display: flex; gap: 10px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #0369a1; line-height: 1.6; margin-top: 12px; }
-  .note-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
-  .note-success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+  /* ── Notes ── */
+  .note{display:flex;gap:10px;border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.6;margin-top:8px}
+  .note-info   {background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1}
+  .note-warn   {background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+  .note-success{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534}
 
-  /* Header */
-  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; }
-  .header-meta { font-size: 11px; color: #94a3b8; margin-top: 6px; }
+  /* ── Two-col ── */
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:640px){.two-col{grid-template-columns:1fr}.role-grid{grid-template-columns:1fr}}
 
-  /* TOC */
-  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 40px; }
-  .toc-item { font-size: 12px; font-weight: 500; color: #3b82f6; text-decoration: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 5px 12px; }
-  .toc-item:hover { background: #dbeafe; }
+  /* ── Table ── */
+  .tbl{width:100%;border-collapse:collapse;font-size:12px}
+  .tbl th{text-align:left;padding:8px 12px;background:#f8fafc;color:#64748b;font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.05em;border-bottom:1px solid #e2e8f0}
+  .tbl td{padding:9px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl .tc{text-align:center}
+  .check{color:#10b981;font-weight:700}
+  .cross{color:#cbd5e1}
+  .partial{color:#f59e0b;font-weight:600}
+  .tbl .group-row td{background:#f8fafc;font-weight:700;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;padding:7px 12px}
 
-  /* Status pills */
-  .pill { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
-  .pill-pending  { background: #fef3c7; color: #92400e; }
-  .pill-approved { background: #d1fae5; color: #065f46; }
-  .pill-rejected { background: #fee2e2; color: #991b1b; }
-  .pill-active   { background: #dbeafe; color: #1e40af; }
-  .pill-complete { background: #ede9fe; color: #5b21b6; }
+  /* ── Numbered list ── */
+  .steps-list{counter-reset:step;list-style:none}
+  .steps-list li{counter-increment:step;display:flex;gap:11px;margin-bottom:10px;font-size:13px;color:#334155;line-height:1.6}
+  .steps-list li::before{content:counter(step);flex-shrink:0;width:22px;height:22px;border-radius:50%;background:#3b82f6;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
 
-  /* Numbered list */
-  .steps-list { counter-reset: step; list-style: none; }
-  .steps-list li { counter-increment: step; display: flex; gap: 12px; margin-bottom: 10px; font-size: 13px; color: #334155; line-height: 1.5; }
-  .steps-list li::before { content: counter(step); flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: #3b82f6; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  /* ── Gap cards ── */
+  .gap-card{border-left:3px solid #f59e0b;background:#fff;border-radius:0 10px 10px 0;border-top:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:16px 18px;margin-bottom:14px}
+  .gap-title{font-size:13px;font-weight:700;color:#92400e;margin-bottom:4px}
+  .gap-desc{font-size:12px;color:#64748b;line-height:1.6}
+  .gap-fix{font-size:11px;color:#059669;margin-top:8px;font-weight:600}
+
+  /* ── Mobile top bar ── */
+  .topbar{display:none;background:#0f172a;padding:12px 16px;align-items:center;gap:12px;flex-shrink:0}
+  .topbar-title{font-size:14px;font-weight:700;color:#fff}
+  .menu-btn{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:20px;line-height:1}
+  @media(max-width:768px){
+    .topbar{display:flex}
+    .sidebar{position:fixed;inset:0;z-index:50;transform:translateX(-100%);transition:transform .25s;width:240px}
+    .sidebar.open{transform:translateX(0)}
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40}
+    .overlay.open{display:block}
+    .content{padding:24px 20px 60px}
+    .page-header{padding:20px}
+    .flow{flex-wrap:wrap}
+  }
+
+  /* ── Highlight box ── */
+  .highlight-box{background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 18px;margin-bottom:16px}
+  .highlight-box-title{font-size:12px;font-weight:700;color:#0369a1;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+  .highlight-box p{font-size:12px;color:#0369a1;line-height:1.7}
+
+  /* ── Formula ── */
+  .formula{background:#1e293b;color:#e2e8f0;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:12px;margin:12px 0;line-height:1.7}
+  .formula .val{color:#60a5fa}
+  .formula .op{color:#f472b6}
 </style>
 </head>
 <body>
-<div class="page">
 
-  <!-- Header -->
-  <div class="page-header">
-    <div>
-      <h1>Cooperative Platform — Application Flow</h1>
-      <div class="subtitle">End-to-end workflow reference for all roles and features</div>
-      <div class="header-meta">Generated July 2026 · cooperative-platform</div>
-    </div>
-  </div>
-
-  <!-- TOC -->
-  <div class="toc">
-    <a class="toc-item" href="#roles">Roles</a>
-    <a class="toc-item" href="#onboarding">Member Onboarding</a>
-    <a class="toc-item" href="#equity">Equity Shares</a>
-    <a class="toc-item" href="#savings">Savings</a>
-    <a class="toc-item" href="#loans">Loans</a>
-    <a class="toc-item" href="#damayan">Damayan</a>
-    <a class="toc-item" href="#transfers">Share Transfers</a>
-    <a class="toc-item" href="#branches">Branch Income</a>
-    <a class="toc-item" href="#dividends">Dividends</a>
-    <a class="toc-item" href="#rebates">Rebates</a>
-    <a class="toc-item" href="#permissions">Role Permissions</a>
-  </div>
-
-  <!-- ── ROLES ─────────────────────────────────────────────────────────────── -->
-  <div id="roles">
-    <div class="section-title">Section 1</div>
-    <div class="section-label">User Roles</div>
-    <div class="section-desc">Five roles control what each user can see and do. Admin always has full access regardless of permission toggles.</div>
-    <div class="role-grid">
-      <div class="role-card">
-        <div class="role-dot dot-admin"></div>
-        <div><div class="role-name">Admin</div><div class="role-desc">Full access. Manages config, roles, dividends, rebates, and all approvals.</div></div>
-      </div>
-      <div class="role-card">
-        <div class="role-dot dot-staff"></div>
-        <div><div class="role-name">Staff</div><div class="role-desc">Day-to-day operations. Approves deposits, loans, savings. Cannot change config or roles.</div></div>
-      </div>
-      <div class="role-card">
-        <div class="role-dot dot-board"></div>
-        <div><div class="role-name">Board of Directors</div><div class="role-desc">Read-only financial oversight. Views reports, members, loans, branch portfolio.</div></div>
-      </div>
-      <div class="role-card">
-        <div class="role-dot dot-collector"></div>
-        <div><div class="role-name">Collector</div><div class="role-desc">Creates batch deposits on behalf of multiple members. Limited access.</div></div>
-      </div>
-      <div class="role-card">
-        <div class="role-dot dot-member"></div>
-        <div><div class="role-name">Member</div><div class="role-desc">Self-service. Applies for loans, submits deposits, manages savings and transfers.</div></div>
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── ONBOARDING ─────────────────────────────────────────────────────────── -->
-  <div id="onboarding">
-    <div class="section-title">Section 2</div>
-    <div class="section-label">Member Onboarding</div>
-    <div class="section-desc">A new member must complete their profile before accessing any features. Their first equity share is opened by an admin.</div>
-
-    <div class="card">
-      <div class="card-title">Onboarding Flow</div>
-      <div class="card-subtitle">From registration to active membership</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box highlight">
-            <div class="step-icon">📝</div>
-            <div class="step-title">Register</div>
-            <div class="step-detail">Email + password + full name</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Member</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box highlight">
-            <div class="step-icon">👤</div>
-            <div class="step-title">Complete Profile</div>
-            <div class="step-detail">DOB, address, civil status, emergency contact</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Member</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">📂</div>
-            <div class="step-title">Admin Opens Share</div>
-            <div class="step-detail">Admin creates equity share subscription for the member</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box">
-            <div class="step-icon">💰</div>
-            <div class="step-title">Deposit Payments</div>
-            <div class="step-detail">Member pays toward share target amount</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Member</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">✅</div>
-            <div class="step-title">Share Completed</div>
-            <div class="step-detail">Membership activates. Savings account auto-created.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">🎉</div>
-            <div class="step-title">Active Member</div>
-            <div class="step-detail">Eligible for loans, savings, dividends, damayan</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Member</span></div>
-        </div>
-      </div>
-      <div class="note note-warn">
-        ⚠ <strong>Gap:</strong> Members cannot self-initiate a share subscription. They must wait for admin/staff to open one from the Member Detail page.
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── EQUITY SHARES ──────────────────────────────────────────────────────── -->
-  <div id="equity">
-    <div class="section-title">Section 3</div>
-    <div class="section-label">Equity Shares &amp; Deposit Requests</div>
-    <div class="section-desc">Members pay toward their share(s) via deposit requests. Each request is reviewed before the contribution is recorded.</div>
-
-    <div class="card">
-      <div class="card-title">Deposit Request Flow</div>
-      <div class="card-subtitle">Member submits → Admin/Staff approves → Contribution recorded</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box highlight">
-            <div class="step-icon">📤</div>
-            <div class="step-title">Submit Request</div>
-            <div class="step-detail">Amount, payment method, reference, receipt photo</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Member</span> <span class="badge badge-collector">Collector</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div><div class="arrow-label">pending</div></div>
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">🔍</div>
-            <div class="step-title">Admin Reviews</div>
-            <div class="step-detail">Checks receipt, amount, reference</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">✅</div>
-            <div class="step-title">Approved</div>
-            <div class="step-detail">Contribution recorded. Share paid_amount increases.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col" style="margin-top:0;padding-top:28px;"><span style="font-size:13px;color:#94a3b8;">or</span></div>
-        <div class="step">
-          <div class="step-box danger">
-            <div class="step-icon">❌</div>
-            <div class="step-title">Rejected</div>
-            <div class="step-detail">Member notified with rejection reason</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
-        </div>
-      </div>
-      <div class="note">
-        💡 When <strong>paid_amount ≥ target_amount</strong>, the share status becomes <span class="pill pill-complete">completed</span> and the membership_status evaluates automatically. A savings account is created if this is their first completed share.
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── SAVINGS ────────────────────────────────────────────────────────────── -->
-  <div id="savings">
-    <div class="section-title">Section 4</div>
-    <div class="section-label">Savings Account</div>
-    <div class="section-desc">Auto-created once a member completes their first share. Members can deposit and withdraw with admin approval.</div>
-
-    <div class="two-col">
-      <div class="card">
-        <div class="card-title">💳 Savings Deposit</div>
-        <div class="card-subtitle">Min ₱500 per deposit. Weekly cap configurable in System Config.</div>
-        <ul class="steps-list">
-          <li>Member submits deposit request (amount, method, receipt)</li>
-          <li>Admin/Staff reviews and approves</li>
-          <li>Balance credited to savings account immediately</li>
-          <li>Ledger entry recorded (<code>savings_deposit</code>)</li>
-        </ul>
-      </div>
-      <div class="card">
-        <div class="card-title">🏧 Savings Withdrawal</div>
-        <div class="card-subtitle">Cannot exceed current balance. Admin verifies before releasing.</div>
-        <ul class="steps-list">
-          <li>Member requests withdrawal with reason</li>
-          <li>Admin validates balance is sufficient</li>
-          <li>Admin approves → balance deducted</li>
-          <li>Ledger entry recorded (<code>savings_withdrawal</code>)</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">📈 Savings Interest Release</div>
-      <div class="card-subtitle">Default rate: 2.5% per 6 months. Configured in System Config → <code>savings_interest_rate</code>.</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">⚙️</div>
-            <div class="step-title">Admin Triggers Release</div>
-            <div class="step-detail">From Savings Deposits page → Release Interest</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box">
-            <div class="step-icon">🧮</div>
-            <div class="step-title">Compute Interest</div>
-            <div class="step-detail">Balance × rate for each active account with balance &gt; 0</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">💚</div>
-            <div class="step-title">Credited to Savings</div>
-            <div class="step-detail">Balance increases. Interest log recorded.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── LOANS ──────────────────────────────────────────────────────────────── -->
-  <div id="loans">
-    <div class="section-title">Section 5</div>
-    <div class="section-label">Loan Applications &amp; Repayments</div>
-    <div class="section-desc">Members with completed shares can apply for loans. Collateral determines whether a co-maker is required.</div>
-
-    <div class="card">
-      <div class="card-title">Loan Application Flow</div>
-      <div class="card-subtitle">From draft to disbursement</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box highlight">
-            <div class="step-icon">📋</div>
-            <div class="step-title">Member Applies</div>
-            <div class="step-detail">Amount, purpose, term, loan product</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Member</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">🤝</div>
-            <div class="step-title">Co-maker?</div>
-            <div class="step-detail">Required only if amount &gt; borrower's shares + savings</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box">
-            <div class="step-icon">✍️</div>
-            <div class="step-title">Co-maker Confirms</div>
-            <div class="step-detail">Co-maker sees request in Loan page. Confirms or declines.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Co-maker</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">🔍</div>
-            <div class="step-title">Admin Reviews</div>
-            <div class="step-detail">Checks eligibility, collateral, co-maker status</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">🚀</div>
-            <div class="step-title">Approved &amp; Disbursed</div>
-            <div class="step-detail">Loan created. Repayment schedule generated automatically.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-      </div>
-
-      <div class="note" style="margin-top:16px;">
-        💡 <strong>Collateral formula:</strong> Borrower's completed share value + borrower's savings balance + all confirmed co-maker share values + co-maker savings. If loan amount ≤ this total, co-maker is optional.
-      </div>
-    </div>
-
-    <div class="two-col">
-      <div class="card">
-        <div class="card-title">💸 Repayment Recording</div>
-        <div class="card-subtitle">Members can record their own payments.</div>
-        <ul class="steps-list">
-          <li>Member goes to Loan → Loan Detail</li>
-          <li>Clicks "Record Payment" — enters amount, method, reference</li>
-          <li>Repayment posted to schedule (installments marked paid)</li>
-          <li>Outstanding balance decreases. Ledger entry created.</li>
-        </ul>
-        <div class="note note-success" style="margin-top:12px;">✓ Members can record their own repayments — no admin action needed.</div>
-      </div>
-      <div class="card">
-        <div class="card-title">📊 Calculation Methods</div>
-        <div class="card-subtitle">Set per loan product.</div>
-        <table>
-          <tr><th>Method</th><th>How Interest Works</th></tr>
-          <tr><td><strong>Flat</strong></td><td>Interest = principal × rate × term. Fixed monthly payment.</td></tr>
-          <tr><td><strong>Reducing Balance</strong></td><td>Interest recalculates on outstanding balance each month.</td></tr>
-          <tr><td><strong>Equal Principal</strong></td><td>Same principal each month, interest decreases over time.</td></tr>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── DAMAYAN ─────────────────────────────────────────────────────────────── -->
-  <div id="damayan">
-    <div class="section-title">Section 6</div>
-    <div class="section-label">Damayan (Mutual Aid Fund)</div>
-    <div class="section-desc">When a member experiences a qualifying event (death, hospitalization), all other active members are assessed a contribution.</div>
-
-    <div class="card">
-      <div class="card-title">Damayan Flow</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box pink">
-            <div class="step-icon">📣</div>
-            <div class="step-title">Admin Creates Event</div>
-            <div class="step-detail">Title, affected member, event date, assessment amount per member</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box">
-            <div class="step-icon">📊</div>
-            <div class="step-title">Assessments Generated</div>
-            <div class="step-detail">One record per active member (excluding affected member)</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box highlight">
-            <div class="step-icon">👁</div>
-            <div class="step-title">Members See Assessment</div>
-            <div class="step-detail">Amount due shown in Damayan page</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Member</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">💵</div>
-            <div class="step-title">Admin Records Payment</div>
-            <div class="step-detail">Admin marks each member's assessment as paid</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">✅</div>
-            <div class="step-title">Event Closed</div>
-            <div class="step-detail">Once all members paid or waived, event closes</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
-        </div>
-      </div>
-      <div class="note note-warn">
-        ⚠ <strong>Gap:</strong> Members cannot self-pay their Damayan assessment. They must pay staff in person; staff records it in the system.
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── SHARE TRANSFERS ────────────────────────────────────────────────────── -->
-  <div id="transfers">
-    <div class="section-title">Section 7</div>
-    <div class="section-label">Share Transfers</div>
-    <div class="section-desc">A member can transfer an equity share to another active member. Admin must approve the transfer.</div>
-
-    <div class="card">
-      <div class="card-title">Share Transfer Flow</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box highlight">
-            <div class="step-icon">🔄</div>
-            <div class="step-title">Member Requests</div>
-            <div class="step-detail">Selects share + recipient member + reason</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-member">Member</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">🔍</div>
-            <div class="step-title">Admin Reviews</div>
-            <div class="step-detail">Verifies both parties, checks eligibility</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">✅</div>
-            <div class="step-title">Approved</div>
-            <div class="step-detail">Share ownership changes. Ledger entries for both parties.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col" style="padding-top:28px;"><span style="font-size:13px;color:#94a3b8;">or</span></div>
-        <div class="step">
-          <div class="step-box danger">
-            <div class="step-icon">❌</div>
-            <div class="step-title">Rejected</div>
-            <div class="step-detail">Transfer cancelled with reason</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── BRANCH INCOME ──────────────────────────────────────────────────────── -->
-  <div id="branches">
-    <div class="section-title">Section 8</div>
-    <div class="section-label">Branch Income &amp; Expenses</div>
-    <div class="section-desc">Branches are cooperative-owned businesses (stores, farms, etc.). Income is distributed to all shareholders proportional to their completed share count.</div>
-
-    <div class="card">
-      <div class="card-title">Branch Income Distribution Flow</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">🏪</div>
-            <div class="step-title">Admin Records Income</div>
-            <div class="step-detail">Branch, amount, period, description</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box">
-            <div class="step-icon">🧮</div>
-            <div class="step-title">Formula</div>
-            <div class="step-detail">Income ÷ total completed shares = per-share amount</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">📤</div>
-            <div class="step-title">Admin Distributes</div>
-            <div class="step-detail">Clicks "Distribute" button after confirming preview</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">💚</div>
-            <div class="step-title">Credited to Savings</div>
-            <div class="step-detail">Each member's savings balance increases by their share of income</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-      </div>
-      <div class="note">
-        💡 <strong>Example:</strong> Branch earns ₱100,000. Co-op has 100 completed shares total. Per-share = ₱1,000. A member with 2 completed shares receives ₱2,000 added to savings. Only <em>completed</em> shares count — partial shares are ignored.
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">📊 Branch KPI (visible to all roles)</div>
-      <div class="card-subtitle">Accessible from the sidebar under Branch Portfolio</div>
-      <table>
-        <tr><th>KPI</th><th>Formula</th></tr>
-        <tr><td>Gross Revenue</td><td>Sum of all branch income records for the period</td></tr>
-        <tr><td>Total Expenses</td><td>Sum of all branch expense records (salary, rent, utilities, etc.)</td></tr>
-        <tr><td>Net Profit</td><td>Gross Revenue − Total Expenses</td></tr>
-        <tr><td>Profit Margin</td><td>Net Profit ÷ Gross Revenue × 100%</td></tr>
-      </table>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── DIVIDENDS ───────────────────────────────────────────────────────────── -->
-  <div id="dividends">
-    <div class="section-title">Section 9</div>
-    <div class="section-label">Equity Dividends</div>
-    <div class="section-desc">Annual payment to members based on the value of their completed shares. Rate configured in System Config → <code>equity_dividend_rate</code> (default 5%).</div>
-
-    <div class="card">
-      <div class="card-title">Dividend Release Flow</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">📅</div>
-            <div class="step-title">Admin Initiates</div>
-            <div class="step-detail">Cooperative → Dividends → Release Dividends</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin only</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box highlight">
-            <div class="step-icon">👁</div>
-            <div class="step-title">Preview Shown</div>
-            <div class="step-detail">Per-member table: shares, share value, dividend amount</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box">
-            <div class="step-icon">🧮</div>
-            <div class="step-title">Compute</div>
-            <div class="step-detail">Each share: target_amount × rate%. Member gets sum of all their shares.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">💚</div>
-            <div class="step-title">Credited to Savings</div>
-            <div class="step-detail">Member's savings balance increases. Ledger entry: <code>equity_dividend</code>.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-      </div>
-      <div class="note note-warn">
-        ⚠ Run once per year at fiscal year-end. The system does not prevent double-releasing — admin must track the last release date shown on the page.
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── REBATES ─────────────────────────────────────────────────────────────── -->
-  <div id="rebates">
-    <div class="section-title">Section 10</div>
-    <div class="section-label">Loan Rebates</div>
-    <div class="section-desc">Returns a percentage of loan interest paid back to members as a reward for good repayment standing. Rate configured in System Config → <code>rebate_rate</code> (default 10%).</div>
-
-    <div class="card">
-      <div class="card-title">Rebate Release Flow</div>
-      <div class="flow">
-        <div class="step">
-          <div class="step-box warning">
-            <div class="step-icon">📅</div>
-            <div class="step-title">Admin Sets Period</div>
-            <div class="step-detail">Loans → Rebates → set start &amp; end date</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin only</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box highlight">
-            <div class="step-icon">👁</div>
-            <div class="step-title">Preview Loaded</div>
-            <div class="step-detail">Per-member: interest paid in period + rebate amount</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box">
-            <div class="step-icon">🧮</div>
-            <div class="step-title">Compute</div>
-            <div class="step-detail">Sum interest_due from paid schedule rows in date range × rebate rate</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-        <div class="arrow-col"><div class="arrow">→</div></div>
-        <div class="step">
-          <div class="step-box success">
-            <div class="step-icon">💚</div>
-            <div class="step-title">Credited to Savings</div>
-            <div class="step-detail">Not deducted from future payments. Ledger entry: <code>rebate</code>.</div>
-          </div>
-          <div class="step-actor"><span class="badge badge-system">System</span></div>
-        </div>
-      </div>
-      <div class="note">
-        💡 Only members who made paid loan repayments in the selected period receive a rebate. Typical cadence: semi-annually (Jan–Jun, Jul–Dec).
-      </div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── PERMISSIONS MATRIX ─────────────────────────────────────────────────── -->
-  <div id="permissions">
-    <div class="section-title">Section 11</div>
-    <div class="section-label">Role Permissions Matrix</div>
-    <div class="section-desc">Quick reference for what each role can do across all major features.</div>
-
-    <div class="card" style="overflow-x:auto;">
-      <table>
-        <tr>
-          <th>Feature / Action</th>
-          <th style="text-align:center">Admin</th>
-          <th style="text-align:center">Staff</th>
-          <th style="text-align:center">Board</th>
-          <th style="text-align:center">Collector</th>
-          <th style="text-align:center">Member</th>
-        </tr>
-        <tr><td colspan="6" style="background:#f8fafc;font-weight:700;font-size:11px;color:#64748b;text-transform:uppercase;padding:8px 12px;letter-spacing:.05em;">Equity Shares</td></tr>
-        <tr><td>View own shares</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td></tr>
-        <tr><td>Submit deposit request</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="check" style="text-align:center">Batch</td><td class="check" style="text-align:center">✓</td></tr>
-        <tr><td>Approve/reject deposits</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓*</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>Open share for member</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-
-        <tr><td colspan="6" style="background:#f8fafc;font-weight:700;font-size:11px;color:#64748b;text-transform:uppercase;padding:8px 12px;letter-spacing:.05em;">Savings</td></tr>
-        <tr><td>Submit savings deposit/withdrawal</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="check" style="text-align:center">✓</td></tr>
-        <tr><td>Approve savings requests</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓*</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>Release interest</td><td class="check" style="text-align:center">✓</td><td class="partial" style="text-align:center">✓*</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-
-        <tr><td colspan="6" style="background:#f8fafc;font-weight:700;font-size:11px;color:#64748b;text-transform:uppercase;padding:8px 12px;letter-spacing:.05em;">Loans</td></tr>
-        <tr><td>Apply for loan</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="check" style="text-align:center">✓</td></tr>
-        <tr><td>Approve/reject loan apps</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓*</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>Record repayment</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="check" style="text-align:center">✓</td></tr>
-        <tr><td>View loan portfolio</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">Own</td></tr>
-
-        <tr><td colspan="6" style="background:#f8fafc;font-weight:700;font-size:11px;color:#64748b;text-transform:uppercase;padding:8px 12px;letter-spacing:.05em;">Cooperative Features</td></tr>
-        <tr><td>Release dividends</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>Release rebates</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>Manage Damayan events</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓*</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">View</td></tr>
-        <tr><td>Approve share transfers</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓*</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">Request</td></tr>
-        <tr><td>Record branch income/expenses</td><td class="check" style="text-align:center">✓</td><td class="partial" style="text-align:center">✓*</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>View branch KPI portfolio</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="check" style="text-align:center">✓</td></tr>
-
-        <tr><td colspan="6" style="background:#f8fafc;font-weight:700;font-size:11px;color:#64748b;text-transform:uppercase;padding:8px 12px;letter-spacing:.05em;">Admin Functions</td></tr>
-        <tr><td>Manage users &amp; roles</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>System config</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>View financial reports</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-        <tr><td>View member list</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="check" style="text-align:center">✓</td><td class="cross" style="text-align:center">—</td><td class="cross" style="text-align:center">—</td></tr>
-      </table>
-      <div style="margin-top:10px;font-size:11px;color:#94a3b8;">* Staff access to this action is configurable via Admin → Permissions page.</div>
-    </div>
-  </div>
-
-  <hr class="divider" />
-
-  <!-- ── KNOWN GAPS ─────────────────────────────────────────────────────────── -->
-  <div>
-    <div class="section-title">Section 12</div>
-    <div class="section-label">Known Flow Gaps</div>
-    <div class="section-desc">Areas where the current implementation requires workarounds or manual staff involvement.</div>
-    <div class="two-col">
-      <div class="card">
-        <div class="card-title">⚠ Member Cannot Self-initiate Share</div>
-        <div class="card-subtitle">Admin must open the first share subscription in Member Detail page. No member-facing "Apply for Share" form exists.</div>
-        <div class="note note-warn">Workaround: Member contacts admin → admin opens share → member submits deposit requests.</div>
-      </div>
-      <div class="card">
-        <div class="card-title">⚠ Damayan Has No Self-pay</div>
-        <div class="card-subtitle">Members see their assessment amount but have no button to pay it. Staff must manually record each payment.</div>
-        <div class="note note-warn">Workaround: Member pays staff in person or via transfer → staff records payment in Admin → Damayan.</div>
-      </div>
-      <div class="card">
-        <div class="card-title">⚠ No Guided Onboarding</div>
-        <div class="card-subtitle">After profile completion, members land on Dashboard with no clear next step. The share-opening process is invisible to them.</div>
-        <div class="note note-warn">Workaround: Communicate the steps verbally or via printed onboarding guide.</div>
-      </div>
-      <div class="card">
-        <div class="card-title">⚠ No Dividend/Rebate Double-release Guard</div>
-        <div class="card-subtitle">The system shows the last release date as a warning, but does not block running dividends or rebates twice for the same period.</div>
-        <div class="note note-warn">Workaround: Admin must manually verify the last release date before proceeding.</div>
-      </div>
-    </div>
-  </div>
-
+<div class="topbar">
+  <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+  <span class="topbar-title">Flow Guide</span>
 </div>
+<div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+<div class="shell">
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">Cooperative Platform</div>
+      <div class="sidebar-sub">Application Flow Guide</div>
+    </div>
+
+    <div class="nav-group-label">Overview</div>
+    <div class="nav-item active" onclick="show('roles')">
+      <span class="nav-icon">👥</span> User Roles
+    </div>
+    <div class="nav-item" onclick="show('onboarding')">
+      <span class="nav-icon">🚀</span> Member Onboarding
+    </div>
+
+    <div class="nav-group-label">Financial Flows</div>
+    <div class="nav-item" onclick="show('equity')">
+      <span class="nav-icon">📊</span> Equity Shares
+    </div>
+    <div class="nav-item" onclick="show('savings')">
+      <span class="nav-icon">💳</span> Savings
+    </div>
+    <div class="nav-item" onclick="show('loans')">
+      <span class="nav-icon">🏦</span> Loans
+    </div>
+
+    <div class="nav-group-label">Cooperative</div>
+    <div class="nav-item" onclick="show('damayan')">
+      <span class="nav-icon">🤝</span> Damayan
+    </div>
+    <div class="nav-item" onclick="show('transfers')">
+      <span class="nav-icon">🔄</span> Share Transfers
+    </div>
+    <div class="nav-item" onclick="show('branches')">
+      <span class="nav-icon">🏪</span> Branch Income
+    </div>
+    <div class="nav-item" onclick="show('dividends')">
+      <span class="nav-icon">💰</span> Dividends
+    </div>
+    <div class="nav-item" onclick="show('rebates')">
+      <span class="nav-icon">↩️</span> Rebates
+    </div>
+
+    <div class="nav-group-label">Reference</div>
+    <div class="nav-item" onclick="show('permissions')">
+      <span class="nav-icon">🔐</span> Permissions Matrix
+    </div>
+    <div class="nav-item" onclick="show('gaps')">
+      <span class="nav-icon">⚠️</span> Known Gaps
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Dynamic header -->
+    <div class="page-header">
+      <div class="page-header-inner">
+        <div class="breadcrumb" id="breadcrumb">Overview</div>
+        <div class="page-title" id="page-title">User Roles</div>
+        <div class="page-desc" id="page-desc">The five roles that control what each user can see and do. Admin always has full access regardless of permission toggles.</div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- ── ROLES ── -->
+      <div class="section active" id="sec-roles">
+        <div class="role-grid">
+          <div class="role-card">
+            <div class="role-dot dot-admin"></div>
+            <div><div class="role-name">Admin</div><div class="role-desc">Full access to every feature. Manages config, roles, dividends, and rebates. Cannot be restricted.</div></div>
+          </div>
+          <div class="role-card">
+            <div class="role-dot dot-staff"></div>
+            <div><div class="role-name">Staff</div><div class="role-desc">Day-to-day operations. Approves deposits, loans, and savings. Cannot change config or reassign roles.</div></div>
+          </div>
+          <div class="role-card">
+            <div class="role-dot dot-board"></div>
+            <div><div class="role-name">Board of Directors</div><div class="role-desc">Read-only financial oversight. Views reports, members, loan portfolio, and branch KPIs. No action buttons.</div></div>
+          </div>
+          <div class="role-card">
+            <div class="role-dot dot-collector"></div>
+            <div><div class="role-name">Collector</div><div class="role-desc">Creates batch deposit submissions on behalf of multiple members. No other elevated access.</div></div>
+          </div>
+          <div class="role-card" style="grid-column:span 2">
+            <div class="role-dot dot-member"></div>
+            <div><div class="role-name">Member</div><div class="role-desc">Self-service access. Applies for loans, submits deposit and savings requests, views own activity, requests share transfers, and sees co-maker requests.</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🔑 How roles are assigned</div>
+          <ul class="steps-list" style="margin-top:8px">
+            <li>All new registrations default to <span class="badge badge-member">Member</span></li>
+            <li>Admin goes to <strong>Admin → Manage Users</strong>, clicks on the user, and changes their role</li>
+            <li>Role changes take effect immediately on next page load for that user</li>
+            <li>Only <span class="badge badge-admin">Admin</span> can change roles — staff cannot promote users</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-title">⚙️ Configurable staff permissions</div>
+          <div class="card-subtitle">Some staff actions can be toggled on/off by admin at Admin → Permissions</div>
+          <div class="two-col" style="margin-top:4px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Staff can toggle</div>
+              <div style="font-size:12px;color:#334155;line-height:2">
+                Approve share deposits<br>Approve savings requests<br>Approve loan applications<br>Approve share transfers<br>Manage Damayan events<br>Record branch data<br>View financial reports<br>Manage loan products
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Always admin-only</div>
+              <div style="font-size:12px;color:#334155;line-height:2">
+                Release dividends<br>Release rebates<br>Distribute branch income<br>Change user roles<br>System config<br>App settings<br>Permissions page
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ONBOARDING ── -->
+      <div class="section" id="sec-onboarding">
+        <div class="highlight-box">
+          <div class="highlight-box-title">The Path to Active Membership</div>
+          <p>A new member cannot access loans, savings, or dividends until they have at least one <strong>completed equity share</strong>. Completing a share is what activates their membership and auto-creates their savings account.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Step-by-step onboarding</div>
+          <div class="flow" style="margin-top:16px">
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">📝</div>
+                <div class="step-title">Register</div>
+                <div class="step-detail">Email, password, full name, phone</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">👤</div>
+                <div class="step-title">Complete Profile</div>
+                <div class="step-detail">DOB, address, civil status, emergency contact</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">📂</div>
+                <div class="step-title">Admin Opens Share</div>
+                <div class="step-detail">Admin creates equity share subscription in Member Detail</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box gray">
+                <div class="step-icon">💸</div>
+                <div class="step-title">Member Pays</div>
+                <div class="step-detail">Submits deposit requests until share target is reached</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">✅</div>
+                <div class="step-title">Active Member</div>
+                <div class="step-detail">Membership activates. Savings account auto-created.</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+          </div>
+          <div class="note note-warn">⚠ Members cannot self-request a share. They must contact admin/staff who opens it from the Member Detail page.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📋 What gets unlocked per stage</div>
+          <table class="tbl" style="margin-top:8px">
+            <tr><th>Stage</th><th>What the member can do</th></tr>
+            <tr><td>Registered (no profile)</td><td>View dashboard placeholder only. Blocked from all features.</td></tr>
+            <tr><td>Profile completed</td><td>View equity page. Await share being opened by admin.</td></tr>
+            <tr><td>Share opened (in progress)</td><td>Submit deposit requests toward share target.</td></tr>
+            <tr><td>1st share completed</td><td>Membership active. Savings account created. Eligible for loans.</td></tr>
+            <tr><td>Multiple shares</td><td>Higher loan collateral. More dividend and branch income per distribution.</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── EQUITY ── -->
+      <div class="section" id="sec-equity">
+        <div class="highlight-box">
+          <div class="highlight-box-title">How Equity Shares Work</div>
+          <p>Each share has a <strong>target amount</strong> (e.g. ₱5,000). Members make partial payments until paid_amount ≥ target_amount, at which point the share is marked <strong>completed</strong>. Completed shares count toward loan collateral, dividends, and branch income distribution.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Deposit Request Flow</div>
+          <div class="flow" style="margin-top:16px">
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">📤</div>
+                <div class="step-title">Submit Request</div>
+                <div class="step-detail">Amount, method, reference number, receipt photo</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span> <span class="badge badge-collector">Collector</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">🔍</div>
+                <div class="step-title">Admin Reviews</div>
+                <div class="step-detail">Checks receipt, verifies amount and reference</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">✅</div>
+                <div class="step-title">Approved</div>
+                <div class="step-detail">Contribution recorded. Share paid_amount increases.</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+            <div class="arrow-col" style="padding-top:26px"><span style="font-size:12px;color:#94a3b8">or</span></div>
+            <div class="step">
+              <div class="step-box red">
+                <div class="step-icon">❌</div>
+                <div class="step-title">Rejected</div>
+                <div class="step-detail">Member sees rejection reason. Can resubmit.</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">📎 Batch Deposits (Collector)</div>
+            <div class="card-subtitle">Collectors handle bulk submission for groups</div>
+            <ul class="steps-list">
+              <li>Collector creates a batch, adds member + amount rows</li>
+              <li>Uploads single receipt for the whole batch</li>
+              <li>Admin reviews and approves/rejects per entry</li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-title">📄 Document Upload</div>
+            <div class="card-subtitle">For member verification</div>
+            <ul class="steps-list">
+              <li>Member goes to <strong>Profile → Documents section</strong></li>
+              <li>Uploads Government ID, Proof of Address, or Other</li>
+              <li>Admin sees uploaded files in Member Detail → Documents tab</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SAVINGS ── -->
+      <div class="section" id="sec-savings">
+        <div class="highlight-box">
+          <div class="highlight-box-title">Savings Account</div>
+          <p>Auto-created when a member's first equity share is completed. Members can deposit, withdraw, and earn interest. Dividends, rebates, and branch income are also credited here.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">💳 Deposit Flow</div>
+          <div class="card-subtitle">Min ₱500 per deposit · Weekly cap set in System Config</div>
+          <div class="flow" style="margin-top:12px">
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">📤</div>
+                <div class="step-title">Member Submits</div>
+                <div class="step-detail">Amount, method, receipt</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">🔍</div>
+                <div class="step-title">Admin Reviews</div>
+                <div class="step-detail">Validates receipt and amount</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">💚</div>
+                <div class="step-title">Balance Credited</div>
+                <div class="step-detail">Savings balance increases. Ledger entry created.</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🏧 Withdrawal Flow</div>
+          <div class="card-subtitle">Cannot exceed current balance</div>
+          <div class="flow" style="margin-top:12px">
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">📤</div>
+                <div class="step-title">Member Requests</div>
+                <div class="step-detail">Amount + reason</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">🔍</div>
+                <div class="step-title">Admin Validates</div>
+                <div class="step-detail">Confirms balance ≥ requested amount</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">✅</div>
+                <div class="step-title">Balance Deducted</div>
+                <div class="step-detail">Ledger entry: savings_withdrawal</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📈 Interest Release</div>
+          <div class="card-subtitle">Default 2.5% per 6 months · Configured in System Config → <code>savings_interest_rate</code></div>
+          <ul class="steps-list" style="margin-top:8px">
+            <li>Admin goes to <strong>Savings → Deposits</strong> and clicks <em>Release Interest Now</em></li>
+            <li>System computes: <code>balance × rate</code> for every active account with balance &gt; 0</li>
+            <li>Interest added to each member's savings balance + logged in savings_interest_logs</li>
+          </ul>
+          <div class="note note-info" style="margin-top:12px">💡 Run every 6 months (or as configured). There is no automatic scheduler — admin must trigger manually.</div>
+        </div>
+      </div>
+
+      <!-- ── LOANS ── -->
+      <div class="section" id="sec-loans">
+        <div class="highlight-box">
+          <div class="highlight-box-title">Loan Eligibility</div>
+          <p>A member needs at least one completed equity share. The maximum loan amount is the sum of: borrower's completed share value + borrower's savings balance + confirmed co-maker share values + co-maker savings. If the requested amount exceeds the borrower's own collateral, a co-maker is required.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Loan Application Flow</div>
+          <div class="flow" style="margin-top:16px">
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">📋</div>
+                <div class="step-title">Member Applies</div>
+                <div class="step-detail">Loan product, amount, purpose, term, optional co-maker</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box gray">
+                <div class="step-icon">🤝</div>
+                <div class="step-title">Co-maker Confirms</div>
+                <div class="step-detail">Only if amount exceeds borrower's own collateral</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Co-maker</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">🔍</div>
+                <div class="step-title">Admin Reviews</div>
+                <div class="step-detail">Checks eligibility, collateral, co-maker status</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">🚀</div>
+                <div class="step-title">Approved & Disbursed</div>
+                <div class="step-detail">Loan + repayment schedule auto-generated</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+          </div>
+          <div class="formula">
+            Max Loan = <span class="val">borrower_shares</span> <span class="op">+</span> <span class="val">borrower_savings</span> <span class="op">+</span> <span class="val">co_maker_shares</span> <span class="op">+</span> <span class="val">co_maker_savings</span>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">💸 Recording Repayments</div>
+            <div class="card-subtitle">Members can record their own payments</div>
+            <ul class="steps-list">
+              <li>Member goes to <strong>Loan → Loan Detail</strong></li>
+              <li>Clicks <em>Record Payment</em> — enters amount, method, reference</li>
+              <li>Installments marked paid. Outstanding balance decreases.</li>
+              <li>Ledger entry created: <code>loan_repayment</code></li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-title">📊 Calculation Methods</div>
+            <div class="card-subtitle">Set per loan product</div>
+            <table class="tbl">
+              <tr><th>Method</th><th>How Interest Works</th></tr>
+              <tr><td><strong>Flat</strong></td><td>Fixed interest on original principal. Equal monthly payment.</td></tr>
+              <tr><td><strong>Reducing Balance</strong></td><td>Interest recalculates on remaining outstanding balance.</td></tr>
+              <tr><td><strong>Equal Principal</strong></td><td>Same principal each month; interest decreases over time.</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── DAMAYAN ── -->
+      <div class="section" id="sec-damayan">
+        <div class="highlight-box">
+          <div class="highlight-box-title">What is Damayan?</div>
+          <p>A mutual aid fund. When a member experiences a qualifying life event (death in family, hospitalization), all other active members are assessed a fixed contribution. The collected amount is given to the affected member or their family.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Damayan Event Flow</div>
+          <div class="flow" style="margin-top:16px">
+            <div class="step">
+              <div class="step-box pink">
+                <div class="step-icon">📣</div>
+                <div class="step-title">Admin Creates Event</div>
+                <div class="step-detail">Title, affected member, date, assessment amount per member</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box gray">
+                <div class="step-icon">📊</div>
+                <div class="step-title">Assessments Auto-created</div>
+                <div class="step-detail">One per active member (affected member excluded)</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">👁</div>
+                <div class="step-title">Member Sees Amount Due</div>
+                <div class="step-detail">Shown in Damayan page under Finances</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">💵</div>
+                <div class="step-title">Staff Records Payment</div>
+                <div class="step-detail">Admin → Damayan → marks each assessment paid or waived</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">✅</div>
+                <div class="step-title">Event Closed</div>
+                <div class="step-detail">Closed once all paid or waived</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
+            </div>
+          </div>
+          <div class="note note-warn">⚠ Members cannot self-pay online. They pay staff in person or via bank transfer; staff records the payment in the system.</div>
+        </div>
+      </div>
+
+      <!-- ── TRANSFERS ── -->
+      <div class="section" id="sec-transfers">
+        <div class="highlight-box">
+          <div class="highlight-box-title">Share Transfers</div>
+          <p>A member can transfer ownership of an equity share to another active member. Admin must approve. The transfer moves all ownership records and creates ledger entries for both the sender and receiver.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Transfer Flow</div>
+          <div class="flow" style="margin-top:16px">
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">🔄</div>
+                <div class="step-title">Member Requests</div>
+                <div class="step-detail">Selects share, picks recipient from active members, adds reason</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-member">Member</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">🔍</div>
+                <div class="step-title">Admin Reviews</div>
+                <div class="step-detail">Verifies both parties are eligible active members</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">✅</div>
+                <div class="step-title">Approved</div>
+                <div class="step-detail">Ownership transferred. Ledger entries for both parties.</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+            <div class="arrow-col" style="padding-top:26px"><span style="font-size:12px;color:#94a3b8">or</span></div>
+            <div class="step">
+              <div class="step-box red">
+                <div class="step-icon">❌</div>
+                <div class="step-title">Rejected</div>
+                <div class="step-detail">Request cancelled with reason noted</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📌 Important rules</div>
+          <ul class="steps-list" style="margin-top:8px">
+            <li>Only completed or in-progress shares can be transferred</li>
+            <li>Recipient must be an active member in good standing</li>
+            <li>After transfer, the share counts toward the new owner's collateral and distributions</li>
+            <li>Original owner loses the share's value for dividend and branch income purposes</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ── BRANCHES ── -->
+      <div class="section" id="sec-branches">
+        <div class="highlight-box">
+          <div class="highlight-box-title">What Are Branches?</div>
+          <p>Branches are cooperative-owned businesses (stores, farms, service centers, etc.). Their income belongs to the cooperative and is distributed proportionally to all members with completed shares — not to employees or assigned members.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Branch Income Distribution Flow</div>
+          <div class="flow" style="margin-top:16px">
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">🏪</div>
+                <div class="step-title">Admin Records Income</div>
+                <div class="step-detail">Branch, amount, period, description</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box gray">
+                <div class="step-icon">🧮</div>
+                <div class="step-title">Preview Computed</div>
+                <div class="step-detail">Income ÷ total completed shares = per-share rate</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">📤</div>
+                <div class="step-title">Admin Distributes</div>
+                <div class="step-detail">Clicks Distribute after reviewing per-member amounts</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">💚</div>
+                <div class="step-title">Credited to Savings</div>
+                <div class="step-detail">Each member's balance increases proportionally</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+          </div>
+          <div class="formula">
+            per_share_amount = <span class="val">branch_income</span> <span class="op">÷</span> <span class="val">total_completed_shares</span><br>
+            member_credit = <span class="val">per_share_amount</span> <span class="op">×</span> <span class="val">member_completed_shares</span>
+          </div>
+          <div class="note note-info">💡 Example: Branch earns ₱100,000. Cooperative has 100 total completed shares. Per share = ₱1,000. A member with 2 completed shares receives ₱2,000.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📊 Branch KPI Page (all roles can view)</div>
+          <table class="tbl" style="margin-top:8px">
+            <tr><th>KPI</th><th>Formula</th></tr>
+            <tr><td>Gross Revenue</td><td>Sum of all recorded income for the period</td></tr>
+            <tr><td>Total Expenses</td><td>Salary + utilities + rent + supplies + maintenance + other</td></tr>
+            <tr><td>Net Profit</td><td>Gross Revenue − Total Expenses</td></tr>
+            <tr><td>Profit Margin</td><td>Net Profit ÷ Gross Revenue × 100%</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── DIVIDENDS ── -->
+      <div class="section" id="sec-dividends">
+        <div class="highlight-box">
+          <div class="highlight-box-title">Equity Dividends</div>
+          <p>An annual payment to all members with completed equity shares, based on the value of those shares. The rate is set in <strong>System Config → equity_dividend_rate</strong> (default 5%). Dividends go directly into each member's savings account balance.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Dividend Release Flow</div>
+          <div class="flow" style="margin-top:16px">
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">📅</div>
+                <div class="step-title">Admin Opens Page</div>
+                <div class="step-detail">Cooperative → Dividends → Release Dividends</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin only</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">👁</div>
+                <div class="step-title">Preview Loaded</div>
+                <div class="step-detail">Per-member table: shares, share value, dividend amount</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box gray">
+                <div class="step-icon">🧮</div>
+                <div class="step-title">Computed</div>
+                <div class="step-detail">Each share: target_amount × rate%. Member gets total across all their shares.</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">💚</div>
+                <div class="step-title">Credited to Savings</div>
+                <div class="step-detail">Ledger entry: equity_dividend</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+          </div>
+          <div class="formula">
+            dividend_per_member = <span class="val">sum(share.target_amount)</span> <span class="op">×</span> <span class="val">(rate / 100)</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📌 When to run</div>
+          <ul class="steps-list" style="margin-top:8px">
+            <li>Run <strong>once per fiscal year</strong>, typically at year-end</li>
+            <li>The page shows the last release date — verify before releasing again</li>
+            <li>System shows a warning if dividends were already released recently, but does not block</li>
+            <li>Members can withdraw their dividend through a savings withdrawal request</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ── REBATES ── -->
+      <div class="section" id="sec-rebates">
+        <div class="highlight-box">
+          <div class="highlight-box-title">Loan Rebates</div>
+          <p>A percentage of the loan interest paid by members is returned to them as a reward for good repayment standing. The rate is set in <strong>System Config → rebate_rate</strong> (default 10%). Rebates go to savings — they are <em>not</em> deducted from future loan payments.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Rebate Release Flow</div>
+          <div class="flow" style="margin-top:16px">
+            <div class="step">
+              <div class="step-box amber">
+                <div class="step-icon">📅</div>
+                <div class="step-title">Admin Sets Period</div>
+                <div class="step-detail">Loans → Rebates → Set start &amp; end date</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin only</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box blue">
+                <div class="step-icon">👁</div>
+                <div class="step-title">Preview Loaded</div>
+                <div class="step-detail">Per-member: interest paid in period + rebate amount</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-admin">Admin</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box gray">
+                <div class="step-icon">🧮</div>
+                <div class="step-title">Computed</div>
+                <div class="step-detail">Sum of interest_due from paid schedule rows in date range</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+            <div class="arrow-col"><div class="arrow">→</div></div>
+            <div class="step">
+              <div class="step-box green">
+                <div class="step-icon">💚</div>
+                <div class="step-title">Credited to Savings</div>
+                <div class="step-detail">Ledger entry: rebate</div>
+              </div>
+              <div class="step-actor"><span class="badge badge-system">System</span></div>
+            </div>
+          </div>
+          <div class="formula">
+            rebate = <span class="val">sum(interest_paid)</span> <span class="op">×</span> <span class="val">(rebate_rate / 100)</span>
+          </div>
+          <div class="note note-info">💡 Only members who made <strong>paid</strong> loan repayments in the selected period are included. Typical cadence: every 6 months (Jan–Jun, Jul–Dec).</div>
+        </div>
+      </div>
+
+      <!-- ── PERMISSIONS ── -->
+      <div class="section" id="sec-permissions">
+        <div class="card" style="overflow-x:auto">
+          <div class="card-title">Role Permissions Matrix</div>
+          <div class="card-subtitle">✓ = always allowed · ✓* = allowed if toggled on in Permissions page · — = not available</div>
+          <table class="tbl" style="margin-top:8px">
+            <tr>
+              <th>Feature / Action</th>
+              <th class="tc">Admin</th>
+              <th class="tc">Staff</th>
+              <th class="tc">Board</th>
+              <th class="tc">Collector</th>
+              <th class="tc">Member</th>
+            </tr>
+            <tr class="group-row"><td colspan="6">Equity Shares</td></tr>
+            <tr><td>Submit deposit request</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc partial">Batch</td><td class="tc check">✓</td></tr>
+            <tr><td>Approve / reject deposits</td><td class="tc check">✓</td><td class="tc partial">✓*</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>Open share for member</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>Request share transfer</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc check">✓</td></tr>
+            <tr><td>Approve share transfers</td><td class="tc check">✓</td><td class="tc partial">✓*</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+
+            <tr class="group-row"><td colspan="6">Savings</td></tr>
+            <tr><td>Submit savings deposit / withdrawal</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc check">✓</td></tr>
+            <tr><td>Approve savings requests</td><td class="tc check">✓</td><td class="tc partial">✓*</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>Release savings interest</td><td class="tc check">✓</td><td class="tc partial">✓*</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+
+            <tr class="group-row"><td colspan="6">Loans</td></tr>
+            <tr><td>Apply for loan</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc check">✓</td></tr>
+            <tr><td>Approve / reject loan application</td><td class="tc check">✓</td><td class="tc partial">✓*</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>Record loan repayment</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc check">✓</td></tr>
+            <tr><td>View full loan portfolio</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc partial">Own</td></tr>
+
+            <tr class="group-row"><td colspan="6">Cooperative</td></tr>
+            <tr><td>Release equity dividends</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>Release loan rebates</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>Manage Damayan events</td><td class="tc check">✓</td><td class="tc partial">✓*</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc partial">View</td></tr>
+            <tr><td>Record branch income / expenses</td><td class="tc check">✓</td><td class="tc partial">✓*</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>Distribute branch income</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>View branch portfolio KPIs</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc check">✓</td></tr>
+
+            <tr class="group-row"><td colspan="6">Administration</td></tr>
+            <tr><td>Manage users &amp; assign roles</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>System config</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>Permissions page</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>View financial reports</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+            <tr><td>View member list</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc check">✓</td><td class="tc cross">—</td><td class="tc cross">—</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── GAPS ── -->
+      <div class="section" id="sec-gaps">
+        <div class="note note-warn" style="margin-bottom:20px">⚠ These are known workflow gaps where the system requires manual workarounds. They do not break any existing feature — they are areas where self-service is not yet available.</div>
+
+        <div class="gap-card">
+          <div class="gap-title">Member Cannot Self-initiate a Share Subscription</div>
+          <div class="gap-desc">New members have no way to request their first share from within the app. Admin must discover the member exists and manually open a share in the Member Detail page.</div>
+          <div class="gap-fix">→ Workaround: Member contacts admin/staff in person or by phone. Admin opens the share from Admin → Members → Member Detail.</div>
+        </div>
+
+        <div class="gap-card">
+          <div class="gap-title">Damayan Has No Online Self-payment</div>
+          <div class="gap-desc">Members can see their Damayan assessment amount in their Damayan page but there is no "Pay" button. Payment must be made in person or via bank transfer, then staff records it manually.</div>
+          <div class="gap-fix">→ Workaround: Member pays staff directly. Staff marks as paid in Admin → Cooperative → Damayan.</div>
+        </div>
+
+        <div class="gap-card">
+          <div class="gap-title">No Guided Onboarding Flow</div>
+          <div class="gap-desc">After completing their profile, members land on the Dashboard with no clear "next step." The process of getting a share opened is invisible to them from within the app.</div>
+          <div class="gap-fix">→ Workaround: Provide a printed or emailed onboarding guide explaining the steps to new members.</div>
+        </div>
+
+        <div class="gap-card">
+          <div class="gap-title">No Double-release Guard on Dividends &amp; Rebates</div>
+          <div class="gap-desc">The system shows the last release date as a warning, but does not block an admin from running dividends or rebates twice for the same period. This could result in members being credited twice.</div>
+          <div class="gap-fix">→ Workaround: Admin must verify the last release date shown on the page before confirming the release.</div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+const pages = {
+  roles:       { breadcrumb: 'Overview', title: 'User Roles', desc: 'The five roles that control what each user can see and do. Admin always has full access regardless of permission toggles.' },
+  onboarding:  { breadcrumb: 'Overview', title: 'Member Onboarding', desc: 'From registration to active membership — the path every new member follows.' },
+  equity:      { breadcrumb: 'Financial Flows', title: 'Equity Shares', desc: 'Members pay toward share subscriptions via deposit requests reviewed by admin or staff.' },
+  savings:     { breadcrumb: 'Financial Flows', title: 'Savings Account', desc: 'Auto-created on first completed share. Members deposit, withdraw, and earn interest.' },
+  loans:       { breadcrumb: 'Financial Flows', title: 'Loans', desc: 'Members with completed shares can apply for loans. Collateral determines if a co-maker is required.' },
+  damayan:     { breadcrumb: 'Cooperative', title: 'Damayan (Mutual Aid)', desc: 'When a qualifying event occurs, active members are assessed a contribution to support the affected member.' },
+  transfers:   { breadcrumb: 'Cooperative', title: 'Share Transfers', desc: 'Members can transfer equity share ownership to another active member with admin approval.' },
+  branches:    { breadcrumb: 'Cooperative', title: 'Branch Income & Expenses', desc: 'Income from cooperative-owned businesses is distributed proportionally to all shareholders.' },
+  dividends:   { breadcrumb: 'Cooperative', title: 'Equity Dividends', desc: 'Annual payout to members based on their completed share value. Credited to savings account.' },
+  rebates:     { breadcrumb: 'Cooperative', title: 'Loan Rebates', desc: 'A portion of loan interest is returned to members who made payments during the selected period.' },
+  permissions: { breadcrumb: 'Reference', title: 'Permissions Matrix', desc: 'Full table of what each role can and cannot do across every feature.' },
+  gaps:        { breadcrumb: 'Reference', title: 'Known Flow Gaps', desc: 'Areas where manual workarounds are currently needed until self-service flows are implemented.' },
+}
+
+function show(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+  document.getElementById('sec-' + id).classList.add('active')
+  document.querySelector(`[onclick="show('${id}')"]`).classList.add('active')
+  const p = pages[id]
+  document.getElementById('breadcrumb').textContent = p.breadcrumb
+  document.getElementById('page-title').textContent = p.title
+  document.getElementById('page-desc').textContent = p.desc
+  document.querySelector('.main').scrollTop = 0
+  if (window.innerWidth < 768) toggleSidebar(false)
+}
+
+function toggleSidebar(force) {
+  const sb = document.getElementById('sidebar')
+  const ov = document.getElementById('overlay')
+  const open = force !== undefined ? force : !sb.classList.contains('open')
+  sb.classList.toggle('open', open)
+  ov.classList.toggle('open', open)
+}
+</script>
 </body>
 </html>
