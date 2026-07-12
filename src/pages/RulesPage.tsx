@@ -15,10 +15,11 @@ function useRulesConfig() {
         'max_shares_per_member',
         'min_installment_amount',
         'loan_interest_rate',
-        'max_loan_multiplier',
+        'max_loan_term_months',
         'savings_interest_rate',
         'savings_interest_period_months',
         'savings_min_deposit',
+        'savings_min_balance',
         'savings_required_for_loan',
       ]
       const { data, error } = await supabase
@@ -111,12 +112,13 @@ export function RulesPage() {
 
   const sharePrice        = n('share_price', 5000)
   const maxShares         = n('max_shares_per_member', 5)
-  const minInstallment    = n('min_installment_amount', 500)
-  const loanRate          = n('loan_interest_rate', 2)
-  const loanMultiplier    = n('max_loan_multiplier', 3)
+  const minInstallment    = n('min_installment_amount', 250)
+  const loanRate          = n('loan_interest_rate', 3.33)
+  const maxLoanTermMonths = n('max_loan_term_months', 6)
   const savingsRate       = n('savings_interest_rate', 2.5)
   const savingsPeriod     = n('savings_interest_period_months', 6)
-  const savingsMinDeposit = n('savings_min_deposit', 500)
+  const savingsMinDeposit = n('savings_min_deposit', 100)
+  const savingsMinBalance = n('savings_min_balance', 500)
   const savingsForLoan    = cfg['savings_required_for_loan'] === 'true'
 
   const savingsPeriodLabel = savingsPeriod === 6 ? 'every 6 months' :
@@ -203,16 +205,16 @@ export function RulesPage() {
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Share Price" value={currency(sharePrice)} />
             <Stat label="Max Shares" value={`${maxShares} shares`} />
-            <Stat label="Min Installment" value={currency(minInstallment)} />
+            <Stat label="Min Weekly Deposit" value={currency(minInstallment)} />
           </div>
           <Card>
             <CardBody className="space-y-4">
               <ul className="space-y-3">
                 <Rule>
-                  Each share has a fixed target of <strong>{currency(sharePrice)}</strong>. You build it up through installment deposits until fully paid.
+                  Each share has a fixed target of <strong>{currency(sharePrice)}</strong>. You build it up through weekly installment deposits until fully paid.
                 </Rule>
                 <Rule>
-                  The minimum single deposit installment is <strong>{currency(minInstallment)}</strong>.
+                  The minimum deposit per week is <strong>{currency(minInstallment)}</strong>. You may deposit more than the minimum in a single installment.
                 </Rule>
                 <Rule>
                   A member can hold up to <strong>{maxShares} shares</strong> at a time.
@@ -242,10 +244,11 @@ export function RulesPage() {
               </svg>
             }
           />
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Stat label="Interest Rate" value={`${savingsRate}%`} />
             <Stat label="Credited" value={savingsPeriodLabel} />
             <Stat label="Min Deposit" value={currency(savingsMinDeposit)} />
+            <Stat label="Min Balance" value={currency(savingsMinBalance)} />
           </div>
           <Card>
             <CardBody className="space-y-4">
@@ -255,6 +258,9 @@ export function RulesPage() {
                 </Rule>
                 <Rule>
                   The minimum single deposit is <strong>{currency(savingsMinDeposit)}</strong>. There is no maximum — you can deposit any amount.
+                </Rule>
+                <Rule>
+                  A minimum balance of <strong>{currency(savingsMinBalance)}</strong> must be maintained at all times. Withdrawal requests that would bring your balance below this amount will not be approved.
                 </Rule>
                 <Rule>
                   Interest of <strong>{savingsRate}%</strong> is credited to your savings balance <strong>{savingsPeriodLabel}</strong>.
@@ -325,9 +331,10 @@ export function RulesPage() {
               </svg>
             }
           />
-          <div className="grid grid-cols-2 gap-3">
-            <Stat label="Monthly Interest Rate" value={`${loanRate}%`} />
-            <Stat label="Max Loan Amount" value={`${loanMultiplier}× your equity`} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Stat label="Monthly Interest" value={`${loanRate}%`} />
+            <Stat label="Max Term" value={`${maxLoanTermMonths} months`} />
+            <Stat label="Amount Based On" value="Collateral" />
           </div>
           <Card>
             <CardBody className="space-y-4">
@@ -345,13 +352,42 @@ export function RulesPage() {
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Loan Amount</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Maximum Loan Amount</p>
                 <ul className="space-y-3">
                   <Rule>
-                    Maximum loan = <strong>{loanMultiplier}× the total value of your completed shares</strong>.
-                    For example, 2 completed shares at {currency(sharePrice)} = {currency(sharePrice * 2)} equity → max loan of {currency(sharePrice * 2 * loanMultiplier)}.
+                    Your maximum loan is based on the <strong>combined collateral</strong> of you and your co-maker:
                   </Rule>
+                </ul>
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                  <p className="text-sm font-semibold text-amber-800">Collateral Formula</p>
+                  <div className="text-sm text-amber-700 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      <span>Your completed shares value (e.g. 1 share = {currency(sharePrice)})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      <span>+ Your savings balance</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      <span>+ Co-maker's completed shares value</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      <span>+ Co-maker's savings balance</span>
+                    </div>
+                    <div className="border-t border-amber-200 pt-2 mt-1 font-semibold">
+                      = Maximum loan amount
+                    </div>
+                  </div>
+                  <p className="text-xs text-amber-600">
+                    Example: You have 1 share ({currency(sharePrice)}) + {currency(2000)} savings, and your co-maker has 1 share ({currency(sharePrice)}) + {currency(1000)} savings → max loan = {currency(sharePrice + 2000 + sharePrice + 1000)}.
+                  </p>
+                </div>
+                <ul className="space-y-3 mt-3">
                   <Rule>Only one active loan is allowed at a time. You must fully repay before reapplying.</Rule>
+                  <Rule>The maximum repayment term is <strong>{maxLoanTermMonths} months</strong>.</Rule>
                 </ul>
               </div>
 
@@ -362,21 +398,21 @@ export function RulesPage() {
                   <Rule>A co-maker must be Active, have at least one completed share, and have no active loan of their own.</Rule>
                   <Rule>A co-maker cannot be guaranteeing more than one active application at a time.</Rule>
                   <Rule>Once a co-maker confirms, they cannot withdraw their confirmation.</Rule>
+                  <Rule>Including a co-maker increases your maximum borrowable amount — their shares and savings are added to your collateral.</Rule>
                 </ul>
               </div>
 
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Interest</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Interest & Repayment</p>
                 <ul className="space-y-3">
                   <Rule>
-                    Monthly interest rate: <strong>{loanRate}%</strong> per month.
-                    The cooperative may use either flat-rate or reducing-balance calculation depending on your loan product.
+                    Monthly interest rate: <strong>{loanRate}%</strong> per month, for a maximum of <strong>{maxLoanTermMonths} months</strong>.
                   </Rule>
                   <Rule>
                     <strong>Flat rate</strong>: interest is computed on the original principal each month — payments are equal throughout.
                   </Rule>
                   <Rule>
-                    <strong>Reducing balance</strong>: interest is computed only on the outstanding balance — later payments have less interest and more principal.
+                    <strong>Reducing balance</strong>: interest is computed only on the remaining outstanding balance — later payments have less interest.
                   </Rule>
                   <Rule>You will see a full repayment schedule preview before you submit your application.</Rule>
                 </ul>
