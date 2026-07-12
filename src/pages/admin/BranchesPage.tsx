@@ -58,7 +58,10 @@ export function BranchesPage() {
   const [form, setForm] = useState({ name: '', location: '' })
   const [editForm, setEditForm] = useState({ name: '', location: '', is_active: true })
   const [incomeForm, setIncomeForm] = useState({
-    amount: '',
+    gross_sales: '',
+    salary: '',
+    expenses_total: '',
+    roi: '',
     period_start: '',
     period_end: '',
     description: '',
@@ -94,19 +97,27 @@ export function BranchesPage() {
   }
 
   const handleRecordIncome = () => {
-    if (!showRecordIncome || !incomeForm.amount || !incomeForm.period_start || !incomeForm.period_end) return
+    if (!showRecordIncome || !incomeForm.gross_sales || !incomeForm.period_start || !incomeForm.period_end) return
+    const grossSales = parseFloat(incomeForm.gross_sales) || 0
+    const salary = parseFloat(incomeForm.salary) || 0
+    const expensesTotal = parseFloat(incomeForm.expenses_total) || 0
+    const netProfit = grossSales - salary - expensesTotal
     recordIncome.mutate(
       {
         branchId: showRecordIncome.id,
-        amount: parseFloat(incomeForm.amount),
+        amount: netProfit,
         periodStart: incomeForm.period_start,
         periodEnd: incomeForm.period_end,
+        grossSales,
+        salary,
+        expensesTotal,
+        roi: incomeForm.roi ? parseFloat(incomeForm.roi) : null,
         description: incomeForm.description.trim() || undefined,
       },
       {
         onSuccess: () => {
           setShowRecordIncome(null)
-          setIncomeForm({ amount: '', period_start: '', period_end: '', description: '' })
+          setIncomeForm({ gross_sales: '', salary: '', expenses_total: '', roi: '', period_start: '', period_end: '', description: '' })
         },
         onError: (err: any) => alert(err.message ?? 'Failed to record income'),
       }
@@ -413,18 +424,7 @@ export function BranchesPage() {
         size="sm"
       >
         <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Amount <span className="text-red-500">*</span></label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={incomeForm.amount}
-              onChange={e => setIncomeForm(f => ({ ...f, amount: e.target.value }))}
-              placeholder="0.00"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          {/* Period */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Period Start <span className="text-red-500">*</span></label>
@@ -445,22 +445,82 @@ export function BranchesPage() {
               />
             </div>
           </div>
+
+          {/* Financials */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Gross Sales <span className="text-red-500">*</span></label>
+            <input
+              type="number" min="0" step="0.01"
+              value={incomeForm.gross_sales}
+              onChange={e => setIncomeForm(f => ({ ...f, gross_sales: e.target.value }))}
+              placeholder="0.00"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Salary</label>
+              <input
+                type="number" min="0" step="0.01"
+                value={incomeForm.salary}
+                onChange={e => setIncomeForm(f => ({ ...f, salary: e.target.value }))}
+                placeholder="0.00"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Other Expenses</label>
+              <input
+                type="number" min="0" step="0.01"
+                value={incomeForm.expenses_total}
+                onChange={e => setIncomeForm(f => ({ ...f, expenses_total: e.target.value }))}
+                placeholder="0.00"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ROI (%)</label>
+            <input
+              type="number" min="0" step="0.01"
+              value={incomeForm.roi}
+              onChange={e => setIncomeForm(f => ({ ...f, roi: e.target.value }))}
+              placeholder="e.g. 12.5"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Net profit preview */}
+          {incomeForm.gross_sales && (
+            <div className="bg-gray-50 rounded-lg px-4 py-3 text-sm">
+              <span className="text-gray-500">Net Profit (distributable): </span>
+              <span className="font-semibold text-gray-900">
+                ₱{(
+                  (parseFloat(incomeForm.gross_sales) || 0) -
+                  (parseFloat(incomeForm.salary) || 0) -
+                  (parseFloat(incomeForm.expenses_total) || 0)
+                ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
             <input
               type="text"
               value={incomeForm.description}
               onChange={e => setIncomeForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="e.g. Q1 2026 net profit"
+              placeholder="e.g. Q1 2026 summary"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
           <div className="flex gap-3 pt-1">
             <Button variant="outline" className="flex-1" onClick={() => setShowRecordIncome(null)}>Cancel</Button>
             <Button
               className="flex-1"
               loading={recordIncome.isPending}
-              disabled={!incomeForm.amount || !incomeForm.period_start || !incomeForm.period_end}
+              disabled={!incomeForm.gross_sales || !incomeForm.period_start || !incomeForm.period_end}
               onClick={handleRecordIncome}
             >
               Record

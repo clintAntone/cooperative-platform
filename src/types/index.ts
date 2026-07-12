@@ -401,6 +401,10 @@ export interface BranchIncome {
   id: string
   branch_id: string
   amount: number
+  gross_sales: number | null
+  salary: number | null
+  expenses_total: number | null
+  roi: number | null
   period_start: string
   period_end: string
   description: string | null

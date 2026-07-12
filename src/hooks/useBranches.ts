@@ -82,7 +82,7 @@ export function useBranchIncome(branchId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('branch_income')
-        .select('id, branch_id, amount, period_start, period_end, description, distributed, recorded_by, created_at')
+        .select('id, branch_id, amount, gross_sales, salary, expenses_total, roi, period_start, period_end, description, distributed, recorded_by, created_at')
         .eq('branch_id', branchId!)
         .order('period_end', { ascending: false })
       if (error) throw error
@@ -98,7 +98,7 @@ export function useAllBranchIncome() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('branch_income')
-        .select('id, branch_id, amount, period_start, period_end, description, distributed, recorded_by, created_at')
+        .select('id, branch_id, amount, gross_sales, salary, expenses_total, roi, period_start, period_end, description, distributed, recorded_by, created_at')
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as BranchIncome[]
@@ -115,6 +115,10 @@ export function useRecordBranchIncome() {
       periodStart: string
       periodEnd: string
       description?: string
+      grossSales?: number | null
+      salary?: number | null
+      expensesTotal?: number | null
+      roi?: number | null
     }) => {
       const { error } = await supabase.rpc('record_branch_income', {
         p_branch_id: params.branchId,
@@ -122,6 +126,10 @@ export function useRecordBranchIncome() {
         p_period_start: params.periodStart,
         p_period_end: params.periodEnd,
         p_description: params.description ?? null,
+        p_gross_sales: params.grossSales ?? null,
+        p_salary: params.salary ?? null,
+        p_expenses_total: params.expensesTotal ?? null,
+        p_roi: params.roi ?? null,
       })
       if (error) throw error
     },
