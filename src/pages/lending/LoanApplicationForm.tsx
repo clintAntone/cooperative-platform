@@ -223,7 +223,7 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
           <p className="text-sm font-medium text-yellow-800">Insufficient collateral</p>
           <p className="text-xs text-yellow-700 mt-0.5">
             You need completed equity shares or savings to apply for a loan. Your maximum is based
-            on your shares value + savings balance + co-maker assets.
+            on your shares value + savings balance (+ co-maker's shares if you add one).
           </p>
         </div>
       )}
@@ -239,15 +239,12 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
             <span>Your shares: <strong>{currency(collateral.borrowerShares)}</strong></span>
             <span>Your savings: <strong>{currency(collateral.borrowerSavings)}</strong></span>
             {coMakerIds.length > 0 && (
-              <>
-                <span>Co-maker shares: <strong>{currency(collateral.coMakerShares)}</strong></span>
-                <span>Co-maker savings: <strong>{currency(collateral.coMakerSavings)}</strong></span>
-              </>
+              <span>Co-maker shares: <strong>{currency(collateral.coMakerShares)}</strong></span>
             )}
           </div>
           {coMakerIds.length === 0 && (
             <p className="text-xs text-blue-600">
-              Adding a co-maker will increase your maximum based on their shares and savings.
+              Adding a co-maker will increase your maximum based on their completed shares.
             </p>
           )}
         </div>

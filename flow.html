@@ -498,7 +498,7 @@
       <div class="section" id="sec-loans">
         <div class="highlight-box">
           <div class="highlight-box-title">Loan Eligibility</div>
-          <p>A member needs at least one completed equity share to be eligible for a loan. The base collateral is the borrower's own completed share value + savings balance. If the requested amount fits within that, no co-maker is needed. A co-maker is only required when the loan amount exceeds the borrower's own collateral — adding the co-maker's shares and savings to the pool.</p>
+          <p>A member needs at least one completed equity share to be eligible for a loan. The base collateral is the borrower's own completed share value + savings balance. If the requested amount fits within that, no co-maker is needed. A co-maker is only required when the loan amount exceeds the borrower's own collateral — only the co-maker's shares (not their savings) are added to expand the collateral pool.</p>
         </div>
 
         <div class="card">
@@ -534,14 +534,14 @@
 
           <div style="margin:16px 0 8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;font-size:13px;color:#92400e">
             <strong>⚠ Co-maker — only required when loan amount &gt; borrower's own collateral</strong><br>
-            If the requested amount exceeds <code style="background:#fde68a;padding:2px 5px;border-radius:4px">borrower_shares + borrower_savings</code>, the member must add a co-maker. The co-maker must confirm before admin can approve. Their shares and savings are added to the collateral pool.
+            If the requested amount exceeds <code style="background:#fde68a;padding:2px 5px;border-radius:4px">borrower_shares + borrower_savings</code>, the member must add a co-maker. The co-maker must confirm before admin can approve. Only the co-maker's <strong>shares</strong> (not savings) are added to the collateral pool.
           </div>
 
           <div class="formula">
-            Without co-maker: Max Loan = <span class="val">borrower_shares</span> <span class="op">+</span> <span class="val">borrower_savings</span>
+            Default: Max Loan = <span class="val">borrower_shares</span> <span class="op">+</span> <span class="val">borrower_savings</span>
           </div>
           <div class="formula" style="margin-top:8px">
-            With co-maker: Max Loan = <span class="val">borrower_shares</span> <span class="op">+</span> <span class="val">borrower_savings</span> <span class="op">+</span> <span class="val">co_maker_shares</span> <span class="op">+</span> <span class="val">co_maker_savings</span>
+            With co-maker: Max Loan = <span class="val">borrower_shares</span> <span class="op">+</span> <span class="val">borrower_savings</span> <span class="op">+</span> <span class="val">co_maker_shares</span>
           </div>
         </div>
 

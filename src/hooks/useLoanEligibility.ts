@@ -4,7 +4,8 @@ import { useEffectiveUserId } from '../context/ImpersonationContext'
 
 /**
  * Computes the collateral-based loan max for the borrower + selected co-makers:
- *   max = borrower_shares_value + borrower_savings + co-maker_shares_value + co-maker_savings
+ *   max = borrower_shares_value + borrower_savings + co-maker_shares_value
+ * Co-maker savings are NOT included — only their completed shares count as collateral.
  * Matches the server-side formula in admin_approve_loan_application().
  */
 export function useCollateralMax(coMakerIds: string[]) {
@@ -45,14 +46,12 @@ export function useCollateralMax(coMakerIds: string[]) {
       const borrowerShares = sharesByUser[effectiveUserId] ?? 0
       const borrowerSavings = savingsByUser[effectiveUserId] ?? 0
       const coMakerShares = coMakerIds.reduce((s, id) => s + (sharesByUser[id] ?? 0), 0)
-      const coMakerSavings = coMakerIds.reduce((s, id) => s + (savingsByUser[id] ?? 0), 0)
 
       return {
-        total: borrowerShares + borrowerSavings + coMakerShares + coMakerSavings,
+        total: borrowerShares + borrowerSavings + coMakerShares,
         borrowerShares,
         borrowerSavings,
         coMakerShares,
-        coMakerSavings,
       }
     },
     enabled: !!effectiveUserId,
