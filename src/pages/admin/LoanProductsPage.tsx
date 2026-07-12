@@ -8,6 +8,7 @@ import { useCurrency } from '../../hooks/useCurrency'
 import { formatInterestLabel } from '../../lib/utils'
 import { exportToExcel } from '../../lib/exportExcel'
 import type { LoanProduct } from '../../types'
+import { PageGuide } from '../../components/shared/PageGuide'
 
 const CALC_OPTIONS = [
   { value: 'reducing_balance', label: 'Reducing Balance' },
@@ -236,7 +237,17 @@ export function LoanProductsPage() {
         }
       />
 
-      <div className="p-4 sm:p-6">
+      <div className="p-4 sm:p-6 space-y-4">
+        <PageGuide
+          storageKey="loan-products"
+          steps={[
+            'Loan products define the terms available to members: interest rate, calculation method, and repayment term range.',
+            'Create a product before any loans can be applied for — members pick a product when applying.',
+            "Set the interest rate to 3.33% monthly (flat) to match cooperative policy. The method should be 'flat'.",
+            'Deactivating a product hides it from new applications but does not affect existing loans.',
+          ]}
+          note="Run migration 46_loan_product_rate_fix.sql in the Supabase SQL editor to bulk-update existing products to the correct rate."
+        />
         {isLoading ? (
           <p className="text-sm text-gray-400 py-12 text-center">Loading…</p>
         ) : products.length === 0 ? (

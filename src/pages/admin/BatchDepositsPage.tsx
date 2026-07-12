@@ -13,6 +13,7 @@ import {
   type BatchDeposit,
 } from '../../hooks/useBatchDeposits'
 import { useCurrency } from '../../hooks/useCurrency'
+import { PageGuide } from '../../components/shared/PageGuide'
 import { formatDate, formatDateTime } from '../../lib/utils'
 import { cn } from '../../lib/utils'
 
@@ -427,6 +428,15 @@ export function BatchDepositsPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-4">
+        <PageGuide
+          storageKey="batch-deposits"
+          steps={[
+            'Batch deposits are collections created by a Collector role — one submission covers multiple members at once.',
+            'Review the batch summary: check member count, total amount, and individual entries.',
+            'Approve the entire batch to post all contributions, or reject it to send it back for correction.',
+          ]}
+          note="Batches cannot be partially approved — it is all or nothing. Ask the collector to resubmit if individual entries are wrong."
+        />
         {/* Tabs */}
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-max min-w-full sm:w-fit">

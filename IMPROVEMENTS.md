@@ -183,7 +183,7 @@ Identified via full accountant/manager flow review. Status legend: 🔴 Open · 
 | ID | Issue | Status | Fixed In |
 |----|-------|--------|----------|
 | O1 | No overdue installment detection — past-due schedule rows stay `pending`, no automatic `overdue` transition | ✅ | 44_critical_fixes.sql (`mark_overdue_loan_installments()` + pg_cron daily) |
-| O2 | Interest release has no admin UI — pg_cron must be manually configured; no button to trigger manually or see last-run date | 🔴 | — |
+| O2 | Interest release has no admin UI — pg_cron must be manually configured; no button to trigger manually or see last-run date | ✅ | SavingsDepositRequestsPage (interest card) + useSavings hooks |
 | O3 | Co-maker eligibility not reset after application rejection/cancellation — confirmed co-makers on rejected apps stay blocked | ✅ | Already fixed in migration 20 — `get_eligible_co_makers()` correctly scopes to active applications only |
 | O4 | No post-default resolution flow — no RPC or UI to resolve a default, lift suspension, and allow re-application | ✅ | 44_critical_fixes.sql (`admin_resolve_loan_default()`) |
 
@@ -192,14 +192,14 @@ Identified via full accountant/manager flow review. Status legend: 🔴 Open · 
 | ID | Issue | Status | Fixed In |
 |----|-------|--------|----------|
 | P1 | `max_loan_term_months = 6` not enforced in approval RPC — loan product's own `max_term_months` is used instead | ✅ | 44_critical_fixes.sql |
-| P2 | Loan product interest rate may differ from `system_config.loan_interest_rate` (3.33%) — active products may still carry old rate | 🔴 | Manual — review and update active loan products in Supabase dashboard |
+| P2 | Loan product interest rate may differ from `system_config.loan_interest_rate` (3.33%) — active products may still carry old rate | ✅ | 46_loan_product_rate_fix.sql |
 
 ### MISSING FEATURES — From Original Plan
 
 | ID | Feature | Status | Notes |
 |----|---------|--------|-------|
 | F1 | Equity share dividends — no `release_equity_dividend()` RPC, no dividend logs table, no member view | 🔴 | Separate 6-month cycle from savings interest |
-| F2 | Loan max amount not computed/shown during application — member sees no cap, admin has no enforcement | 🔴 | Tied to C4 |
+| F2 | Loan max amount not computed/shown during application — member sees no cap, admin has no enforcement | ✅ | LoanApplicationForm + useCollateralMax hook — live breakdown of borrower + co-maker assets |
 | F3 | Share transfer between members | 🔴 | Future phase |
 | F4 | Damayan (mutual aid fund) | 🔴 | Future phase |
 | F5 | Branch management | 🔴 | Future phase |

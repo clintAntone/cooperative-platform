@@ -7,10 +7,13 @@ import {
   useAllSavingsDepositRequests,
   useApproveSavingsDeposit,
   useRejectSavingsDeposit,
+  useLastInterestRelease,
+  useReleaseSavingsInterest,
 } from '../../hooks/useSavings'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDateTime } from '../../lib/utils'
 import type { SavingsDepositRequestWithMeta } from '../../hooks/useSavings'
+import { PageGuide } from '../../components/shared/PageGuide'
 
 const statusColors: Record<string, string> = {
   pending:  'bg-yellow-100 text-yellow-800',
@@ -28,6 +31,10 @@ export function SavingsDepositRequestsPage() {
   const [rejectTarget, setRejectTarget] = useState<SavingsDepositRequestWithMeta | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [approveTarget, setApproveTarget] = useState<SavingsDepositRequestWithMeta | null>(null)
+  const [showReleaseConfirm, setShowReleaseConfirm] = useState(false)
+
+  const { data: lastRelease } = useLastInterestRelease()
+  const releaseInterest = useReleaseSavingsInterest()
 
   const { data, isLoading } = useAllSavingsDepositRequests({
     statusFilter,
@@ -53,6 +60,42 @@ export function SavingsDepositRequestsPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-4">
+        <PageGuide
+          storageKey="savings-deposits"
+          steps={[
+            'Members deposit into their savings account by submitting a request with a payment receipt.',
+            "Verify the payment details, then Approve to credit the member's savings balance.",
+            'Reject with a reason if the payment cannot be verified.',
+            "Use the 'Release Interest Now' button every 6 months to credit ADB-based interest to all active savings accounts.",
+          ]}
+          note="Interest is calculated using Average Daily Balance — members who deposited earlier in the period earn more than last-minute depositors."
+        />
+        {/* Interest release card */}
+        <Card className="bg-indigo-50 border-indigo-200">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-4 py-4">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-indigo-900">Savings Interest Release</p>
+              {lastRelease ? (
+                <p className="text-xs text-indigo-700 mt-0.5">
+                  Last run: <strong>{new Date(lastRelease.period_end).toLocaleDateString()}</strong>
+                  {' · '}credited <strong>{currency(lastRelease.total_interest)}</strong> to{' '}
+                  <strong>{lastRelease.account_count}</strong> account{lastRelease.account_count !== 1 ? 's' : ''}
+                  {' · '}{formatDateTime(lastRelease.released_at)}
+                </p>
+              ) : (
+                <p className="text-xs text-indigo-700 mt-0.5">No interest has been released yet</p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
+              onClick={() => setShowReleaseConfirm(true)}
+            >
+              Release Interest Now
+            </Button>
+          </div>
+        </Card>
+
         {/* Status filter tabs */}
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <div className="flex gap-1 w-max min-w-full sm:w-fit border-b border-gray-200">
@@ -291,6 +334,44 @@ export function SavingsDepositRequestsPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Interest release confirmation modal */}
+      <Modal
+        isOpen={showReleaseConfirm}
+        onClose={() => setShowReleaseConfirm(false)}
+        title="Release Savings Interest"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            This will credit interest to <strong>all active savings accounts</strong> using the
+            Average Daily Balance method for the current period. This action cannot be undone.
+          </p>
+          {lastRelease && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+              Last release was on <strong>{formatDateTime(lastRelease.released_at)}</strong>.
+              Running again will calculate interest from that date to now.
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setShowReleaseConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+              loading={releaseInterest.isPending}
+              onClick={() =>
+                releaseInterest.mutate(undefined, {
+                  onSuccess: () => setShowReleaseConfirm(false),
+                  onError: (err: any) => alert(err.message ?? 'Failed to release interest'),
+                })
+              }
+            >
+              Release Interest
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

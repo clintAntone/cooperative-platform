@@ -431,6 +431,61 @@ export function useRejectSavingsWithdrawal() {
   })
 }
 
+// ─── Admin: release savings interest ─────────────────────────────────────────
+
+export interface LastInterestRelease {
+  period_end: string
+  total_interest: number
+  account_count: number
+  released_at: string
+}
+
+export function useLastInterestRelease() {
+  return useQuery({
+    queryKey: ['last_interest_release'],
+    queryFn: async (): Promise<LastInterestRelease | null> => {
+      const { data, error } = await supabase
+        .from('savings_interest_logs')
+        .select('period_end, interest_earned, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200)
+
+      if (error) throw error
+      if (!data || data.length === 0) return null
+
+      // Group by period_end to find the most recent batch
+      const latest = data[0].period_end
+      const batch = data.filter((r: { period_end: string; interest_earned: number; created_at: string }) => r.period_end === latest)
+
+      return {
+        period_end: latest,
+        total_interest: batch.reduce((s: number, r: { interest_earned: number }) => s + r.interest_earned, 0),
+        account_count: batch.length,
+        released_at: data[0].created_at,
+      }
+    },
+    staleTime: 60_000,
+  })
+}
+
+export function useReleaseSavingsInterest() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('release_savings_interest')
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['last_interest_release'] })
+      queryClient.invalidateQueries({ queryKey: ['savings_account'] })
+      queryClient.invalidateQueries({ queryKey: ['savings_interest_logs'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast({ title: 'Interest released successfully', description: 'All active savings accounts have been credited', variant: 'success' })
+    },
+  })
+}
+
 // ─── Storage helper (reuses deposit-receipts bucket) ─────────────────────────
 
 export async function uploadSavingsReceipt(userId: string, file: File): Promise<string> {

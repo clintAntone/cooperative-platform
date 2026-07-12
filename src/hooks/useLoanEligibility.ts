@@ -3,6 +3,64 @@ import { supabase } from '../lib/supabase'
 import { useEffectiveUserId } from '../context/ImpersonationContext'
 
 /**
+ * Computes the collateral-based loan max for the borrower + selected co-makers:
+ *   max = borrower_shares_value + borrower_savings + co-maker_shares_value + co-maker_savings
+ * Matches the server-side formula in admin_approve_loan_application().
+ */
+export function useCollateralMax(coMakerIds: string[]) {
+  const effectiveUserId = useEffectiveUserId()
+  const allIds = [effectiveUserId, ...coMakerIds].filter(Boolean) as string[]
+
+  return useQuery({
+    queryKey: ['collateral_max', effectiveUserId, coMakerIds],
+    queryFn: async () => {
+      if (!effectiveUserId) return null
+
+      const [sharesRes, savingsRes] = await Promise.all([
+        supabase
+          .from('equity_shares')
+          .select('user_id, target_amount')
+          .in('user_id', allIds)
+          .eq('status', 'completed'),
+        supabase
+          .from('savings_accounts')
+          .select('user_id, balance')
+          .in('user_id', allIds)
+          .eq('status', 'active'),
+      ])
+
+      if (sharesRes.error) throw sharesRes.error
+      if (savingsRes.error) throw savingsRes.error
+
+      const sharesByUser: Record<string, number> = {}
+      ;(sharesRes.data ?? []).forEach((r: { user_id: string; target_amount: number }) => {
+        sharesByUser[r.user_id] = (sharesByUser[r.user_id] ?? 0) + r.target_amount
+      })
+
+      const savingsByUser: Record<string, number> = {}
+      ;(savingsRes.data ?? []).forEach((r: { user_id: string; balance: number }) => {
+        savingsByUser[r.user_id] = r.balance
+      })
+
+      const borrowerShares = sharesByUser[effectiveUserId] ?? 0
+      const borrowerSavings = savingsByUser[effectiveUserId] ?? 0
+      const coMakerShares = coMakerIds.reduce((s, id) => s + (sharesByUser[id] ?? 0), 0)
+      const coMakerSavings = coMakerIds.reduce((s, id) => s + (savingsByUser[id] ?? 0), 0)
+
+      return {
+        total: borrowerShares + borrowerSavings + coMakerShares + coMakerSavings,
+        borrowerShares,
+        borrowerSavings,
+        coMakerShares,
+        coMakerSavings,
+      }
+    },
+    enabled: !!effectiveUserId,
+    staleTime: 30_000,
+  })
+}
+
+/**
  * Returns the member's maximum eligible loan amount based on:
  *   completedShares × sharePrice × ratio
  * where ratio depends on membership tenure (new vs senior).

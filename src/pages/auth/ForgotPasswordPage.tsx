@@ -134,7 +134,7 @@ export function ForgotPasswordPage() {
                     </div>
                     <input
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="you@gmail.com"
                       autoComplete="email"
                       value={email}
                       onChange={e => setEmail(e.target.value)}

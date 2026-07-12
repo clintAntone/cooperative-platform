@@ -12,6 +12,7 @@ import { formatDate, getProgressPercent } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
 import { exportToExcel } from '../../lib/exportExcel'
 import { useAuth } from '../../context/AuthContext'
+import { ShareTransferModal } from './ShareTransferModal'
 import type { EquityShare } from '../../types'
 
 export function EquityPage() {
@@ -21,6 +22,7 @@ export function EquityPage() {
   const { data: summary } = useEquitySummary()
   const { data: myDepositRequests = [] } = useMyDepositRequests()
   const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
+  const [transferShare, setTransferShare] = useState<EquityShare | null>(null)
 
   const profileIncomplete = !profile?.profile_completed_at
   const { format: currency } = useCurrency()
@@ -155,11 +157,21 @@ export function EquityPage() {
                     </div>
 
                     {share.status === 'completed' ? (
-                      <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Completed {share.completed_at ? formatDate(share.completed_at) : ''}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Completed {share.completed_at ? formatDate(share.completed_at) : ''}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => setTransferShare(share)}
+                        >
+                          Transfer Share
+                        </Button>
                       </div>
                     ) : share.status === 'in_progress' ? (
                       <div className="space-y-2">
@@ -239,6 +251,13 @@ export function EquityPage() {
           onClose={() => setReceiptModal(null)}
           receiptUrl={receiptModal.url}
           details={receiptModal.details}
+        />
+      )}
+
+      {transferShare && (
+        <ShareTransferModal
+          share={transferShare}
+          onClose={() => setTransferShare(null)}
         />
       )}
     </div>

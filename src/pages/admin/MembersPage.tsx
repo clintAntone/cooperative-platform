@@ -14,6 +14,7 @@ import { formatDate } from '../../lib/utils'
 import { supabase } from '../../lib/supabase'
 import { EmployeesTab } from './EmployeesTab'
 import { exportToExcel } from '../../lib/exportExcel'
+import { PageGuide } from '../../components/shared/PageGuide'
 
 function useApproveMember() {
   const queryClient = useQueryClient()
@@ -184,6 +185,16 @@ export function MembersPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-6">
+        <PageGuide
+          storageKey="members"
+          steps={[
+            'Members are registered users whose applications are awaiting or have received admin review.',
+            'Approve a pending member to activate their account and allow them to start contributing equity shares.',
+            'Suspend a member to temporarily block access without deleting their data.',
+            'Use the search box to find a member by name or Employee ID. Click a row to see full member details.',
+          ]}
+          note="Only admin and staff can approve or suspend members. Rejected registrations cannot re-apply without a new account."
+        />
         {/* Tabs */}
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex gap-6">

@@ -132,6 +132,7 @@ export function ProfilePage() {
 
   const currentAvatar = avatarPreview ?? profile?.avatar_url ?? null
   const isComplete = !!profile?.profile_completed_at
+  const isMemberRole = profile?.role === 'member' || profile?.role === 'collector'
 
   return (
     <div>
@@ -147,9 +148,9 @@ export function ProfilePage() {
         }
       />
 
-      <div className="p-4 sm:p-6 space-y-6 max-w-2xl">
-        {/* Incomplete banner */}
-        {!isComplete && (
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* Incomplete banner — members/collectors only */}
+        {isMemberRole && !isComplete && (
           <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
             <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
@@ -161,6 +162,7 @@ export function ProfilePage() {
           </div>
         )}
 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Avatar + basic info */}
           <Card>
@@ -356,8 +358,8 @@ export function ProfilePage() {
           )}
         </form>
 
-        {/* Documents */}
-        <Card>
+        {/* Documents — members/collectors only */}
+        {isMemberRole && <Card>
           <CardHeader>
             <h3 className="text-sm font-semibold text-gray-900">Documents</h3>
             <p className="text-xs text-gray-500 mt-0.5">Upload your government ID and proof of address for verification.</p>
@@ -422,7 +424,8 @@ export function ProfilePage() {
               onChange={handleDocFileChange}
             />
           </CardBody>
-        </Card>
+        </Card>}
+        </div>
       </div>
     </div>
   )

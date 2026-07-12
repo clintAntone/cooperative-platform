@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { SkeletonFormPage } from '../../components/shared/Skeleton'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { PageGuide } from '../../components/shared/PageGuide'
 
 const BRANDING_KEYS = ['app_name', 'app_vision', 'app_mission', 'app_logo_url'] as const
 
@@ -132,6 +133,15 @@ export function AppSettingsPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-6 max-w-2xl">
+        <PageGuide
+          storageKey="app-settings"
+          steps={[
+            'App Settings control the branding shown to all users: cooperative name, logo, currency symbol, and tagline.',
+            'Update the cooperative name and it will appear in the sidebar header and page title.',
+            'Upload a logo image — it will replace the default icon in the sidebar.',
+          ]}
+          note="Currency symbol changes affect all money displays across the entire app immediately."
+        />
         {/* Branding */}
         <Card>
           <CardHeader>

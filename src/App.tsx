@@ -74,6 +74,16 @@ const AppSettingsPage = lazy(() => import('./pages/admin/AppSettingsPage').then(
 const PermissionsPage = lazy(() => import('./pages/admin/PermissionsPage').then(m => ({ default: m.PermissionsPage })))
 const UserDetailPage = lazy(() => import('./pages/admin/UserDetailPage').then(m => ({ default: m.UserDetailPage })))
 
+// Cooperative feature pages (admin/staff)
+const DividendsPage = lazy(() => import('./pages/admin/DividendsPage').then(m => ({ default: m.DividendsPage })))
+const ShareTransfersPage = lazy(() => import('./pages/admin/ShareTransfersPage').then(m => ({ default: m.ShareTransfersPage })))
+const DamayanAdminPage = lazy(() => import('./pages/admin/DamayanAdminPage').then(m => ({ default: m.DamayanAdminPage })))
+const BranchesPage = lazy(() => import('./pages/admin/BranchesPage').then(m => ({ default: m.BranchesPage })))
+const RebatesPage = lazy(() => import('./pages/admin/RebatesPage').then(m => ({ default: m.RebatesPage })))
+
+// Member cooperative pages
+const DamayanPage = lazy(() => import('./pages/damayan/DamayanPage').then(m => ({ default: m.DamayanPage })))
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -128,6 +138,7 @@ export default function App() {
                 <Route path="/savings" element={<ErrorBoundary><SavingsPage /></ErrorBoundary>} />
                 <Route path="/savings/deposit-request" element={<ErrorBoundary><SavingsDepositRequestPage /></ErrorBoundary>} />
                 <Route path="/savings/withdraw" element={<ErrorBoundary><SavingsWithdrawPage /></ErrorBoundary>} />
+                <Route path="/damayan" element={<ErrorBoundary><DamayanPage /></ErrorBoundary>} />
               </Route>
 
               {/* Collector only */}
@@ -149,6 +160,15 @@ export default function App() {
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-deposits" element={<ErrorBoundary><SavingsDepositRequestsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-withdrawals" element={<ErrorBoundary><SavingsWithdrawalsPage /></ErrorBoundary>} />
+                <Route path="/admin/share-transfers" element={<ErrorBoundary><ShareTransfersPage /></ErrorBoundary>} />
+                <Route path="/admin/damayan" element={<ErrorBoundary><DamayanAdminPage /></ErrorBoundary>} />
+                <Route path="/admin/branches" element={<ErrorBoundary><BranchesPage /></ErrorBoundary>} />
+              </Route>
+
+              {/* Admin only — cooperative finance */}
+              <Route element={<AppLayout requiredRoles={['admin']} />}>
+                <Route path="/admin/dividends" element={<ErrorBoundary><DividendsPage /></ErrorBoundary>} />
+                <Route path="/admin/rebates" element={<ErrorBoundary><RebatesPage /></ErrorBoundary>} />
               </Route>
 
               {/* Admin only */}

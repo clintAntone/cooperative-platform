@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { calculateTotalRepayable, calculateMonthlyPayment, formatInterestLabel } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
 import { useAuth } from '../../context/AuthContext'
-import { useLoanEligibility } from '../../hooks/useLoanEligibility'
+import { useLoanEligibility, useCollateralMax } from '../../hooks/useLoanEligibility'
 import type { EligibleCoMaker, LoanProduct } from '../../types'
 
 const schema = z.object({
@@ -39,11 +39,13 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
 
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null)
   const { data: maxEligible = null } = useLoanEligibility()
-  const [minCoMakers, setMinCoMakers] = useState(1)
+  const [, setMinCoMakers] = useState(1)
   const [previewAmount, setPreviewAmount] = useState(0)
   const [previewTerm, setPreviewTerm] = useState(0)
   const [selectedCoMakers, setSelectedCoMakers] = useState<EligibleCoMaker[]>([])
   const [coMakerError, setCoMakerError] = useState<string | null>(null)
+  const coMakerIds = selectedCoMakers.map(m => m.id)
+  const { data: collateral } = useCollateralMax(coMakerIds)
   const [purposeLen, setPurposeLen] = useState(0)
   const submittingRef = useRef(false)
 
@@ -125,12 +127,15 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
     m => !selectedCoMakers.find(s => s.id === m.id)
   )
 
+  const borrowerOnly = (collateral?.borrowerShares ?? 0) + (collateral?.borrowerSavings ?? 0)
+  const coMakerRequired = watchAmount > 0 && collateral !== undefined && watchAmount > borrowerOnly
+
   const onSubmit = async (values: FormValues) => {
     if (submittingRef.current) return
-    if (!maxEligible || maxEligible <= 0) return
+    if (!collateralMax || collateralMax <= 0) return
     if (!selectedProduct) return
-    if (selectedCoMakers.length < minCoMakers) {
-      setCoMakerError(`At least ${minCoMakers} co-maker${minCoMakers > 1 ? 's are' : ' is'} required`)
+    if (coMakerRequired && selectedCoMakers.length === 0) {
+      setCoMakerError('A co-maker is required because your loan amount exceeds your own shares and savings')
       return
     }
     submittingRef.current = true
@@ -148,9 +153,11 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
     }
   }
 
+  // Collateral-based max (matches server approval formula)
+  const collateralMax = collateral?.total ?? maxEligible ?? 0
   const effectiveMax = selectedProduct?.max_amount
-    ? Math.min(maxEligible ?? Infinity, selectedProduct.max_amount)
-    : maxEligible ?? undefined
+    ? Math.min(collateralMax, selectedProduct.max_amount)
+    : collateralMax || undefined
 
   const monthlyPayment = previewAmount > 0 && previewTerm > 0
     ? calculateMonthlyPayment(previewAmount, interestRate, previewTerm, calcMethod, ratePeriod)
@@ -211,24 +218,38 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
       </div>
 
       {/* Eligibility banner */}
-      {maxEligible !== null && maxEligible <= 0 && (
+      {collateral !== undefined && collateral !== null && collateral.total <= 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-sm font-medium text-yellow-800">No completed equity shares</p>
+          <p className="text-sm font-medium text-yellow-800">Insufficient collateral</p>
           <p className="text-xs text-yellow-700 mt-0.5">
-            You must have at least one fully paid equity share to apply for a loan.
+            You need completed equity shares or savings to apply for a loan. Your maximum is based
+            on your shares value + savings balance + co-maker assets.
           </p>
         </div>
       )}
-      {maxEligible !== null && maxEligible > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-sm text-blue-800">
-            <span className="font-semibold">Maximum eligible:</span>{' '}
-            {currency(effectiveMax ?? maxEligible)}
+      {collateral !== undefined && collateral !== null && collateral.total > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1.5">
+          <p className="text-sm text-blue-800 font-semibold">
+            Maximum loan: {currency(effectiveMax ?? collateral.total)}
+            {selectedProduct?.max_amount && effectiveMax !== collateral.total
+              ? ' (capped by product limit)'
+              : ''}
           </p>
-          <p className="text-xs text-blue-600 mt-0.5">
-            Based on your completed equity shares and membership tenure
-            {selectedProduct?.max_amount ? ' (capped by product limit)' : ''}
-          </p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-blue-700">
+            <span>Your shares: <strong>{currency(collateral.borrowerShares)}</strong></span>
+            <span>Your savings: <strong>{currency(collateral.borrowerSavings)}</strong></span>
+            {coMakerIds.length > 0 && (
+              <>
+                <span>Co-maker shares: <strong>{currency(collateral.coMakerShares)}</strong></span>
+                <span>Co-maker savings: <strong>{currency(collateral.coMakerSavings)}</strong></span>
+              </>
+            )}
+          </div>
+          {coMakerIds.length === 0 && (
+            <p className="text-xs text-blue-600">
+              Adding a co-maker will increase your maximum based on their shares and savings.
+            </p>
+          )}
         </div>
       )}
 
@@ -282,11 +303,13 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
       {/* Co-makers */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Co-makers <span className="text-red-500">*</span>
-          <span className="text-xs font-normal text-gray-400 ml-1">(min {minCoMakers})</span>
+          Co-makers{coMakerRequired && <span className="text-red-500 ml-0.5">*</span>}
+          {!coMakerRequired && <span className="text-xs font-normal text-gray-400 ml-1">(optional)</span>}
         </label>
         <p className="text-xs text-gray-400 mb-2">
-          Your application will be submitted for admin review only after all co-makers confirm.
+          {coMakerRequired
+            ? 'Your loan amount exceeds your own shares and savings — a co-maker is required. Their assets will be added to your collateral.'
+            : 'Adding a co-maker is optional but increases your maximum loan amount. All selected co-makers must confirm before admin review.'}
         </p>
 
         {selectedCoMakers.length > 0 && (
@@ -368,8 +391,8 @@ export function LoanApplicationForm({ onSuccess, onCancel }: LoanApplicationForm
           disabled={
             isSubmitting ||
             createApplication.isPending ||
-            !maxEligible ||
-            maxEligible <= 0 ||
+            !collateralMax ||
+            collateralMax <= 0 ||
             !selectedProduct ||
             loanProducts.length === 0
           }

@@ -330,7 +330,7 @@ export function RegisterPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                     </svg>
                   </div>
-                  <input type="email" placeholder="you@example.com" autoComplete="email" {...register('email')}
+                  <input type="email" placeholder="you@gmail.com" autoComplete="email" {...register('email')}
                     className={`block w-full pl-10 pr-3.5 py-2.5 text-sm rounded-xl border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'}`} />
                 </div>
                 {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}

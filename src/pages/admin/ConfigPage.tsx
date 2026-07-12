@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { formatDateTime } from '../../lib/utils'
 import { useAuth } from '../../context/AuthContext'
 import type { SystemConfig, SystemConfigHistory } from '../../types'
+import { PageGuide } from '../../components/shared/PageGuide'
 
 // Keys managed in App Settings — exclude from System Config
 const APP_SETTINGS_KEYS = ['app_name', 'app_vision', 'app_mission', 'app_logo_url']
@@ -176,6 +177,15 @@ export function ConfigPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-6">
+        <PageGuide
+          storageKey="system-config"
+          steps={[
+            'System Config stores all cooperative-wide settings: share price, interest rates, minimum balances, etc.',
+            'Click a value to edit it. Changes take effect immediately for all new transactions.',
+            "All changes are logged with the editor's name and timestamp — see the History section below.",
+          ]}
+          note="Key values to know: share_price (cost per equity share), loan_interest_rate (3.33% monthly), savings_min_balance (₱500 must remain after withdrawal), equity_dividend_rate (annual dividend %)."
+        />
         {/* Config Table */}
         <Card>
           <CardHeader>

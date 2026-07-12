@@ -49,6 +49,7 @@ export interface Profile {
   emergency_contact_name: string | null
   emergency_contact_phone: string | null
   profile_completed_at: string | null
+  branch_id: string | null
   created_at: string
   updated_at: string
 }
@@ -301,4 +302,96 @@ export interface DepositRequest {
   rejection_reason: string | null
   created_at: string
   updated_at: string
+}
+
+// ─── F1: Equity Dividends ─────────────────────────────────────────────────────
+
+export interface EquityDividendLog {
+  id: string
+  share_id: string
+  user_id: string
+  share_value: number
+  dividend_earned: number
+  period_start: string
+  period_end: string
+  released_by: string | null
+  created_at: string
+}
+
+// ─── F3: Share Transfers ──────────────────────────────────────────────────────
+
+export interface ShareTransfer {
+  id: string
+  share_id: string
+  from_user_id: string
+  to_user_id: string
+  reason: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  reviewed_by: string | null
+  reviewed_at: string | null
+  rejection_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ─── F4: Damayan (Mutual Aid Fund) ───────────────────────────────────────────
+
+export interface DamayanEvent {
+  id: string
+  title: string
+  description: string | null
+  affected_member_id: string | null
+  event_date: string
+  assessment_amount: number
+  status: 'active' | 'closed'
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DamayanAssessment {
+  id: string
+  event_id: string
+  user_id: string
+  amount_due: number
+  amount_paid: number
+  status: 'pending' | 'paid' | 'waived'
+  paid_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ─── F5: Branches ─────────────────────────────────────────────────────────────
+
+export interface Branch {
+  id: string
+  name: string
+  location: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+// ─── F6: Rebates ──────────────────────────────────────────────────────────────
+
+export interface RebateRelease {
+  id: string
+  period_start: string
+  period_end: string
+  rebate_rate: number
+  total_amount: number
+  released_by: string
+  notes: string | null
+  created_at: string
+}
+
+export interface RebateLog {
+  id: string
+  release_id: string
+  user_id: string
+  interest_paid: number
+  rebate_rate: number
+  rebate_amount: number
+  created_at: string
 }

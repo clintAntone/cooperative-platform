@@ -4,6 +4,7 @@ import { useRolePermissions, useUpdateRolePermission } from '../../hooks/useRole
 import { STAFF_PERMISSIONS, MEMBER_PERMISSIONS, PERMISSION_LABELS } from '../../lib/permissions'
 import { SkeletonPage } from '../../components/shared/Skeleton'
 import type { PermissionKey } from '../../lib/permissions'
+import { PageGuide } from '../../components/shared/PageGuide'
 
 function Toggle({
   enabled,
@@ -75,6 +76,15 @@ export function PermissionsPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-6">
+        <PageGuide
+          storageKey="permissions"
+          steps={[
+            'Permissions define what each role (admin, staff, collector, member) can see and do.',
+            'Admin has full access. Staff can approve transactions but cannot change config or roles. Collector can create batch deposits.',
+            'Review this page to understand who can perform which action before assigning roles to users.',
+          ]}
+          note="Permissions are enforced server-side via Row Level Security (RLS) policies — changing this display does not change database access."
+        />
         {/* Info banner */}
         <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
           <svg

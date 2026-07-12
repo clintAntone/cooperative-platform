@@ -49,7 +49,7 @@ export function useLoans(userId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loans')
-        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at, updated_at')
+        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at')
         .eq('user_id', targetId!)
         .order('created_at', { ascending: false })
 
@@ -66,7 +66,7 @@ export function useLoan(loanId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loans')
-        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at, updated_at')
+        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at')
         .eq('id', loanId)
         .single()
 

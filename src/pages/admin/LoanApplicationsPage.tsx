@@ -4,6 +4,7 @@ import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { exportToExcel } from '../../lib/exportExcel'
+import { PageGuide } from '../../components/shared/PageGuide'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { SkeletonPage } from '../../components/shared/Skeleton'
@@ -157,6 +158,16 @@ export function LoanApplicationsPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-6">
+        <PageGuide
+          storageKey="loan-applications"
+          steps={[
+            'Members submit loan applications with an amount, term, purpose, and at least one co-maker (if amount exceeds their own collateral).',
+            'Co-makers must confirm their role before the application can be approved — check the co-maker status column.',
+            "Click 'Review' to open the application detail, verify collateral, then Approve or Reject.",
+            'On approval, a loan record is created, a repayment schedule is generated, and a ledger disbursement entry is posted.',
+          ]}
+          note="The maximum loan amount is automatically enforced: borrower's completed shares value + savings + confirmed co-maker assets. Approval will fail if the amount exceeds this."
+        />
         {/* Tabs */}
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-max min-w-full sm:w-fit">

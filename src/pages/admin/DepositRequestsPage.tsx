@@ -19,6 +19,7 @@ import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate } from '../../lib/utils'
 import { cn } from '../../lib/utils'
 import { exportToExcel } from '../../lib/exportExcel'
+import { PageGuide } from '../../components/shared/PageGuide'
 
 type TabValue = 'all' | 'pending' | 'approved' | 'rejected'
 
@@ -200,6 +201,16 @@ export function DepositRequestsPage() {
       />
 
       <div className="p-4 sm:p-6 space-y-4">
+        <PageGuide
+          storageKey="deposit-requests"
+          steps={[
+            'Members submit a deposit request when they pay their equity share installment (cash, bank transfer, or mobile money).',
+            "Review the payment reference and receipt, then click Approve to record the contribution and credit the member's share.",
+            'Click Reject to decline the request with a required reason — the member will see this reason.',
+            "Approved deposits automatically update the member's share balance and create a ledger entry.",
+          ]}
+          note="If a share reaches its target amount after approval, it is automatically marked as 'completed' and a savings account is opened for the member."
+        />
         {/* Filter tabs */}
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-max min-w-full sm:w-fit">
