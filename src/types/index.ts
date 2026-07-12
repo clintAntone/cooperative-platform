@@ -368,6 +368,7 @@ export interface Branch {
   name: string
   location: string | null
   is_active: boolean
+  report_cutoff_day: number  // 0=Sun, 1=Mon, ..., 6=Sat
   created_at: string
   updated_at: string
 }

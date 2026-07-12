@@ -55,8 +55,24 @@ export function BranchesPage() {
   // Per-branch tab state: 'income' | 'expenses'
   const [branchTab, setBranchTab] = useState<Record<string, 'income' | 'expenses'>>({})
 
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+  // Returns the most recent completed week [start, end] based on cutoff day
+  const getLastWeekPeriod = (cutoffDay: number): { start: string; end: string } => {
+    const today = new Date()
+    const todayDay = today.getDay()
+    // Days since last cutoff
+    const daysSinceCutoff = (todayDay - cutoffDay + 7) % 7 || 7
+    const periodEnd = new Date(today)
+    periodEnd.setDate(today.getDate() - daysSinceCutoff)
+    const periodStart = new Date(periodEnd)
+    periodStart.setDate(periodEnd.getDate() - 6)
+    const fmt = (d: Date) => d.toISOString().split('T')[0]
+    return { start: fmt(periodStart), end: fmt(periodEnd) }
+  }
+
   const [form, setForm] = useState({ name: '', location: '' })
-  const [editForm, setEditForm] = useState({ name: '', location: '', is_active: true })
+  const [editForm, setEditForm] = useState({ name: '', location: '', is_active: true, report_cutoff_day: 0 })
   const [incomeForm, setIncomeForm] = useState({
     gross_sales: '',
     salary: '',
@@ -88,7 +104,7 @@ export function BranchesPage() {
   const handleEdit = () => {
     if (!editTarget || !editForm.name.trim()) return
     updateBranch.mutate(
-      { id: editTarget.id, name: editForm.name.trim(), location: editForm.location.trim() || null, is_active: editForm.is_active },
+      { id: editTarget.id, name: editForm.name.trim(), location: editForm.location.trim() || null, is_active: editForm.is_active, report_cutoff_day: editForm.report_cutoff_day },
       {
         onSuccess: () => setEditTarget(null),
         onError: (err: any) => alert(err.message ?? 'Failed to update branch'),
@@ -213,27 +229,25 @@ export function BranchesPage() {
                         </span>
                       </div>
                       {branch.location && <p className="text-xs text-gray-500 mt-0.5">{branch.location}</p>}
+                      <p className="text-xs text-gray-400 mt-0.5">Cutoff: {DAY_NAMES[branch.report_cutoff_day ?? 0]}s</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Button
                         size="sm"
-                        onClick={() => setShowRecordIncome(branch)}
+                        onClick={() => {
+                          const { start, end } = getLastWeekPeriod(branch.report_cutoff_day ?? 0)
+                          setIncomeForm(f => ({ ...f, period_start: start, period_end: end }))
+                          setShowRecordIncome(branch)
+                        }}
                       >
                         Record Income
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setShowRecordExpense(branch)}
-                      >
-                        Add Expense
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
                         onClick={() => {
                           setEditTarget(branch)
-                          setEditForm({ name: branch.name, location: branch.location ?? '', is_active: branch.is_active })
+                          setEditForm({ name: branch.name, location: branch.location ?? '', is_active: branch.is_active, report_cutoff_day: branch.report_cutoff_day ?? 0 })
                         }}
                       >
                         Edit
@@ -403,6 +417,21 @@ export function BranchesPage() {
               onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Weekly Report Cutoff Day</label>
+            <select
+              value={editForm.report_cutoff_day}
+              onChange={e => setEditForm(f => ({ ...f, report_cutoff_day: parseInt(e.target.value) }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              {DAY_NAMES.map((day, i) => (
+                <option key={i} value={i}>{day}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              The week ends on this day. "Record Income" will auto-fill the most recent completed week.
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
             <input

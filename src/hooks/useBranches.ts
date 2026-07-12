@@ -12,7 +12,7 @@ export function useBranches() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('branches')
-        .select('id, name, location, is_active, created_at, updated_at')
+        .select('id, name, location, is_active, report_cutoff_day, created_at, updated_at')
         .order('name', { ascending: true })
       if (error) throw error
       return data as Branch[]
@@ -26,7 +26,7 @@ export function useActiveBranches() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('branches')
-        .select('id, name, location, is_active, created_at, updated_at')
+        .select('id, name, location, is_active, report_cutoff_day, created_at, updated_at')
         .eq('is_active', true)
         .order('name', { ascending: true })
       if (error) throw error
@@ -42,7 +42,7 @@ export function useCreateBranch() {
       const { data, error } = await supabase
         .from('branches')
         .insert({ name: params.name, location: params.location })
-        .select('id, name, location, is_active, created_at, updated_at')
+        .select('id, name, location, is_active, report_cutoff_day, created_at, updated_at')
         .single()
       if (error) throw error
       return data as Branch
@@ -57,12 +57,12 @@ export function useCreateBranch() {
 export function useUpdateBranch() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (params: { id: string; name: string; location: string | null; is_active: boolean }) => {
+    mutationFn: async (params: { id: string; name: string; location: string | null; is_active: boolean; report_cutoff_day: number }) => {
       const { data, error } = await supabase
         .from('branches')
-        .update({ name: params.name, location: params.location, is_active: params.is_active, updated_at: new Date().toISOString() })
+        .update({ name: params.name, location: params.location, is_active: params.is_active, report_cutoff_day: params.report_cutoff_day, updated_at: new Date().toISOString() })
         .eq('id', params.id)
-        .select('id, name, location, is_active, created_at, updated_at')
+        .select('id, name, location, is_active, report_cutoff_day, created_at, updated_at')
         .single()
       if (error) throw error
       return data as Branch
