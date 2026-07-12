@@ -417,3 +417,17 @@ export interface BranchIncomeDistribution {
   amount: number
   created_at: string
 }
+
+export type ExpenseCategory = 'salary' | 'utilities' | 'rent' | 'supplies' | 'maintenance' | 'other'
+
+export interface BranchExpense {
+  id: string
+  branch_id: string
+  category: ExpenseCategory
+  amount: number
+  period_start: string
+  period_end: string
+  description: string | null
+  recorded_by: string
+  created_at: string
+}

@@ -83,6 +83,7 @@ const RebatesPage = lazy(() => import('./pages/admin/RebatesPage').then(m => ({ 
 
 // Member cooperative pages
 const DamayanPage = lazy(() => import('./pages/damayan/DamayanPage').then(m => ({ default: m.DamayanPage })))
+const BranchKPIPage = lazy(() => import('./pages/branches/BranchKPIPage').then(m => ({ default: m.BranchKPIPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -139,6 +140,7 @@ export default function App() {
                 <Route path="/savings/deposit-request" element={<ErrorBoundary><SavingsDepositRequestPage /></ErrorBoundary>} />
                 <Route path="/savings/withdraw" element={<ErrorBoundary><SavingsWithdrawPage /></ErrorBoundary>} />
                 <Route path="/damayan" element={<ErrorBoundary><DamayanPage /></ErrorBoundary>} />
+                <Route path="/branches" element={<ErrorBoundary><BranchKPIPage /></ErrorBoundary>} />
               </Route>
 
               {/* Collector only */}
@@ -150,6 +152,7 @@ export default function App() {
               {/* Admin + Staff */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
                 <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
+                <Route path="/branches" element={<ErrorBoundary><BranchKPIPage /></ErrorBoundary>} />
                 <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
                 <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
                 <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />

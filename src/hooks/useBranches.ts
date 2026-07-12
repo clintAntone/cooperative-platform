@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useEffectiveUserId } from '../context/ImpersonationContext'
 import { toast } from '../lib/toast'
-import type { Branch, BranchIncome, BranchIncomeDistribution } from '../types'
+import type { Branch, BranchIncome, BranchIncomeDistribution, BranchExpense } from '../types'
 
 // ─── Branches ─────────────────────────────────────────────────────────────────
 
@@ -147,6 +147,50 @@ export function useDistributeBranchIncome() {
       queryClient.invalidateQueries({ queryKey: ['branch_income_distributions'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       toast({ title: 'Income distributed to all shareholders', variant: 'success' })
+    },
+  })
+}
+
+// ─── Branch expenses ──────────────────────────────────────────────────────────
+
+export function useAllBranchExpenses() {
+  return useQuery({
+    queryKey: ['branch_expenses_all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('branch_expenses')
+        .select('id, branch_id, category, amount, period_start, period_end, description, recorded_by, created_at')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as BranchExpense[]
+    },
+  })
+}
+
+export function useRecordBranchExpense() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (params: {
+      branchId: string
+      category: string
+      amount: number
+      periodStart: string
+      periodEnd: string
+      description?: string
+    }) => {
+      const { error } = await supabase.rpc('record_branch_expense', {
+        p_branch_id: params.branchId,
+        p_category: params.category,
+        p_amount: params.amount,
+        p_period_start: params.periodStart,
+        p_period_end: params.periodEnd,
+        p_description: params.description ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['branch_expenses_all'] })
+      toast({ title: 'Expense recorded', variant: 'success' })
     },
   })
 }

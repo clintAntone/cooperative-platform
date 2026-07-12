@@ -10,29 +10,61 @@ import {
   useAllBranchIncome,
   useRecordBranchIncome,
   useDistributeBranchIncome,
+  useAllBranchExpenses,
+  useRecordBranchExpense,
 } from '../../hooks/useBranches'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate } from '../../lib/utils'
 import { PageGuide } from '../../components/shared/PageGuide'
-import type { Branch, BranchIncome } from '../../types'
+import type { Branch, BranchIncome, ExpenseCategory } from '../../types'
+
+const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
+  { value: 'salary', label: 'Salary' },
+  { value: 'utilities', label: 'Utilities' },
+  { value: 'rent', label: 'Rent' },
+  { value: 'supplies', label: 'Supplies' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'other', label: 'Other' },
+]
+
+const categoryBadgeColors: Record<ExpenseCategory, string> = {
+  salary: 'bg-purple-100 text-purple-700',
+  utilities: 'bg-blue-100 text-blue-700',
+  rent: 'bg-orange-100 text-orange-700',
+  supplies: 'bg-yellow-100 text-yellow-700',
+  maintenance: 'bg-red-100 text-red-700',
+  other: 'bg-gray-100 text-gray-600',
+}
 
 export function BranchesPage() {
   const { format: currency } = useCurrency()
   const { data: branches = [], isLoading } = useBranches()
   const { data: allIncome = [] } = useAllBranchIncome()
+  const { data: allExpenses = [] } = useAllBranchExpenses()
   const createBranch = useCreateBranch()
   const updateBranch = useUpdateBranch()
   const recordIncome = useRecordBranchIncome()
   const distribute = useDistributeBranchIncome()
+  const recordExpense = useRecordBranchExpense()
 
   const [showCreate, setShowCreate] = useState(false)
   const [editTarget, setEditTarget] = useState<Branch | null>(null)
   const [showRecordIncome, setShowRecordIncome] = useState<Branch | null>(null)
+  const [showRecordExpense, setShowRecordExpense] = useState<Branch | null>(null)
   const [distributeTarget, setDistributeTarget] = useState<BranchIncome | null>(null)
+  // Per-branch tab state: 'income' | 'expenses'
+  const [branchTab, setBranchTab] = useState<Record<string, 'income' | 'expenses'>>({})
 
   const [form, setForm] = useState({ name: '', location: '' })
   const [editForm, setEditForm] = useState({ name: '', location: '', is_active: true })
   const [incomeForm, setIncomeForm] = useState({
+    amount: '',
+    period_start: '',
+    period_end: '',
+    description: '',
+  })
+  const [expenseForm, setExpenseForm] = useState({
+    category: 'other' as ExpenseCategory,
     amount: '',
     period_start: '',
     period_end: '',
@@ -81,8 +113,36 @@ export function BranchesPage() {
     )
   }
 
+  const handleRecordExpense = () => {
+    if (!showRecordExpense || !expenseForm.amount || !expenseForm.period_start || !expenseForm.period_end) return
+    recordExpense.mutate(
+      {
+        branchId: showRecordExpense.id,
+        category: expenseForm.category,
+        amount: parseFloat(expenseForm.amount),
+        periodStart: expenseForm.period_start,
+        periodEnd: expenseForm.period_end,
+        description: expenseForm.description.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setShowRecordExpense(null)
+          setExpenseForm({ category: 'other', amount: '', period_start: '', period_end: '', description: '' })
+        },
+        onError: (err: any) => alert(err.message ?? 'Failed to record expense'),
+      }
+    )
+  }
+
   const incomeByBranch = (branchId: string) =>
     allIncome.filter(i => i.branch_id === branchId)
+
+  const expensesByBranch = (branchId: string) =>
+    allExpenses.filter(e => e.branch_id === branchId)
+
+  const getTab = (branchId: string) => branchTab[branchId] ?? 'income'
+  const setTab = (branchId: string, tab: 'income' | 'expenses') =>
+    setBranchTab(prev => ({ ...prev, [branchId]: tab }))
 
   return (
     <div>
@@ -96,7 +156,8 @@ export function BranchesPage() {
           storageKey="branches"
           steps={[
             'Branches are businesses owned and operated by the cooperative (e.g., a sari-sari store, a farm, a transport service).',
-            'Create a branch, then record its net income each period (monthly, quarterly, etc.).',
+            'Create a branch, then record its gross income and expenses each period (monthly, quarterly, etc.).',
+            'Net Profit = Gross Revenue minus Total Expenses. Profit Margin shows what percentage of revenue is kept as profit.',
             "Click 'Distribute' on an income record to divide it among all shareholders. The system counts total completed shares across all active members, then gives each member their proportional cut.",
             'Example: ₱100,000 income ÷ 100 total completed shares = ₱1,000 per share. A member with 3 completed shares receives ₱3,000.',
             'Distributions are credited to each member\'s savings account and recorded in the ledger.',
@@ -120,8 +181,12 @@ export function BranchesPage() {
           <div className="space-y-4">
             {branches.map(branch => {
               const income = incomeByBranch(branch.id)
+              const expenses = expensesByBranch(branch.id)
               const totalIncome = income.reduce((s, i) => s + i.amount, 0)
-              const totalDistributed = income.filter(i => i.distributed).reduce((s, i) => s + i.amount, 0)
+              const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
+              const netProfit = totalIncome - totalExpenses
+              const profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : null
+              const activeTab = getTab(branch.id)
 
               return (
                 <Card key={branch.id}>
@@ -130,9 +195,9 @@ export function BranchesPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-semibold text-gray-900">{branch.name}</h3>
-                        {!branch.is_active && (
-                          <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Inactive</span>
-                        )}
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${branch.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {branch.is_active ? 'Active' : 'Inactive'}
+                        </span>
                       </div>
                       {branch.location && <p className="text-xs text-gray-500 mt-0.5">{branch.location}</p>}
                     </div>
@@ -142,6 +207,13 @@ export function BranchesPage() {
                         onClick={() => setShowRecordIncome(branch)}
                       >
                         Record Income
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowRecordExpense(branch)}
+                      >
+                        Add Expense
                       </Button>
                       <Button
                         size="sm"
@@ -156,52 +228,104 @@ export function BranchesPage() {
                     </div>
                   </div>
 
-                  {/* Income summary */}
-                  <div className="px-4 py-2 grid grid-cols-2 sm:grid-cols-3 gap-3 border-b border-gray-100 bg-gray-50 text-xs">
+                  {/* KPI summary row */}
+                  <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 border-b border-gray-100 bg-gray-50 text-xs">
                     <div>
-                      <p className="text-gray-500">Total Income Recorded</p>
+                      <p className="text-gray-500">Gross Revenue</p>
                       <p className="font-semibold text-gray-900">{currency(totalIncome)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Total Distributed</p>
-                      <p className="font-semibold text-green-700">{currency(totalDistributed)}</p>
+                      <p className="text-gray-500">Total Expenses</p>
+                      <p className="font-semibold text-red-600">{currency(totalExpenses)}</p>
                     </div>
                     <div>
-                      <p className="text-gray-500">Pending Distribution</p>
-                      <p className="font-semibold text-orange-600">{currency(totalIncome - totalDistributed)}</p>
+                      <p className="text-gray-500">Net Profit</p>
+                      <p className={`font-semibold ${netProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                        {currency(netProfit)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Profit Margin</p>
+                      <p className={`font-semibold ${profitMargin === null ? 'text-gray-400' : profitMargin >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                        {profitMargin === null ? '—' : `${profitMargin.toFixed(1)}%`}
+                      </p>
                     </div>
                   </div>
 
+                  {/* Tabs */}
+                  <div className="flex border-b border-gray-100 bg-white">
+                    <button
+                      className={`px-4 py-2 text-xs font-medium transition-colors ${activeTab === 'income' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => setTab(branch.id, 'income')}
+                    >
+                      Income ({income.length})
+                    </button>
+                    <button
+                      className={`px-4 py-2 text-xs font-medium transition-colors ${activeTab === 'expenses' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                      onClick={() => setTab(branch.id, 'expenses')}
+                    >
+                      Expenses ({expenses.length})
+                    </button>
+                  </div>
+
                   {/* Income records */}
-                  {income.length === 0 ? (
-                    <p className="px-4 py-3 text-xs text-gray-400 italic">No income recorded yet.</p>
-                  ) : (
-                    <div className="divide-y divide-gray-50">
-                      {income.map(inc => (
-                        <div key={inc.id} className="px-4 py-3 flex items-center gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900">{currency(inc.amount)}</p>
-                            <p className="text-xs text-gray-500">
-                              {formatDate(inc.period_start)} – {formatDate(inc.period_end)}
-                              {inc.description && ` · ${inc.description}`}
-                            </p>
+                  {activeTab === 'income' && (
+                    income.length === 0 ? (
+                      <p className="px-4 py-3 text-xs text-gray-400 italic">No income recorded yet.</p>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {income.map(inc => (
+                          <div key={inc.id} className="px-4 py-3 flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">{currency(inc.amount)}</p>
+                              <p className="text-xs text-gray-500">
+                                {formatDate(inc.period_start)} – {formatDate(inc.period_end)}
+                                {inc.description && ` · ${inc.description}`}
+                              </p>
+                            </div>
+                            {inc.distributed ? (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium shrink-0">
+                                Distributed
+                              </span>
+                            ) : (
+                              <Button
+                                size="sm"
+                                className="shrink-0 bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() => setDistributeTarget(inc)}
+                              >
+                                Distribute
+                              </Button>
+                            )}
                           </div>
-                          {inc.distributed ? (
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium shrink-0">
-                              Distributed
-                            </span>
-                          ) : (
-                            <Button
-                              size="sm"
-                              className="shrink-0 bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => setDistributeTarget(inc)}
-                            >
-                              Distribute
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )
+                  )}
+
+                  {/* Expense records */}
+                  {activeTab === 'expenses' && (
+                    expenses.length === 0 ? (
+                      <p className="px-4 py-3 text-xs text-gray-400 italic">No expenses recorded yet.</p>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {expenses.map(exp => (
+                          <div key={exp.id} className="px-4 py-3 flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium capitalize ${categoryBadgeColors[exp.category]}`}>
+                                  {exp.category}
+                                </span>
+                                <p className="text-sm font-medium text-gray-900">{currency(exp.amount)}</p>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {formatDate(exp.period_start)} – {formatDate(exp.period_end)}
+                                {exp.description && ` · ${exp.description}`}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
                   )}
                 </Card>
               )
@@ -338,6 +462,82 @@ export function BranchesPage() {
               loading={recordIncome.isPending}
               disabled={!incomeForm.amount || !incomeForm.period_start || !incomeForm.period_end}
               onClick={handleRecordIncome}
+            >
+              Record
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Record expense modal */}
+      <Modal
+        isOpen={!!showRecordExpense}
+        onClose={() => setShowRecordExpense(null)}
+        title={`Add Expense — ${showRecordExpense?.name ?? ''}`}
+        size="sm"
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category <span className="text-red-500">*</span></label>
+            <select
+              value={expenseForm.category}
+              onChange={e => setExpenseForm(f => ({ ...f, category: e.target.value as ExpenseCategory }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {EXPENSE_CATEGORIES.map(cat => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Amount <span className="text-red-500">*</span></label>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={expenseForm.amount}
+              onChange={e => setExpenseForm(f => ({ ...f, amount: e.target.value }))}
+              placeholder="0.00"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Period Start <span className="text-red-500">*</span></label>
+              <input
+                type="date"
+                value={expenseForm.period_start}
+                onChange={e => setExpenseForm(f => ({ ...f, period_start: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Period End <span className="text-red-500">*</span></label>
+              <input
+                type="date"
+                value={expenseForm.period_end}
+                onChange={e => setExpenseForm(f => ({ ...f, period_end: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+            <input
+              type="text"
+              value={expenseForm.description}
+              onChange={e => setExpenseForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="e.g. March salaries"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => setShowRecordExpense(null)}>Cancel</Button>
+            <Button
+              className="flex-1"
+              loading={recordExpense.isPending}
+              disabled={!expenseForm.amount || !expenseForm.period_start || !expenseForm.period_end}
+              onClick={handleRecordExpense}
             >
               Record
             </Button>
