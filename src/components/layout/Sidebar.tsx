@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useImpersonation } from '../../context/ImpersonationContext'
 import { usePendingCoMakerCount } from '../../hooks/useLoans'
@@ -444,6 +444,7 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
   const { data: pendingCoMakerCount = 0 } = usePendingCoMakerCount()
   const { data: pendingDepositCount = 0 } = usePendingDepositCount()
   const [confirmSignOut, setConfirmSignOut] = React.useState(false)
+  const location = useLocation()
 
   // When impersonating, show the nav for the impersonated user's role
   const effectiveRole = impersonatedUser?.role ?? profile?.role
@@ -453,11 +454,32 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
       if (!group.roles) return true
       return effectiveRole && group.roles.includes(effectiveRole)
     })
-    .map(group => ({
-      ...group,
-      items: group.items, // all items in a visible group are visible
-    }))
     .filter(group => group.items.length > 0)
+
+  // Collapsed state per group label, persisted in localStorage
+  const storageKey = 'sidebar_collapsed_groups'
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? '{}') }
+    catch { return {} }
+  })
+
+  // Auto-expand the group containing the active route
+  useEffect(() => {
+    const activeGroup = visibleGroups.find(g =>
+      g.items.some(item => location.pathname === item.path || location.pathname.startsWith(item.path + '/'))
+    )
+    if (activeGroup && collapsed[activeGroup.label]) {
+      setCollapsed(prev => ({ ...prev, [activeGroup.label]: false }))
+    }
+  }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleGroup = useCallback((label: string) => {
+    setCollapsed(prev => {
+      const next = { ...prev, [label]: !prev[label] }
+      localStorage.setItem(storageKey, JSON.stringify(next))
+      return next
+    })
+  }, [])
 
   return (
     <aside className={`flex flex-col w-64 bg-gray-900 text-white overflow-y-auto
@@ -509,45 +531,67 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-4">
-        {visibleGroups.map(group => (
-          <div key={group.label}>
-            <p className="px-3 mb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              {group.label}
-            </p>
-            <div className="space-y-0.5">
-              {group.items.map(item => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                    )
-                  }
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {visibleGroups.map(group => {
+          const isCollapsed = !!collapsed[group.label]
+          const hasActive = group.items.some(item =>
+            location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+          )
+          return (
+            <div key={group.label}>
+              <button
+                onClick={() => toggleGroup(group.label)}
+                className={cn(
+                  'w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors',
+                  hasActive && isCollapsed
+                    ? 'text-blue-400 hover:text-blue-300'
+                    : 'text-gray-500 hover:text-gray-300'
+                )}
+              >
+                <span>{group.label}</span>
+                <svg
+                  className={cn('w-3 h-3 transition-transform duration-200', isCollapsed ? '-rotate-90' : '')}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
                 >
-                  {item.icon}
-                  <span className="flex-1">{item.label}</span>
-                  {item.path === '/lending' && pendingCoMakerCount > 0 && (
-                    <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                      {pendingCoMakerCount}
-                    </span>
-                  )}
-                  {item.path === '/admin/deposit-requests' && pendingDepositCount > 0 && (
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400" />
-                    </span>
-                  )}
-                </NavLink>
-              ))}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {!isCollapsed && (
+                <div className="mt-0.5 mb-2 space-y-0.5">
+                  {group.items.map(item => (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      end={item.end}
+                      className={({ isActive }) =>
+                        cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                        )
+                      }
+                    >
+                      {item.icon}
+                      <span className="flex-1">{item.label}</span>
+                      {item.path === '/lending' && pendingCoMakerCount > 0 && (
+                        <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                          {pendingCoMakerCount}
+                        </span>
+                      )}
+                      {item.path === '/admin/deposit-requests' && pendingDepositCount > 0 && (
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400" />
+                        </span>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* User info and sign out */}
