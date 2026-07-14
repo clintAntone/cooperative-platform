@@ -39,7 +39,7 @@ export function useMonthlyNewMembers() {
       const { data, error } = await supabase
         .from('profiles')
         .select('created_at')
-        .eq('role', 'member')
+        .in('role', ['member', 'collector'])
         .gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: true })
       if (error) throw error
