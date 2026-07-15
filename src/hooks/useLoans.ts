@@ -25,13 +25,32 @@ export function useLoanApplications(userId?: string) {
   })
 }
 
-export function useAllLoanApplications() {
+export function useLoanApplication(applicationId: string) {
   return useQuery({
-    queryKey: ['all_loan_applications'],
+    queryKey: ['loan_application', applicationId],
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loan_applications')
-        .select('*, profiles(full_name)')
+        .select('*, profiles!loan_applications_user_id_fkey(id, full_name, phone, role, account_status, employee_id)')
+        .eq('id', applicationId)
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    enabled: !!applicationId,
+  })
+}
+
+export function useAllLoanApplications() {
+  return useQuery({
+    queryKey: ['all_loan_applications'],
+    staleTime: 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loan_applications')
+        .select('*, profiles!loan_applications_user_id_fkey(full_name)')
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -49,7 +68,7 @@ export function useLoans(userId?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loans')
-        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at')
+        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, repayment_frequency, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at')
         .eq('user_id', targetId!)
         .order('created_at', { ascending: false })
 
@@ -66,7 +85,7 @@ export function useLoan(loanId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loans')
-        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at')
+        .select('id, application_id, user_id, principal, interest_rate, term_months, calculation_method, repayment_frequency, total_repayable, amount_paid, outstanding, status, disbursed_at, due_date, created_at')
         .eq('id', loanId)
         .single()
 
@@ -82,7 +101,7 @@ export function useLoanSchedule(loanId: string) {
     queryKey: ['loan_schedule', loanId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('loan_repayment_schedule')
+        .from('loan_repayment_schedules')
         .select('id, loan_id, installment_no, due_date, principal_due, interest_due, total_due, amount_paid, status, paid_at')
         .eq('loan_id', loanId)
         .order('installment_no', { ascending: true })
@@ -125,6 +144,10 @@ export function useCreateLoanApplication() {
 
   return useMutation({
     mutationFn: async (input: LoanApplicationInput) => {
+      // If co-makers are required, stay in draft until they confirm.
+      // If no co-makers, go straight to submitted for admin review.
+      const initialStatus = input.co_maker_ids.length > 0 ? 'draft' : 'submitted'
+
       const { data, error } = await supabase
         .from('loan_applications')
         .insert({
@@ -133,7 +156,7 @@ export function useCreateLoanApplication() {
           purpose: input.purpose,
           term_months: input.term_months,
           loan_product_id: input.loan_product_id ?? null,
-          status: 'draft',
+          status: initialStatus,
         })
         .select()
         .single()
@@ -155,10 +178,32 @@ export function useCreateLoanApplication() {
 
       return data as LoanApplication
     },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['loan_applications'] })
+      queryClient.invalidateQueries({ queryKey: ['all_loan_applications'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      const msg = variables.co_maker_ids.length > 0
+        ? 'Waiting for co-maker confirmation before admin review'
+        : 'Your application has been submitted for admin review'
+      toast({ title: 'Application submitted', description: msg, variant: 'success' })
+    },
+  })
+}
+
+export function useCancelLoanApplication() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (applicationId: string) => {
+      const { error } = await supabase.rpc('cancel_loan_application', {
+        p_application_id: applicationId,
+      })
+      if (error) throw error
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['loan_applications'] })
+      queryClient.invalidateQueries({ queryKey: ['all_loan_applications'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast({ title: 'Application submitted', description: 'Waiting for co-maker confirmation', variant: 'success' })
+      toast({ title: 'Application cancelled', variant: 'success' })
     },
   })
 }
@@ -199,22 +244,16 @@ interface RecordRepaymentInput {
 
 export function useRecordRepayment() {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
 
   return useMutation({
     mutationFn: async (input: RecordRepaymentInput) => {
-      const { data, error } = await supabase
-        .from('loan_repayments')
-        .insert({
-          loan_id: input.loan_id,
-          schedule_id: input.schedule_id ?? null,
-          amount: input.amount,
-          payment_method: input.payment_method,
-          reference: input.reference ?? null,
-          recorded_by: user!.id,
-        })
-        .select()
-        .single()
+      const { data, error } = await supabase.rpc('record_loan_repayment', {
+        p_loan_id: input.loan_id,
+        p_schedule_id: input.schedule_id ?? null,
+        p_amount: input.amount,
+        p_payment_method: input.payment_method,
+        p_reference: input.reference ?? null,
+      })
 
       if (error) throw error
       return data
@@ -329,6 +368,9 @@ export function useAdminApproveLoan() {
       queryClient.invalidateQueries({ queryKey: ['member_list_report'] })
       toast({ title: 'Loan approved', variant: 'success' })
     },
+    onError: (err: any) => {
+      toast({ title: err?.message ?? 'Failed to approve loan', variant: 'error' })
+    },
   })
 }
 
@@ -347,6 +389,9 @@ export function useAdminRejectLoan() {
       queryClient.invalidateQueries({ queryKey: ['loan_applications'] })
       toast({ title: 'Loan application rejected', variant: 'info' })
     },
+    onError: (err: any) => {
+      toast({ title: err?.message ?? 'Failed to reject loan', variant: 'error' })
+    },
   })
 }
 
@@ -361,6 +406,10 @@ export function useAdminSetUnderReview() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all_loan_applications'] })
+      toast({ title: 'Application moved to Under Review', variant: 'success' })
+    },
+    onError: (err: any) => {
+      toast({ title: err?.message ?? 'Failed to update status', variant: 'error' })
     },
   })
 }
@@ -373,7 +422,7 @@ export function useLoanProducts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loan_products')
-        .select('id, name, description, interest_rate, min_amount, max_amount, min_term_months, max_term_months, calculation_method, is_active, created_at, created_by')
+        .select('id, name, description, interest_rate, interest_rate_period, calculation_method, repayment_frequency, min_amount, max_amount, min_term_months, max_term_months, is_active, created_at, created_by, processing_fee_type, processing_fee_value, insurance_type, insurance_value, service_fee_type, service_fee_value, cbu_type, cbu_value')
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as LoanProduct[]

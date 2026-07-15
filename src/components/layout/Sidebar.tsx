@@ -6,7 +6,60 @@ import { useImpersonation } from '../../context/ImpersonationContext'
 import { usePendingCoMakerCount } from '../../hooks/useLoans'
 import { usePendingDepositCount } from '../../hooks/useDepositRequests'
 import { useAppBranding } from '../../hooks/useAppBranding'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
+
+const PINNED_KEY = 'sidebar_pinned_items'
+
+function loadPinned(): string[] {
+  try { return JSON.parse(localStorage.getItem(PINNED_KEY) ?? '[]') } catch { return [] }
+}
+function savePinned(paths: string[]) {
+  localStorage.setItem(PINNED_KEY, JSON.stringify(paths))
+}
+
+export function usePendingSavingsDepositCount() {
+  return useQuery({
+    queryKey: ['pending_savings_deposit_count'],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('savings_deposit_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+      return count ?? 0
+    },
+    staleTime: 30_000,
+  })
+}
+
+export function usePendingMemberDepositCount() {
+  return useQuery({
+    queryKey: ['pending_member_deposit_count'],
+    queryFn: async () => {
+      const [{ count: sharesCount }, { count: savingsCount }] = await Promise.all([
+        supabase.from('equity_deposit_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('savings_deposit_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      ])
+      return (sharesCount ?? 0) + (savingsCount ?? 0)
+    },
+    staleTime: 30_000,
+  })
+}
+
+export function usePendingLoanApplicationCount() {
+  return useQuery({
+    queryKey: ['pending_loan_application_count'],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('loan_applications')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['submitted', 'under_review'])
+      return count ?? 0
+    },
+    staleTime: 30_000,
+  })
+}
 
 interface NavItem {
   path: string
@@ -26,7 +79,7 @@ const navGroups: NavGroup[] = [
   // Member nav
   {
     label: 'Overview',
-    roles: ['member', 'collector'],
+    roles: ['member'],
     items: [
       {
         path: '/dashboard',
@@ -35,16 +88,6 @@ const navGroups: NavGroup[] = [
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-        ),
-      },
-      {
-        path: '/membership',
-        label: 'Membership',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
           </svg>
         ),
       },
@@ -61,8 +104,8 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Finances',
-    roles: ['member', 'collector'],
+    label: 'My Accounts',
+    roles: ['member'],
     items: [
       {
         path: '/equity',
@@ -85,14 +128,19 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
+    ],
+  },
+  {
+    label: 'Cooperative',
+    roles: ['member'],
+    items: [
       {
-        path: '/lending',
-        label: 'Loan',
-        end: true,
+        path: '/membership',
+        label: 'Membership',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
           </svg>
         ),
       },
@@ -120,10 +168,26 @@ const navGroups: NavGroup[] = [
       },
     ],
   },
-
+  {
+    label: 'Loans',
+    roles: ['member'],
+    items: [
+      {
+        path: '/lending',
+        label: 'My Loans',
+        end: true,
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        ),
+      },
+    ],
+  },
   {
     label: 'Help',
-    roles: ['member', 'collector'],
+    roles: ['member'],
     items: [
       {
         path: '/rules',
@@ -154,22 +218,13 @@ const navGroups: NavGroup[] = [
     roles: ['board'],
     items: [
       {
-        path: '/reports',
-        label: 'Reports',
+        path: '/overview',
+        label: 'Overview',
+        end: true,
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        ),
-      },
-      {
-        path: '/branches',
-        label: 'Branch Portfolio',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
           </svg>
         ),
       },
@@ -218,14 +273,31 @@ const navGroups: NavGroup[] = [
     ],
   },
 
-  // Collector nav
+  // Admin/Staff nav
   {
-    label: 'Collector',
-    roles: ['collector'],
+    label: 'Overview',
+    roles: ['admin', 'staff'],
     items: [
       {
-        path: '/batch-deposit',
-        label: 'Batch Deposit',
+        path: '/overview',
+        label: 'Overview',
+        end: true,
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
+    label: 'Members',
+    roles: ['admin', 'staff'],
+    items: [
+      {
+        path: '/admin/members',
+        label: 'All Members',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -233,74 +305,10 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
-      {
-        path: '/batch-deposits',
-        label: 'My Batches',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        ),
-      },
-    ],
-  },
-
-  // Admin/Staff nav
-  {
-    label: 'Overview',
-    roles: ['admin', 'staff'],
-    items: [
-      {
-        path: '/reports',
-        label: 'Reports',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        ),
-      },
-      {
-        path: '/branches',
-        label: 'Branch Portfolio',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-        ),
-      },
     ],
   },
   {
-    label: 'People',
-    roles: ['admin', 'staff'],
-    items: [
-      {
-        path: '/admin/members',
-        label: 'Members',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-        ),
-      },
-      {
-        path: '/admin/users',
-        label: 'Manage Users',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: 'Shares',
+    label: 'Member Accounts',
     roles: ['admin', 'staff'],
     items: [
       {
@@ -315,33 +323,27 @@ const navGroups: NavGroup[] = [
       },
       {
         path: '/admin/batch-deposits',
-        label: 'Batch Deposits',
+        label: 'Batch Entry',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              d="M4 6h16M4 10h16M4 14h16M4 18h16" />
           </svg>
         ),
       },
-    ],
-  },
-  {
-    label: 'Savings',
-    roles: ['admin', 'staff'],
-    items: [
       {
-        path: '/admin/savings-deposits',
-        label: 'Deposits',
+        path: '/admin/share-transfers',
+        label: 'Share Transfers',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
           </svg>
         ),
       },
       {
         path: '/admin/savings-withdrawals',
-        label: 'Withdrawals',
+        label: 'Savings Withdrawals',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -356,16 +358,6 @@ const navGroups: NavGroup[] = [
     roles: ['admin', 'staff'],
     items: [
       {
-        path: '/admin/loan-products',
-        label: 'Loan Products',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
-          </svg>
-        ),
-      },
-      {
         path: '/admin/loans',
         label: 'Applications',
         icon: (
@@ -376,13 +368,12 @@ const navGroups: NavGroup[] = [
         ),
       },
       {
-        path: '/admin/rebates',
-        label: 'Rebates',
-        roles: ['admin'],
+        path: '/admin/loan-products',
+        label: 'Loan Products',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
           </svg>
         ),
       },
@@ -404,12 +395,13 @@ const navGroups: NavGroup[] = [
         ),
       },
       {
-        path: '/admin/share-transfers',
-        label: 'Share Transfers',
+        path: '/admin/rebates',
+        label: 'Rebates',
+        roles: ['admin'],
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         ),
       },
@@ -471,6 +463,16 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
+      {
+        path: '/admin/roles',
+        label: 'Custom Roles',
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
+          </svg>
+        ),
+      },
     ],
   },
   {
@@ -501,6 +503,80 @@ const navGroups: NavGroup[] = [
   },
 ]
 
+// ─── Nav item row with pin support ───────────────────────────────────────────
+
+interface NavItemRowProps {
+  item: NavItem
+  isPinned: boolean
+  onTogglePin: () => void
+  pendingCoMakerCount: number
+  pendingDepositCount: number
+  pendingMemberDepositCount: number
+  pendingLoanCount: number
+}
+
+function NavItemRow({ item, isPinned, onTogglePin, pendingCoMakerCount, pendingDepositCount, pendingMemberDepositCount, pendingLoanCount }: NavItemRowProps) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <NavLink
+        to={item.path}
+        end={item.end}
+        className={({ isActive }) =>
+          cn(
+            'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors pr-8',
+            isActive
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+          )
+        }
+      >
+        {item.icon}
+        <span className="flex-1 truncate">{item.label}</span>
+        {item.path === '/lending' && pendingCoMakerCount > 0 && (
+          <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+            {pendingCoMakerCount}
+          </span>
+        )}
+        {item.path === '/admin/batch-deposits' && pendingDepositCount > 0 && (
+          <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-yellow-400 text-gray-900 text-[10px] font-bold">
+            {pendingDepositCount}
+          </span>
+        )}
+        {item.path === '/admin/deposit-requests' && pendingMemberDepositCount > 0 && (
+          <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-yellow-400 text-gray-900 text-[10px] font-bold">
+            {pendingMemberDepositCount}
+          </span>
+        )}
+        {item.path === '/admin/loans' && pendingLoanCount > 0 && (
+          <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+            {pendingLoanCount}
+          </span>
+        )}
+      </NavLink>
+      {/* Pin button — visible on hover or when pinned */}
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin() }}
+        title={isPinned ? 'Unpin' : 'Pin to top'}
+        className={cn(
+          'absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded transition-all',
+          hovered || isPinned ? 'opacity-100' : 'opacity-0',
+          isPinned ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-500 hover:text-yellow-400'
+        )}
+      >
+        <svg className="w-3.5 h-3.5" fill={isPinned ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
@@ -513,6 +589,8 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
   const { data: branding } = useAppBranding()
   const { data: pendingCoMakerCount = 0 } = usePendingCoMakerCount()
   const { data: pendingDepositCount = 0 } = usePendingDepositCount()
+  const { data: pendingMemberDepositCount = 0 } = usePendingMemberDepositCount()
+  const { data: pendingLoanCount = 0 } = usePendingLoanApplicationCount()
   const [confirmSignOut, setConfirmSignOut] = React.useState(false)
   const location = useLocation()
 
@@ -532,6 +610,20 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
     try { return JSON.parse(localStorage.getItem(storageKey) ?? '{}') }
     catch { return {} }
   })
+
+  // Pinned items (paths), persisted in localStorage
+  const [pinnedPaths, setPinnedPaths] = useState<string[]>(loadPinned)
+
+  const togglePin = useCallback((path: string) => {
+    setPinnedPaths(prev => {
+      const next = prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path]
+      savePinned(next)
+      return next
+    })
+  }, [])
+
+  // All items across visible groups (for resolving pinned items)
+  const allVisibleItems = visibleGroups.flatMap(g => g.items)
 
   // Auto-expand the group containing the active route
   useEffect(() => {
@@ -602,6 +694,37 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
+        {/* Pinned items */}
+        {pinnedPaths.filter(p => allVisibleItems.some(i => i.path === p)).length > 0 && (
+          <div>
+            <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-yellow-400 flex items-center gap-1.5">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5v6l1 1 1-1v-6h5v-2l-2-2z" />
+              </svg>
+              Pinned
+            </div>
+            <div className="mt-0.5 mb-2 space-y-0.5">
+              {pinnedPaths
+                .map(p => allVisibleItems.find(i => i.path === p))
+                .filter((item): item is NavItem => !!item)
+                .map(item => (
+                  <NavItemRow
+                    key={`pinned-${item.path}`}
+                    item={item}
+                    isPinned
+                    onTogglePin={() => togglePin(item.path)}
+                    pendingCoMakerCount={pendingCoMakerCount}
+                    pendingDepositCount={pendingDepositCount}
+                    pendingMemberDepositCount={pendingMemberDepositCount}
+                    pendingLoanCount={pendingLoanCount}
+                  />
+                ))}
+            </div>
+            <div className="border-t border-gray-700/50 mb-2" />
+          </div>
+        )}
+
+        {/* Regular groups */}
         {visibleGroups.map(group => {
           const isCollapsed = !!collapsed[group.label]
           const hasActive = group.items.some(item =>
@@ -628,35 +751,20 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
               </button>
               {!isCollapsed && (
                 <div className="mt-0.5 mb-2 space-y-0.5">
-                  {group.items.map(item => (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      end={item.end}
-                      className={({ isActive }) =>
-                        cn(
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                          isActive
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                        )
-                      }
-                    >
-                      {item.icon}
-                      <span className="flex-1">{item.label}</span>
-                      {item.path === '/lending' && pendingCoMakerCount > 0 && (
-                        <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                          {pendingCoMakerCount}
-                        </span>
-                      )}
-                      {item.path === '/admin/deposit-requests' && pendingDepositCount > 0 && (
-                        <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400" />
-                        </span>
-                      )}
-                    </NavLink>
-                  ))}
+                  {group.items
+                    .filter(item => !item.roles || !effectiveRole || item.roles.includes(effectiveRole))
+                    .map(item => (
+                      <NavItemRow
+                        key={item.path}
+                        item={item}
+                        isPinned={pinnedPaths.includes(item.path)}
+                        onTogglePin={() => togglePin(item.path)}
+                        pendingCoMakerCount={pendingCoMakerCount}
+                        pendingDepositCount={pendingDepositCount}
+                        pendingMemberDepositCount={pendingMemberDepositCount}
+                        pendingLoanCount={pendingLoanCount}
+                      />
+                    ))}
                 </div>
               )}
             </div>

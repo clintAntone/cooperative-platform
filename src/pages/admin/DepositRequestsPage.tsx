@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { ReceiptModal } from '../../components/shared/ReceiptModal'
+import { RejectModal } from '../../components/shared/RejectModal'
+import { InlineReceiptViewer } from '../../components/shared/InlineReceiptViewer'
 import { SkeletonPage } from '../../components/shared/Skeleton'
 import { Pagination } from '../../components/shared/Pagination'
 import {
@@ -62,7 +64,6 @@ export function DepositRequestsPage() {
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showBulkRejectModal, setShowBulkRejectModal] = useState(false)
-  const [bulkRejectReason, setBulkRejectReason] = useState('')
 
   const { format: currency } = useCurrency()
   const approveRequest = useApproveDepositRequest()
@@ -70,10 +71,11 @@ export function DepositRequestsPage() {
   const bulkApprove = useBulkApproveDepositRequests()
   const bulkReject = useBulkRejectDepositRequests()
 
-  const [inlineRejectId, setInlineRejectId] = useState<string | null>(null)
-  const [inlineReason, setInlineReason] = useState('')
+  const [rejectTarget, setRejectTarget] = useState<DepositRequestWithMeta | null>(null)
   const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
   const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null)
+  const [detailReq, setDetailReq] = useState<DepositRequestWithMeta | null>(null)
+  const [confirmingApproveInDetail, setConfirmingApproveInDetail] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300)
@@ -131,16 +133,11 @@ export function DepositRequestsPage() {
     approveRequest.mutate(requestId)
   }
 
-  const handleInlineReject = (req: DepositRequestWithMeta) => {
-    if (!inlineReason.trim()) return
+  const handleReject = (reason: string) => {
+    if (!rejectTarget) return
     rejectRequest.mutate(
-      { requestId: req.id, reason: inlineReason },
-      {
-        onSuccess: () => {
-          setInlineRejectId(null)
-          setInlineReason('')
-        },
-      }
+      { requestId: rejectTarget.id, reason },
+      { onSuccess: () => setRejectTarget(null) }
     )
   }
 
@@ -150,15 +147,13 @@ export function DepositRequestsPage() {
     })
   }
 
-  const handleBulkReject = () => {
-    if (!bulkRejectReason.trim()) return
+  const handleBulkReject = (reason: string) => {
     bulkReject.mutate(
-      { requestIds: [...selectedIds], reason: bulkRejectReason },
+      { requestIds: [...selectedIds], reason },
       {
         onSuccess: () => {
           setSelectedIds(new Set())
           setShowBulkRejectModal(false)
-          setBulkRejectReason('')
         },
       }
     )
@@ -293,7 +288,7 @@ export function DepositRequestsPage() {
               <Button
                 size="sm"
                 variant="danger"
-                onClick={() => { setShowBulkRejectModal(true); setBulkRejectReason('') }}
+                onClick={() => setShowBulkRejectModal(true)}
               >
                 Reject Selected
               </Button>
@@ -368,29 +363,9 @@ export function DepositRequestsPage() {
                     <Button size="sm" variant="primary" loading={approveRequest.isPending} onClick={() => setConfirmApproveId(req.id)}>
                       Approve
                     </Button>
-                    <Button size="sm" variant="danger" onClick={() => { setInlineRejectId(inlineRejectId === req.id ? null : req.id); setInlineReason('') }}>
+                    <Button size="sm" variant="danger" onClick={() => setRejectTarget(req)}>
                       Reject
                     </Button>
-                  </div>
-                )}
-                {inlineRejectId === req.id && (
-                  <div className="space-y-2 pt-1">
-                    <input
-                      type="text"
-                      placeholder="Enter rejection reason..."
-                      value={inlineReason}
-                      onChange={e => setInlineReason(e.target.value)}
-                      className="w-full border border-red-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                      autoFocus
-                    />
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="danger" loading={rejectRequest.isPending} disabled={!inlineReason.trim()} onClick={() => handleInlineReject(req)}>
-                        Confirm
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setInlineRejectId(null); setInlineReason('') }}>
-                        Cancel
-                      </Button>
-                    </div>
                   </div>
                 )}
               </div>
@@ -440,10 +415,9 @@ export function DepositRequestsPage() {
                   </tr>
                 )}
                 {paged.map(req => (
-                  <React.Fragment key={req.id}>
-                    <tr className="hover:bg-gray-50">
+                  <tr key={req.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailReq(req)}>
                       {showCheckboxes && (
-                        <td className="px-4 py-3 w-10">
+                        <td className="px-4 py-3 w-10" onClick={e => e.stopPropagation()}>
                           {req.status === 'pending' && (
                             <input
                               type="checkbox"
@@ -467,7 +441,7 @@ export function DepositRequestsPage() {
                       <td className="px-4 py-3 text-gray-600 capitalize">
                         {req.payment_method.replace('_', ' ')}
                       </td>
-                      <td className="px-4 py-3 text-gray-500">
+                      <td className="px-4 py-3 text-gray-500" onClick={e => e.stopPropagation()}>
                         {req.reference ? (
                           <span className="inline-flex items-center gap-1.5">
                             <span className="font-mono text-xs">{req.reference}</span>
@@ -484,7 +458,7 @@ export function DepositRequestsPage() {
                           </span>
                         ) : <span className="text-gray-400">—</span>}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         {req.receipt_url ? (
                           <button
                             onClick={() =>
@@ -513,7 +487,7 @@ export function DepositRequestsPage() {
                       <td className="px-4 py-3">
                         <StatusBadge status={req.status} />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         {req.status === 'pending' && (
                           <div className="flex gap-2">
                             <Button
@@ -527,10 +501,7 @@ export function DepositRequestsPage() {
                             <Button
                               size="sm"
                               variant="danger"
-                              onClick={() => {
-                                setInlineRejectId(inlineRejectId === req.id ? null : req.id)
-                                setInlineReason('')
-                              }}
+                              onClick={() => setRejectTarget(req)}
                             >
                               Reject
                             </Button>
@@ -542,43 +513,7 @@ export function DepositRequestsPage() {
                           </span>
                         )}
                       </td>
-                    </tr>
-                    {inlineRejectId === req.id && (
-                      <tr key={`${req.id}-reject`} className="bg-red-50">
-                        <td colSpan={showCheckboxes ? 11 : 10} className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="text"
-                              placeholder="Enter rejection reason..."
-                              value={inlineReason}
-                              onChange={e => setInlineReason(e.target.value)}
-                              className="flex-1 border border-red-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                              autoFocus
-                            />
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              loading={rejectRequest.isPending}
-                              disabled={!inlineReason.trim()}
-                              onClick={() => handleInlineReject(req)}
-                            >
-                              Confirm Reject
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setInlineRejectId(null)
-                                setInlineReason('')
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -592,6 +527,113 @@ export function DepositRequestsPage() {
           />
         </Card>
       </div>
+
+      {/* Detail modal */}
+      <Modal isOpen={!!detailReq} onClose={() => { setDetailReq(null); setConfirmingApproveInDetail(false) }} title="Deposit Request Details" size="lg">
+        {detailReq && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500">{formatDate(detailReq.created_at)}</p>
+              <StatusBadge status={detailReq.status} />
+            </div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm border-t border-gray-100 pt-4">
+              <div>
+                <dt className="text-xs text-gray-500">Member</dt>
+                <dd className="font-semibold text-gray-900 mt-0.5">{detailReq.profiles?.full_name ?? '—'}</dd>
+                {detailReq.profiles?.employee_id && <dd className="text-xs text-gray-500">{detailReq.profiles.employee_id}</dd>}
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Share #</dt>
+                <dd className="font-semibold text-gray-900 mt-0.5">
+                  {detailReq.equity_shares ? `#${detailReq.equity_shares.share_number}` : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Amount</dt>
+                <dd className="font-semibold text-gray-900 mt-0.5">{currency(detailReq.amount)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Payment Method</dt>
+                <dd className="text-gray-800 mt-0.5 capitalize">{detailReq.payment_method.replace('_', ' ')}</dd>
+              </div>
+              {detailReq.reference && (
+                <div>
+                  <dt className="text-xs text-gray-500">Reference</dt>
+                  <dd className="font-mono text-xs text-gray-800 mt-0.5">{detailReq.reference}</dd>
+                </div>
+              )}
+              {detailReq.notes && (
+                <div className="col-span-2">
+                  <dt className="text-xs text-gray-500">Notes</dt>
+                  <dd className="text-gray-800 mt-0.5">{detailReq.notes}</dd>
+                </div>
+              )}
+              {detailReq.receipt_url && (
+                <div className="col-span-2">
+                  <dt className="text-xs text-gray-500 mb-1">Receipt</dt>
+                  <dd>
+                    <InlineReceiptViewer url={detailReq.receipt_url} />
+                  </dd>
+                </div>
+              )}
+              {detailReq.status === 'rejected' && detailReq.rejection_reason && (
+                <div className="col-span-2">
+                  <dt className="text-xs text-red-500">Rejection Reason</dt>
+                  <dd className="text-red-700 mt-0.5">{detailReq.rejection_reason}</dd>
+                </div>
+              )}
+            </dl>
+            {detailReq.status === 'pending' && (
+              <div className="pt-2 border-t border-gray-100 space-y-3">
+                {confirmingApproveInDetail ? (
+                  /* Inline confirmation */
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
+                    <p className="text-sm text-gray-800 font-medium">Confirm approval</p>
+                    <p className="text-sm text-gray-600">
+                      Approve the deposit of <strong>{currency(detailReq.amount)}</strong> from{' '}
+                      <strong>{detailReq.profiles?.full_name}</strong>? This will update the member's share balance.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setConfirmingApproveInDetail(false)}
+                        disabled={approveRequest.isPending}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        loading={approveRequest.isPending}
+                        onClick={() => {
+                          handleApprove(detailReq.id)
+                          setConfirmingApproveInDetail(false)
+                          setDetailReq(null)
+                        }}
+                      >
+                        Confirm Approve
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => { const t = detailReq; setDetailReq(null); setRejectTarget(t) }}>
+                      Reject
+                    </Button>
+                    <Button variant="primary" className="flex-1"
+                      onClick={() => setConfirmingApproveInDetail(true)}>
+                      Approve
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {receiptModal && (
         <ReceiptModal
@@ -635,48 +677,25 @@ export function DepositRequestsPage() {
         </div>
       </Modal>
 
-      {/* Bulk Reject Modal */}
-      <Modal
+      {/* Single reject modal */}
+      <RejectModal
+        isOpen={!!rejectTarget}
+        onClose={() => setRejectTarget(null)}
+        title="Reject Deposit Request"
+        description={rejectTarget ? <>Reject deposit of <strong>{currency(rejectTarget.amount)}</strong> from <strong>{rejectTarget.profiles?.full_name}</strong>?</> : undefined}
+        isLoading={rejectRequest.isPending}
+        onConfirm={handleReject}
+      />
+
+      {/* Bulk reject modal */}
+      <RejectModal
         isOpen={showBulkRejectModal}
         onClose={() => setShowBulkRejectModal(false)}
         title={`Reject ${selectedIds.size} Deposit${selectedIds.size > 1 ? 's' : ''}`}
-        size="sm"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            This rejection reason will apply to all selected deposits.
-          </p>
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-gray-700">Rejection Reason</label>
-            <textarea
-              value={bulkRejectReason}
-              onChange={e => setBulkRejectReason(e.target.value)}
-              placeholder="Enter reason for rejection..."
-              rows={3}
-              className="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
-              autoFocus
-            />
-          </div>
-          <div className="flex gap-3 pt-1">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setShowBulkRejectModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              className="flex-1"
-              loading={bulkReject.isPending}
-              disabled={!bulkRejectReason.trim()}
-              onClick={handleBulkReject}
-            >
-              Confirm Reject
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        description="This rejection reason will apply to all selected deposits."
+        isLoading={bulkReject.isPending}
+        onConfirm={handleBulkReject}
+      />
     </div>
   )
 }

@@ -9,6 +9,8 @@ export interface MemberRow extends Profile {
   membership_status: MembershipStatus | null
   total_invested: number
   completed_shares: number
+  savings_balance: number
+  // role and account_status are inherited from Profile
 }
 
 export interface MembersPage {
@@ -22,15 +24,17 @@ export function useMembers(params?: {
   search?: string
   sortKey?: 'full_name' | 'created_at'
   sortDir?: 'asc' | 'desc'
+  allRoles?: boolean
 }) {
   const page = params?.page ?? 0
   const pageSize = params?.pageSize ?? 20
   const search = params?.search ?? ''
   const sortKey = params?.sortKey ?? 'full_name'
   const sortDir = params?.sortDir ?? 'asc'
+  const allRoles = params?.allRoles ?? false
 
   return useQuery({
-    queryKey: ['members_list', page, pageSize, search, sortKey, sortDir],
+    queryKey: ['members_list', page, pageSize, search, sortKey, sortDir, allRoles],
     queryFn: async (): Promise<MembersPage> => {
       const from = page * pageSize
       const to = from + pageSize - 1
@@ -41,9 +45,15 @@ export function useMembers(params?: {
           `*, membership_status(status, completed_shares, last_evaluated_at, reason, updated_at)`,
           { count: 'exact' }
         )
-        .in('role', ['member', 'collector'])
         .order(sortKey, { ascending: sortDir === 'asc' })
         .range(from, to)
+
+      if (!allRoles) {
+        query = query.in('role', ['member'])
+      } else {
+        // Always exclude admins from the members list view
+        query = query.not('role', 'eq', 'admin')
+      }
 
       if (search) {
         query = query.or(`full_name.ilike.%${search}%,employee_id.ilike.%${search}%`)
@@ -55,13 +65,19 @@ export function useMembers(params?: {
       const profileIds = (data ?? []).map((p: any) => p.id)
       if (profileIds.length === 0) return { rows: [], total: count ?? 0 }
 
-      const { data: shares } = await supabase
-        .from('equity_shares')
-        .select('user_id, paid_amount, target_amount, status')
-        .in('user_id', profileIds)
+      const [sharesRes, savingsRes] = await Promise.all([
+        supabase
+          .from('equity_shares')
+          .select('user_id, paid_amount, target_amount, status')
+          .in('user_id', profileIds),
+        supabase
+          .from('savings_accounts')
+          .select('user_id, balance')
+          .in('user_id', profileIds),
+      ])
 
       const equityMap: Record<string, { totalInvested: number; completedShares: number }> = {}
-      for (const s of shares ?? []) {
+      for (const s of sharesRes.data ?? []) {
         if (!equityMap[s.user_id]) equityMap[s.user_id] = { totalInvested: 0, completedShares: 0 }
         equityMap[s.user_id].totalInvested += s.paid_amount ?? 0
         const target = s.target_amount ?? 0
@@ -70,12 +86,18 @@ export function useMembers(params?: {
         }
       }
 
+      const savingsMap: Record<string, number> = {}
+      for (const a of savingsRes.data ?? []) {
+        savingsMap[a.user_id] = a.balance ?? 0
+      }
+
       return {
         rows: (data ?? []).map((p: any) => ({
           ...p,
           membership_status: p.membership_status ?? null,
           total_invested: equityMap[p.id]?.totalInvested ?? 0,
           completed_shares: equityMap[p.id]?.completedShares ?? 0,
+          savings_balance: savingsMap[p.id] ?? 0,
         })) as MemberRow[],
         total: count ?? 0,
       }
@@ -110,11 +132,11 @@ export function useMemberDetail(userId: string) {
           .order('share_number', { ascending: true }),
         supabase
           .from('equity_contributions')
-          .select('*, deposit_requests(receipt_url)')
+          .select('*, equity_deposit_requests(receipt_url)')
           .eq('user_id', userId)
           .order('contribution_at', { ascending: false }),
         supabase
-          .from('deposit_requests')
+          .from('equity_deposit_requests')
           .select('id, user_id, share_id, amount, payment_method, reference, receipt_url, notes, status, reviewed_by, reviewed_at, rejection_reason, created_at, updated_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false }),

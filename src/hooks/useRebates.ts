@@ -34,7 +34,7 @@ export function useRebatePreview(periodStart: string, periodEnd: string) {
 
       // 2. Fetch paid schedule rows in range
       const { data: schedules, error } = await supabase
-        .from('loan_repayment_schedule')
+        .from('loan_repayment_schedules')
         .select('loan_id, interest_due, paid_at')
         .eq('status', 'paid')
         .gte('paid_at', periodStart)

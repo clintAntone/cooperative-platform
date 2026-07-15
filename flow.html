@@ -194,6 +194,9 @@
     <div class="nav-item" onclick="show('permissions')">
       <span class="nav-icon">🔐</span> Permissions Matrix
     </div>
+    <div class="nav-item" onclick="show('audit')">
+      <span class="nav-icon">🔎</span> Audit & Reconciliation
+    </div>
     <div class="nav-item" onclick="show('gaps')">
       <span class="nav-icon">⚠️</span> Known Gaps
     </div>
@@ -548,13 +551,15 @@
         <div class="two-col">
           <div class="card">
             <div class="card-title">💸 Recording Repayments</div>
-            <div class="card-subtitle">Members can record their own payments</div>
+            <div class="card-subtitle">Admin or staff records payments</div>
             <ul class="steps-list">
-              <li>Member goes to <strong>Loan → Loan Detail</strong></li>
-              <li>Clicks <em>Record Payment</em> — enters amount, method, reference</li>
-              <li>Installments marked paid. Outstanding balance decreases.</li>
-              <li>Ledger entry created: <code>loan_repayment</code></li>
+              <li>Admin goes to <strong>Admin → Loans → Loan Detail</strong></li>
+              <li>Clicks <em>Record Payment</em> — selects installment, enters amount, method, reference</li>
+              <li>Installment status updated (pending → paid / partial). <code>loans.outstanding</code> decreases.</li>
+              <li>Two ledger entries created: <code>loan_repayment_principal</code> + <code>loan_repayment_interest</code></li>
+              <li>When <code>outstanding = 0</code>, loan auto-flips to <strong>completed</strong></li>
             </ul>
+            <div class="note note-info" style="margin-top:8px;display:block">💡 A nightly cron job (<code style="word-break:break-all">mark_overdue_installments()</code>) flips past-due pending installments to <strong>overdue</strong> after the grace period expires, and marks loans as <strong>defaulted</strong> once beyond the default threshold. Both thresholds are in System Config.</div>
           </div>
           <div class="card">
             <div class="card-title">📊 Calculation Methods</div>
@@ -625,6 +630,7 @@
             </div>
           </div>
           <div class="note note-warn">⚠ Members cannot self-pay online. They pay staff in person or via bank transfer; staff records the payment in the system.</div>
+          <div class="note note-success" style="margin-top:8px">✅ Each payment now creates a <code>damayan_collection</code> ledger entry, giving the general ledger a full audit trail of mutual-aid fund inflows.</div>
         </div>
       </div>
 
@@ -701,7 +707,7 @@
               <div class="step-box amber">
                 <div class="step-icon">🏪</div>
                 <div class="step-title">Admin Records Income</div>
-                <div class="step-detail">Branch, amount, period, description</div>
+                <div class="step-detail">Gross sales, salary, other expenses, ROI, period (auto-filled from branch cutoff day)</div>
               </div>
               <div class="step-actor"><span class="badge badge-admin">Admin</span> <span class="badge badge-staff">Staff</span></div>
             </div>
@@ -737,18 +743,21 @@
             per_share_amount = <span class="val">branch_income</span> <span class="op">÷</span> <span class="val">total_completed_shares</span><br>
             member_credit = <span class="val">per_share_amount</span> <span class="op">×</span> <span class="val">member_completed_shares</span>
           </div>
-          <div class="note note-info">💡 Example: Branch earns ₱100,000. Cooperative has 100 total completed shares. Per share = ₱1,000. A member with 2 completed shares receives ₱2,000.</div>
+          <div class="note note-info">💡 Example: Branch earns ₱100,000. Cooperative has 100 total completed shares <em>as of the period end date</em>. Per share = ₱1,000. A member with 2 completed shares receives ₱2,000. Members who completed shares <strong>after</strong> the period end are excluded from the distribution.</div>
         </div>
 
         <div class="card">
           <div class="card-title">📊 Branch KPI Page (all roles can view)</div>
           <table class="tbl" style="margin-top:8px">
-            <tr><th>KPI</th><th>Formula</th></tr>
-            <tr><td>Gross Revenue</td><td>Sum of all recorded income for the period</td></tr>
-            <tr><td>Total Expenses</td><td>Salary + utilities + rent + supplies + maintenance + other</td></tr>
-            <tr><td>Net Profit</td><td>Gross Revenue − Total Expenses</td></tr>
-            <tr><td>Profit Margin</td><td>Net Profit ÷ Gross Revenue × 100%</td></tr>
+            <tr><th>KPI</th><th>Source / Formula</th></tr>
+            <tr><td>Gross Sales</td><td>Entered directly when recording income</td></tr>
+            <tr><td>Salary</td><td>Entered directly when recording income</td></tr>
+            <tr><td>Other Expenses</td><td>Entered directly when recording income</td></tr>
+            <tr><td>Net Profit</td><td>Gross Sales − Salary − Other Expenses</td></tr>
+            <tr><td>Profit Margin</td><td>Net Profit ÷ Gross Sales × 100%</td></tr>
+            <tr><td>ROI</td><td>Entered directly (optional) or computed by admin</td></tr>
           </table>
+          <div class="note note-info" style="margin-top:12px">💡 Each branch has a configurable <strong>Weekly Report Cutoff Day</strong> (e.g. Sunday). When admin clicks <em>Record Income</em>, the period start and end dates are auto-filled based on the most recent completed week ending on that day.</div>
         </div>
       </div>
 
@@ -808,7 +817,7 @@
           <ul class="steps-list" style="margin-top:8px">
             <li>Run <strong>once per fiscal year</strong>, typically at year-end</li>
             <li>The page shows the last release date — verify before releasing again</li>
-            <li>System shows a warning if dividends were already released recently, but does not block</li>
+            <li>System now <strong>blocks double-release</strong>: a UNIQUE constraint on <code>(share_id, period_start, period_end)</code> prevents crediting the same share twice for the same period</li>
             <li>Members can withdraw their dividend through a savings withdrawal request</li>
           </ul>
         </div>
@@ -864,6 +873,84 @@
             rebate = <span class="val">sum(interest_paid)</span> <span class="op">×</span> <span class="val">(rebate_rate / 100)</span>
           </div>
           <div class="note note-info">💡 Only members who made <strong>paid</strong> loan repayments in the selected period are included. Typical cadence: every 6 months (Jan–Jun, Jul–Dec).</div>
+          <div class="note note-success" style="margin-top:8px">✅ Double-release guard: a UNIQUE constraint on <code>(period_start, period_end)</code> in <code>rebate_releases</code> blocks re-running the same period. The RPC raises a clear error with the existing release ID if attempted.</div>
+        </div>
+      </div>
+
+      <!-- ── AUDIT ── -->
+      <div class="section" id="sec-audit">
+        <div class="highlight-box">
+          <div class="highlight-box-title">Audit & Reconciliation Tools</div>
+          <p>These SQL functions are available to admin in the Supabase SQL editor. They verify that the running balances stored in the database match what the ledger history says they should be.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🔎 Savings Balance Reconciliation</div>
+          <div class="card-subtitle"><code>SELECT * FROM verify_savings_balance('&lt;account_uuid&gt;')</code></div>
+          <p style="font-size:12px;color:#334155;line-height:1.7;margin-top:8px">Recomputes expected balance from: contributions + interest credits + branch income distributions + dividends + rebates − approved withdrawals. Compares to <code>savings_accounts.balance</code>. Returns <code>is_reconciled = true</code> if difference &lt; ¢1.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🔎 Loan Outstanding Reconciliation</div>
+          <div class="card-subtitle"><code>SELECT * FROM verify_loan_outstanding('&lt;loan_uuid&gt;')</code></div>
+          <p style="font-size:12px;color:#334155;line-height:1.7;margin-top:8px">Recomputes outstanding from unpaid/partial installments in <code>loan_repayment_schedule</code>. Compares to <code>loans.outstanding</code>. Use the bulk check query below to scan all active loans at once.</p>
+          <div class="formula" style="margin-top:12px;font-size:11px">
+            SELECT l.id, l.outstanding,<br>
+            &nbsp;&nbsp;SUM(CASE WHEN lrs.status IN ('pending','overdue') THEN lrs.total_due<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WHEN lrs.status = 'partial' THEN lrs.total_due - lrs.amount_paid<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ELSE 0 END) AS computed<br>
+            FROM loans l LEFT JOIN loan_repayment_schedule lrs ON lrs.loan_id = l.id<br>
+            WHERE l.status = 'active'<br>
+            GROUP BY l.id, l.outstanding<br>
+            HAVING ABS(l.outstanding - COALESCE(SUM(...), 0)) >= 0.01;
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📊 Loan Aging / Delinquency Report</div>
+          <div class="card-subtitle">Available in the Reports page → Loan Aging section</div>
+          <table class="tbl" style="margin-top:8px">
+            <tr><th>Bucket</th><th>Meaning</th></tr>
+            <tr><td>Current</td><td>No overdue installments — next due date is today or future</td></tr>
+            <tr><td>1–30 days</td><td>Oldest overdue installment is 1–30 days past due</td></tr>
+            <tr><td>31–60 days</td><td>31–60 days past due</td></tr>
+            <tr><td>61–90 days</td><td>61–90 days past due</td></tr>
+            <tr><td>90+ days</td><td>Severely overdue — likely already marked defaulted</td></tr>
+            <tr><td>Completed</td><td>Fully repaid loans</td></tr>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🚪 Member Exit / Deactivation</div>
+          <div class="card-subtitle"><code>SELECT admin_deactivate_member('&lt;user_uuid&gt;', 'reason')</code></div>
+          <ul class="steps-list" style="margin-top:8px">
+            <li>Blocks if member has any active or defaulted loans — settle first</li>
+            <li>Closes savings account and records the closing balance</li>
+            <li>Waives all pending Damayan assessments</li>
+            <li>Cancels in-progress equity shares</li>
+            <li>Sets profile <code>account_status = 'inactive'</code></li>
+            <li>If savings balance &gt; 0, creates an <code>adjustment</code> ledger entry flagging the manual payout needed</li>
+          </ul>
+          <div class="note note-warn" style="margin-top:8px">⚠ Deactivation is not reversible through the UI. Re-activating a member requires manual DB intervention.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🛡 Double-entry Ledger Check</div>
+          <div class="card-subtitle">Verifies every loan disbursement has both a debit and credit side</div>
+          <div class="formula" style="font-size:11px">
+            SELECT reference_id, COUNT(*) AS entry_count<br>
+            FROM ledger_entries<br>
+            WHERE entry_type IN ('loan_disbursement','loan_disbursement_liability')<br>
+            GROUP BY reference_id HAVING COUNT(*) &lt; 2;<br>
+            <span style="color:#94a3b8">-- 0 rows = all disbursements are properly double-entered</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">🤖 Automated Smoke Test</div>
+          <div class="card-subtitle">Run after every deployment</div>
+          <div class="formula" style="font-size:11px">bash scripts/smoke-test.sh</div>
+          <p style="font-size:12px;color:#334155;line-height:1.7;margin-top:8px">Checks: TypeScript build passes · All 63 migrations numbered sequentially · All critical RPC names referenced in the codebase · All expected routes defined in App.tsx. Returns a pass/fail/warn summary.</p>
         </div>
       </div>
 
@@ -930,7 +1017,7 @@
         <div class="gap-card">
           <div class="gap-title">Damayan Has No Online Self-payment</div>
           <div class="gap-desc">Members can see their Damayan assessment amount in their Damayan page but there is no "Pay" button. Payment must be made in person or via bank transfer, then staff records it manually.</div>
-          <div class="gap-fix">→ Workaround: Member pays staff directly. Staff marks as paid in Admin → Cooperative → Damayan.</div>
+          <div class="gap-fix">→ Workaround: Member pays staff directly. Staff marks as paid in Admin → Cooperative → Damayan. (GL ledger entry is now auto-created on payment.)</div>
         </div>
 
         <div class="gap-card">
@@ -940,9 +1027,33 @@
         </div>
 
         <div class="gap-card">
-          <div class="gap-title">No Double-release Guard on Dividends &amp; Rebates</div>
-          <div class="gap-desc">The system shows the last release date as a warning, but does not block an admin from running dividends or rebates twice for the same period. This could result in members being credited twice.</div>
-          <div class="gap-fix">→ Workaround: Admin must verify the last release date shown on the page before confirming the release.</div>
+          <div class="gap-title">No Loan Write-off Process</div>
+          <div class="gap-desc">The <code>loans.status = 'written_off'</code> state exists in the database but there is no admin UI or RPC to formally write off a bad debt. Loans currently stay in defaulted state indefinitely.</div>
+          <div class="gap-fix">→ Workaround: Admin updates status directly in Supabase for now. A formal write-off RPC with ledger entries is a future task.</div>
+        </div>
+
+        <div class="gap-card">
+          <div class="gap-title">Branch Expense Periods Not Linked to Income Periods</div>
+          <div class="gap-desc">Expenses can be recorded for any arbitrary date range. There is no database constraint that enforces expenses must fall within a recorded income period for the same branch.</div>
+          <div class="gap-fix">→ Workaround: Admin follows the convention of using the same period dates when recording income and expenses for each weekly cycle.</div>
+        </div>
+
+        <div style="margin-top:24px;padding:16px 18px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px">
+          <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">✅ Previously listed gaps — now resolved</div>
+          <table class="tbl" style="font-size:12px">
+            <tr><th>Gap</th><th>Resolution</th></tr>
+            <tr><td>No double-release guard on dividends</td><td>UNIQUE(share_id, period_start, period_end) constraint added — migration 61</td></tr>
+            <tr><td>No double-release guard on rebates</td><td>UNIQUE(period_start, period_end) on rebate_releases + RPC idempotency check — migration 61</td></tr>
+            <tr><td>Damayan payments had zero GL integration</td><td>record_damayan_payment() now inserts damayan_collection ledger entry — migration 61</td></tr>
+            <tr><td>Loan disbursement was single-entry only</td><td>Now creates both DR (loan_disbursement) and CR (loan_disbursement_liability) — migration 61</td></tr>
+            <tr><td>Loan repayment was one combined ledger entry</td><td>Split into loan_repayment_principal + loan_repayment_interest — migration 62</td></tr>
+            <tr><td>Loan completion not automatic</td><td>record_loan_repayment() RPC auto-completes loan when outstanding = 0 — migration 62</td></tr>
+            <tr><td>Overdue installments never flagged</td><td>mark_overdue_installments() cron runs nightly — migration 62</td></tr>
+            <tr><td>Savings interest could fire twice</td><td>UNIQUE(account_id, period_end) + ON CONFLICT DO NOTHING guard — migration 62</td></tr>
+            <tr><td>Branch distribution used live share count</td><td>Now snapshots shares as of income period_end date — migration 63</td></tr>
+            <tr><td>No member exit/deactivation process</td><td>admin_deactivate_member() RPC added — migration 63</td></tr>
+            <tr><td>No loan aging / delinquency report</td><td>Loan Aging section added to Reports page — migration 63</td></tr>
+          </table>
         </div>
       </div>
 

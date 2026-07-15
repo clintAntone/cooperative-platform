@@ -18,6 +18,7 @@ import {
 } from '../../hooks/useLoans'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, cn } from '../../lib/utils'
+import { LoanApplicationDetailModal } from './LoanApplicationDetailModal'
 
 type TabValue = 'all' | 'submitted' | 'under_review' | 'approved' | 'rejected'
 
@@ -40,7 +41,8 @@ const tabs: { label: string; value: TabValue }[] = [
 ]
 
 export function LoanApplicationsPage() {
-  const [activeTab, setActiveTab] = useState<TabValue>('submitted')
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<TabValue>('all')
   const [search, setSearch] = useState('')
   const [approveError, setApproveError] = useState<Record<string, string>>({})
   const [rejectingId, setRejectingId] = useState<string | null>(null)
@@ -51,7 +53,7 @@ export function LoanApplicationsPage() {
 
   useEffect(() => { setPage(0) }, [activeTab, search, sortKey, sortDir])
 
-  const { data: applications = [], isLoading } = useAllLoanApplications()
+  const { data: applications = [], isLoading, isError, refetch } = useAllLoanApplications()
   const approveLoan = useAdminApproveLoan()
   const rejectLoan = useAdminRejectLoan()
   const setUnderReview = useAdminSetUnderReview()
@@ -83,10 +85,19 @@ export function LoanApplicationsPage() {
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  // Admins never see 'draft' — those are still awaiting co-maker confirmation
+  // Treat draft applications with no pending co-makers as effectively 'submitted'
+  // (they are stuck orphans from before the draft-flow fix)
+  const effectiveStatus = (app: any) => {
+    if (app.status === 'draft') {
+      const cm = coMakerSummary(app.id)
+      return cm.pending > 0 ? 'draft' : 'submitted'
+    }
+    return app.status
+  }
+
   const filtered = (applications as any[]).filter(app => {
-    if (app.status === 'draft') return false
-    const matchesTab = activeTab === 'all' ? true : app.status === activeTab
+    if (effectiveStatus(app) === 'draft') return false
+    const matchesTab = activeTab === 'all' ? true : effectiveStatus(app) === activeTab
     const q = search.toLowerCase()
     const matchesSearch = !q ||
       (app.profiles?.full_name ?? '').toLowerCase().includes(q) ||
@@ -127,6 +138,12 @@ export function LoanApplicationsPage() {
   }
 
   if (isLoading) return <SkeletonPage cards={3} rows={6} />
+  if (isError) return (
+    <div className="p-8 text-center">
+      <p className="text-red-600 mb-4">Failed to load loan applications.</p>
+      <Button onClick={() => refetch()}>Retry</Button>
+    </div>
+  )
 
   return (
     <div>
@@ -134,26 +151,38 @@ export function LoanApplicationsPage() {
         title="Loan Applications"
         subtitle="Review and approve member loan applications"
         actions={
-          <button
-            onClick={() => {
-              const rows = filtered.map((app: any) => ({
-                Member: app.profiles?.full_name ?? '',
-                Amount: app.amount_requested,
-                'Term (months)': app.term_months,
-                Purpose: app.purpose ?? '',
-                Status: app.status,
-                'Applied On': formatDate(app.created_at),
-              }))
-              exportToExcel(rows, `loan-applications-${activeTab}`)
-            }}
-            title="Export to Excel"
-            className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-            </svg>
-            <span className="hidden sm:inline">Export</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => refetch()}
+              title="Refresh"
+              className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button
+              onClick={() => {
+                const rows = filtered.map((app: any) => ({
+                  Member: app.profiles?.full_name ?? '',
+                  Amount: app.amount_requested,
+                  'Term (months)': app.term_months,
+                  Purpose: app.purpose ?? '',
+                  Status: app.status,
+                  'Applied On': formatDate(app.created_at),
+                }))
+                exportToExcel(rows, `loan-applications-${activeTab}`)
+              }}
+              title="Export to Excel"
+              className="inline-flex items-center gap-1.5 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              <span className="hidden sm:inline">Export</span>
+            </button>
+          </div>
         }
       />
 
@@ -233,11 +262,15 @@ export function LoanApplicationsPage() {
             {paged.length === 0 && <p className="text-center py-10 text-gray-400 text-sm">No applications found</p>}
             {paged.map((app: any) => {
               const cm = coMakerSummary(app.id)
-              const allConfirmed = cm.total > 0 && cm.confirmed === cm.total
-              const canApprove = app.status === 'submitted' || app.status === 'under_review'
+              const allConfirmed = cm.total === 0 || cm.confirmed === cm.total
+              const canApprove = effectiveStatus(app) === 'submitted' || effectiveStatus(app) === 'under_review'
               const err = approveError[app.id]
               return (
-                <div key={app.id} className="p-4 space-y-2">
+                <div
+                  key={app.id}
+                  className="p-4 space-y-2 cursor-pointer hover:bg-gray-50 active:bg-gray-100"
+                  onClick={() => setSelectedAppId(app.id)}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-medium text-sm text-gray-900">{app.profiles?.full_name ?? '—'}</p>
@@ -265,9 +298,9 @@ export function LoanApplicationsPage() {
                     )}
                   </div>
                   {canApprove && (
-                    <div className="flex flex-col gap-1 pt-1">
+                    <div className="flex flex-col gap-1 pt-1" onClick={e => e.stopPropagation()}>
                       <div className="flex gap-3">
-                        {app.status === 'submitted' && (
+                        {effectiveStatus(app) === 'submitted' && (
                           <button
                             onClick={() => setUnderReview.mutate(app.id)}
                             disabled={setUnderReview.isPending}
@@ -279,7 +312,7 @@ export function LoanApplicationsPage() {
                         <button
                           onClick={() => handleApprove(app.id)}
                           disabled={approveLoan.isPending || !allConfirmed}
-                          title={!allConfirmed ? 'All co-makers must confirm first' : undefined}
+                          title={!allConfirmed && cm.total > 0 ? 'All co-makers must confirm first' : undefined}
                           className="text-xs text-green-700 hover:underline font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           Approve
@@ -337,12 +370,16 @@ export function LoanApplicationsPage() {
                 )}
                 {paged.map((app: any) => {
                   const cm = coMakerSummary(app.id)
-                  const allConfirmed = cm.total > 0 && cm.confirmed === cm.total
-                  const canApprove = app.status === 'submitted' || app.status === 'under_review'
+                  const allConfirmed = cm.total === 0 || cm.confirmed === cm.total
+                  const canApprove = effectiveStatus(app) === 'submitted' || effectiveStatus(app) === 'under_review'
                   const err = approveError[app.id]
 
                   return (
-                    <tr key={app.id} className="hover:bg-gray-50">
+                    <tr
+                      key={app.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setSelectedAppId(app.id)}
+                    >
                       <td className="px-4 py-3 font-medium text-gray-900">
                         {app.profiles?.full_name ?? '—'}
                       </td>
@@ -375,11 +412,11 @@ export function LoanApplicationsPage() {
                       <td className="px-4 py-3 text-gray-400 text-xs">
                         {formatDate(app.created_at)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         {canApprove && (
                           <div className="flex flex-col gap-1 items-end">
                             <div className="flex gap-2">
-                              {app.status === 'submitted' && (
+                              {effectiveStatus(app) === 'submitted' && (
                                 <button
                                   onClick={() => setUnderReview.mutate(app.id)}
                                   disabled={setUnderReview.isPending}
@@ -391,7 +428,7 @@ export function LoanApplicationsPage() {
                               <button
                                 onClick={() => handleApprove(app.id)}
                                 disabled={approveLoan.isPending || !allConfirmed}
-                                title={!allConfirmed ? 'All co-makers must confirm first' : undefined}
+                                title={!allConfirmed && cm.total > 0 ? 'All co-makers must confirm first' : undefined}
                                 className="text-xs text-green-700 hover:underline font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                               >
                                 Approve
@@ -428,6 +465,11 @@ export function LoanApplicationsPage() {
           />
         </Card>
       </div>
+
+      <LoanApplicationDetailModal
+        applicationId={selectedAppId}
+        onClose={() => setSelectedAppId(null)}
+      />
 
       {/* Reject Modal */}
       <Modal

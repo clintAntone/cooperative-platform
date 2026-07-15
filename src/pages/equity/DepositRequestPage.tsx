@@ -125,7 +125,7 @@ export function DepositRequestPage() {
     // Check for duplicate reference number before uploading or submitting
     if (values.reference && values.reference.trim() !== '') {
       const { data: existing } = await supabase
-        .from('deposit_requests')
+        .from('equity_deposit_requests')
         .select('id')
         .eq('reference', values.reference.trim())
         .limit(1)

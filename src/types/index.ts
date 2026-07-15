@@ -1,10 +1,12 @@
-export type UserRole = 'admin' | 'member' | 'staff' | 'collector' | 'board'
+export type UserRole = 'admin' | 'member' | 'staff' | 'board'
 export type AccountStatus = 'active' | 'suspended' | 'inactive'
 export type MembershipStatusValue = 'pending' | 'active' | 'suspended' | 'inactive'
 export type CivilStatus = 'single' | 'married' | 'widowed' | 'separated' | 'divorced'
 export type EquityShareStatus = 'in_progress' | 'completed' | 'cancelled'
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'mobile_money'
 export type LoanApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'cancelled'
+
+export type RepaymentFrequency = 'weekly' | 'bi_weekly' | 'semi_monthly' | 'monthly'
 
 export interface LoanProduct {
   id: string
@@ -13,6 +15,7 @@ export interface LoanProduct {
   interest_rate: number
   interest_rate_period: 'monthly' | 'annual'
   calculation_method: 'flat' | 'reducing_balance' | 'equal_principal'
+  repayment_frequency: RepaymentFrequency
   min_amount: number
   max_amount: number | null
   min_term_months: number
@@ -76,7 +79,7 @@ export interface EquityContribution {
   recorded_by: string | null
   contribution_at: string
   created_at: string
-  deposit_requests?: { receipt_url: string | null } | null
+  equity_deposit_requests?: { receipt_url: string | null } | null
 }
 
 export interface MembershipStatus {
@@ -122,6 +125,7 @@ export interface Loan {
   interest_rate: number
   term_months: number
   calculation_method: 'flat' | 'reducing_balance'
+  repayment_frequency: RepaymentFrequency
   total_repayable: number
   amount_paid: number
   outstanding: number

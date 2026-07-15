@@ -9,10 +9,10 @@ import type { ShareTransfer } from '../types'
 export function useMyShareTransfers() {
   const effectiveUserId = useEffectiveUserId()
   return useQuery({
-    queryKey: ['share_transfers', 'mine', effectiveUserId],
+    queryKey: ['equity_share_transfers', 'mine', effectiveUserId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('share_transfers')
+        .from('equity_share_transfers')
         .select('id, share_id, from_user_id, to_user_id, reason, status, reviewed_by, reviewed_at, rejection_reason, created_at, updated_at')
         .or(`from_user_id.eq.${effectiveUserId},to_user_id.eq.${effectiveUserId}`)
         .order('created_at', { ascending: false })
@@ -36,7 +36,7 @@ export function useRequestShareTransfer() {
       return data as string
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['share_transfers'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_share_transfers'] })
       queryClient.invalidateQueries({ queryKey: ['equity_shares'] })
       toast({ title: 'Transfer requested', description: 'Your transfer request has been submitted for review', variant: 'success' })
     },
@@ -57,11 +57,11 @@ export function useAllShareTransfers(params: {
   search: string
 }) {
   return useQuery({
-    queryKey: ['share_transfers', 'all', params],
+    queryKey: ['equity_share_transfers', 'all', params],
     queryFn: async () => {
       // Two-step fetch: get transfers, then get profiles
       let query = supabase
-        .from('share_transfers')
+        .from('equity_share_transfers')
         .select('id, share_id, from_user_id, to_user_id, reason, status, reviewed_by, reviewed_at, rejection_reason, created_at, updated_at', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(params.page * params.pageSize, (params.page + 1) * params.pageSize - 1)
@@ -118,7 +118,7 @@ export function useApproveShareTransfer() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['share_transfers'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_share_transfers'] })
       queryClient.invalidateQueries({ queryKey: ['equity_shares'] })
       toast({ title: 'Transfer approved', description: 'Share ownership has been updated', variant: 'success' })
     },
@@ -136,7 +136,7 @@ export function useRejectShareTransfer() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['share_transfers'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_share_transfers'] })
       toast({ title: 'Transfer rejected', variant: 'success' })
     },
   })

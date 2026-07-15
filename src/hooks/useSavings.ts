@@ -57,6 +57,45 @@ export function useSavingsDepositRequests(userId?: string) {
   })
 }
 
+// ─── Member: server-side ADB (uses DB now() — immune to device clock) ────────
+
+export function useSavingsAdb(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['savings_adb', accountId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_savings_adb', { p_account_id: accountId })
+      if (error) throw error
+      const row = (data as { adb: number; period_days: number; accrued_interest: number }[])?.[0]
+      return { adb: row?.adb ?? 0, periodDays: row?.period_days ?? 0, accruedInterest: row?.accrued_interest ?? 0 }
+    },
+    enabled: !!accountId,
+  })
+}
+
+// ─── Member: per-deposit breakdown for current interest period ───────────────
+
+export interface SavingsDepositBreakdown {
+  contribution_id: string
+  request_id: string | null
+  contributed_at: string
+  amount: number
+  days_held: number
+  accrued_interest: number
+  reference: string | null
+}
+
+export function useSavingsDepositsBreakdown(accountId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['savings_deposits_breakdown', accountId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_savings_deposits_breakdown', { p_account_id: accountId })
+      if (error) throw error
+      return (data ?? []) as SavingsDepositBreakdown[]
+    },
+    enabled: !!accountId,
+  })
+}
+
 // ─── Member: approved contributions (deposit history) ────────────────────────
 
 export function useSavingsContributions(accountId: string | null | undefined) {
@@ -473,7 +512,7 @@ export function useReleaseSavingsInterest() {
 
   return useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('release_savings_interest')
+      const { error } = await supabase.rpc('release_savings_interest', { p_force: true })
       if (error) throw error
     },
     onSuccess: () => {
@@ -496,7 +535,7 @@ export async function uploadSavingsReceipt(userId: string, file: File): Promise<
   if (file.size > MAX_SIZE_MB * 1024 * 1024) throw new Error(`File size must be under ${MAX_SIZE_MB}MB.`)
 
   const ext = file.name.split('.').pop()
-  const path = `savings/${userId}/${Date.now()}.${ext}`
+  const path = `${userId}/savings-${Date.now()}.${ext}`
   const { error } = await supabase.storage.from('deposit-receipts').upload(path, file)
   if (error) throw error
   const { data } = supabase.storage.from('deposit-receipts').getPublicUrl(path)

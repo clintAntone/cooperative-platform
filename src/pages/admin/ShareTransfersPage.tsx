@@ -27,6 +27,7 @@ export function ShareTransfersPage() {
   const [approveTarget, setApproveTarget] = useState<ShareTransferWithMeta | null>(null)
   const [rejectTarget, setRejectTarget] = useState<ShareTransferWithMeta | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [detailTransfer, setDetailTransfer] = useState<ShareTransferWithMeta | null>(null)
 
   const { data, isLoading } = useAllShareTransfers({ statusFilter, page, pageSize: PAGE_SIZE, search })
   const approve = useApproveShareTransfer()
@@ -149,7 +150,7 @@ export function ShareTransfersPage() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">No transfer requests found.</td></tr>
               ) : rows.map(t => (
-                <tr key={t.id} className="hover:bg-gray-50">
+                <tr key={t.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailTransfer(t)}>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(t.created_at)}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{t.from_profile?.full_name ?? '—'}</p>
@@ -170,7 +171,7 @@ export function ShareTransfersPage() {
                       <p className="text-xs text-red-500 mt-0.5 max-w-xs">{t.rejection_reason}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     {t.status === 'pending' && (
                       <div className="flex items-center gap-2">
                         <button
@@ -206,6 +207,56 @@ export function ShareTransfersPage() {
           </div>
         )}
       </div>
+
+      {/* Detail modal */}
+      <Modal isOpen={!!detailTransfer} onClose={() => setDetailTransfer(null)} title="Share Transfer Details" size="lg">
+        {detailTransfer && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500">{formatDateTime(detailTransfer.created_at)}</p>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusColors[detailTransfer.status]}`}>
+                {detailTransfer.status}
+              </span>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm border-t border-gray-100 pt-4">
+              <div>
+                <dt className="text-xs text-gray-500">From</dt>
+                <dd className="font-semibold text-gray-900 mt-0.5">{detailTransfer.from_profile?.full_name ?? '—'}</dd>
+                {detailTransfer.from_profile?.employee_id && <dd className="text-xs text-gray-500">{detailTransfer.from_profile.employee_id}</dd>}
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">To</dt>
+                <dd className="font-semibold text-gray-900 mt-0.5">{detailTransfer.to_profile?.full_name ?? '—'}</dd>
+                {detailTransfer.to_profile?.employee_id && <dd className="text-xs text-gray-500">{detailTransfer.to_profile.employee_id}</dd>}
+              </div>
+              {detailTransfer.reason && (
+                <div className="col-span-2">
+                  <dt className="text-xs text-gray-500">Reason</dt>
+                  <dd className="text-gray-800 mt-0.5">{detailTransfer.reason}</dd>
+                </div>
+              )}
+              {detailTransfer.status === 'rejected' && detailTransfer.rejection_reason && (
+                <div className="col-span-2">
+                  <dt className="text-xs text-red-500">Rejection Reason</dt>
+                  <dd className="text-red-700 mt-0.5">{detailTransfer.rejection_reason}</dd>
+                </div>
+              )}
+            </dl>
+            {detailTransfer.status === 'pending' && (
+              <div className="flex gap-3 pt-2 border-t border-gray-100">
+                <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => { setDetailTransfer(null); setRejectTarget(detailTransfer); setRejectReason('') }}>
+                  Reject
+                </Button>
+                <Button className="flex-1"
+                  onClick={() => { setDetailTransfer(null); setApproveTarget(detailTransfer) }}>
+                  Approve
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Approve modal */}
       <Modal isOpen={!!approveTarget} onClose={() => setApproveTarget(null)} title="Approve Share Transfer" size="sm">

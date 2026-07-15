@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 // @ts-ignore - recharts not in devDependencies yet
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -18,6 +19,18 @@ import { useLoanPortfolioStats } from '../../hooks/useLoans'
 import { useMonthlyContributions, useMonthlyNewMembers } from '../../hooks/useReports'
 import { exportToExcel } from '../../lib/exportExcel'
 import { exportMembersPdf, exportLoanPortfolioPdf } from '../../lib/exportPdf'
+
+function useLoanAgingReport() {
+  return useQuery({
+    queryKey: ['loan_aging_report'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_loan_aging_report')
+      if (error) throw error
+      return (data ?? []) as { bucket: string; loan_count: number; total_outstanding: number }[]
+    },
+    staleTime: 60_000,
+  })
+}
 
 function useLoanConfigured() {
   return useQuery({
@@ -107,6 +120,71 @@ function useAllLoans(dateFrom: string, dateTo: string) {
   })
 }
 
+function useTotalSavings() {
+  return useQuery({
+    queryKey: ['total_savings_report'],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('savings_accounts').select('balance')
+      if (error) throw error
+      return (data as { balance: number }[]).reduce((sum, r) => sum + (r.balance ?? 0), 0)
+    },
+  })
+}
+
+function useMemberPortfolioReport() {
+  return useQuery({
+    queryKey: ['member_portfolio_report'],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, account_status, employee_id, created_at, membership_status(status, completed_shares)')
+        .eq('role', 'member')
+        .order('full_name')
+      if (error) throw error
+
+      const userIds = (profiles ?? []).map((p: any) => p.id)
+      if (userIds.length === 0) return []
+
+      const [sharesRes, savingsRes, loansRes] = await Promise.all([
+        supabase.from('equity_shares').select('user_id, paid_amount, target_amount, status, share_number').in('user_id', userIds),
+        supabase.from('savings_accounts').select('user_id, balance, status').in('user_id', userIds),
+        supabase.from('loans').select('user_id, outstanding, status').in('user_id', userIds),
+      ])
+
+      const equityMap: Record<string, { total: number; count: number; completed: number; shares: any[] }> = {}
+      for (const s of (sharesRes.data ?? []) as any[]) {
+        if (!equityMap[s.user_id]) equityMap[s.user_id] = { total: 0, count: 0, completed: 0, shares: [] }
+        equityMap[s.user_id].total += s.paid_amount ?? 0
+        equityMap[s.user_id].count += 1
+        if (s.status === 'completed') equityMap[s.user_id].completed += 1
+        equityMap[s.user_id].shares.push(s)
+      }
+
+      const savingsMap: Record<string, number> = {}
+      for (const s of (savingsRes.data ?? []) as any[]) savingsMap[s.user_id] = s.balance ?? 0
+
+      const loanMap: Record<string, { active: number; outstanding: number }> = {}
+      for (const l of (loansRes.data ?? []) as any[]) {
+        if (!loanMap[l.user_id]) loanMap[l.user_id] = { active: 0, outstanding: 0 }
+        if (l.status === 'active') { loanMap[l.user_id].active += 1; loanMap[l.user_id].outstanding += l.outstanding ?? 0 }
+      }
+
+      return (profiles ?? []).map((p: any) => ({
+        id: p.id,
+        full_name: p.full_name,
+        account_status: p.account_status,
+        created_at: p.created_at,
+        membership_status: Array.isArray(p.membership_status) ? p.membership_status[0] ?? null : p.membership_status ?? null,
+        equity: equityMap[p.id] ?? { total: 0, count: 0, completed: 0, shares: [] },
+        savings_balance: savingsMap[p.id] ?? 0,
+        loans: loanMap[p.id] ?? { active: 0, outstanding: 0 },
+      }))
+    },
+  })
+}
+
 interface ExportDropdownProps {
   onMembersXls: () => void
   onMembersPdf: () => void
@@ -175,6 +253,7 @@ function CurrencyTooltip({ active, payload, label, symbol = '₱' }: any) {
 }
 
 export function ReportsPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
@@ -182,9 +261,12 @@ export function ReportsPage() {
 
   const { data: membershipBreakdown, isLoading: breakdownLoading } = useMembershipBreakdown()
   const { data: totalEquity, isLoading: equityLoading } = useTotalEquity()
+  const { data: totalSavings } = useTotalSavings()
   const { data: loanStats, isLoading: loanStatsLoading } = useLoanPortfolioStats()
   const { data: loanConfigured = false } = useLoanConfigured()
+  const { data: loanAging = [] } = useLoanAgingReport()
   const { data: membersRaw, isLoading: membersLoading } = useMemberList(dateFrom, dateTo)
+  const { data: portfolio = [] } = useMemberPortfolioReport()
   const { data: contributions = [], isLoading: contributionsLoading } = useMonthlyContributions()
   const { data: newMembers = [], isLoading: newMembersLoading } = useMonthlyNewMembers()
   const { data: allLoans = [] } = useAllLoans(dateFrom, dateTo)
@@ -198,6 +280,13 @@ export function ReportsPage() {
 
   const filteredMembers = members.filter((m: any) => {
     const matchesSearch = m.full_name.toLowerCase().includes(search.toLowerCase())
+    const ms = m.membership_status?.status ?? 'pending'
+    const matchesStatus = statusFilter === 'all' || ms === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  const filteredPortfolio = (portfolio as any[]).filter((m: any) => {
+    const matchesSearch = (m.full_name ?? '').toLowerCase().includes(search.toLowerCase())
     const ms = m.membership_status?.status ?? 'pending'
     const matchesStatus = statusFilter === 'all' || ms === statusFilter
     return matchesSearch && matchesStatus
@@ -318,7 +407,7 @@ export function ReportsPage() {
           </div>
         </div>
         {/* Key Stats */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 [&>*:last-child]:col-span-2 xl:[&>*:last-child]:col-span-1">
           <StatCard
             title="Total Members"
             value={formatNumber(totalMembers)}
@@ -360,6 +449,17 @@ export function ReportsPage() {
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            }
+          />
+          <StatCard
+            title="Total Savings"
+            value={currency(totalSavings ?? 0)}
+            subtitle={`${(portfolio as any[]).filter(m => m.savings_balance > 0).length} active savers`}
+            icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             }
           />
@@ -494,52 +594,194 @@ export function ReportsPage() {
           </Card>
         </div>
 
-        {/* Members Table */}
+        {/* Loan Aging Report */}
+        {loanConfigured && loanAging.length > 0 && (
+          <Card>
+            <CardHeader>
+              <h3 className="text-base font-semibold text-gray-900">Loan Aging / Delinquency Report</h3>
+            </CardHeader>
+            <CardBody className="p-0">
+              <Table>
+                <Thead>
+                  <Tr>
+                    <Th>Aging Bucket</Th>
+                    <Th className="text-center">Loans</Th>
+                    <Th className="text-right">Outstanding Balance</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {loanAging.map((row) => {
+                    const isOverdue = !['Current', 'Completed'].includes(row.bucket)
+                    return (
+                      <Tr key={row.bucket}>
+                        <Td>
+                          <span className={`font-medium ${isOverdue ? 'text-red-600' : 'text-gray-900'}`}>
+                            {row.bucket}
+                          </span>
+                        </Td>
+                        <Td className="text-center">{formatNumber(row.loan_count)}</Td>
+                        <Td className="text-right">
+                          <span className={isOverdue && row.total_outstanding > 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}>
+                            {currency(row.total_outstanding)}
+                          </span>
+                        </Td>
+                      </Tr>
+                    )
+                  })}
+                </Tbody>
+              </Table>
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Shares & Savings Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Shares breakdown */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Equity Shares</h3>
+                  <p className="text-sm text-gray-500">Total: {currency(totalEquity ?? 0)}</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardBody className="p-0">
+              {(portfolio as any[]).filter(m => m.equity.count > 0).length === 0 ? (
+                <p className="text-sm text-gray-400 p-6 text-center">No shares on record</p>
+              ) : (
+                <Table>
+                  <Thead>
+                    <Tr>
+                      <Th>Member</Th>
+                      <Th className="text-center">Shares</Th>
+                      <Th className="text-center">Completed</Th>
+                      <Th className="text-right">Amount Paid</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {(portfolio as any[])
+                      .filter(m => m.equity.count > 0)
+                      .sort((a, b) => b.equity.total - a.equity.total)
+                      .map(m => (
+                        <Tr
+                          key={m.id}
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => navigate(`/admin/members/${m.id}`)}
+                        >
+                          <Td className="font-medium text-gray-900">{m.full_name}</Td>
+                          <Td className="text-center text-gray-600">{m.equity.count}</Td>
+                          <Td className="text-center">
+                            <span className={m.equity.completed === m.equity.count ? 'text-green-700 font-medium' : 'text-gray-500'}>
+                              {m.equity.completed}
+                            </span>
+                          </Td>
+                          <Td className="text-right font-semibold text-gray-900">{currency(m.equity.total)}</Td>
+                        </Tr>
+                      ))}
+                  </Tbody>
+                </Table>
+              )}
+            </CardBody>
+          </Card>
+
+          {/* Savings breakdown */}
+          <Card>
+            <CardHeader>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Savings Balances</h3>
+                <p className="text-sm text-gray-500">Total: {currency(totalSavings ?? 0)}</p>
+              </div>
+            </CardHeader>
+            <CardBody className="p-0">
+              {(portfolio as any[]).filter(m => m.savings_balance > 0).length === 0 ? (
+                <p className="text-sm text-gray-400 p-6 text-center">No savings on record</p>
+              ) : (
+                <Table>
+                  <Thead>
+                    <Tr>
+                      <Th>Member</Th>
+                      <Th className="text-right">Balance</Th>
+                      <Th className="text-right">% of Total</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {(portfolio as any[])
+                      .filter(m => m.savings_balance > 0)
+                      .sort((a, b) => b.savings_balance - a.savings_balance)
+                      .map(m => (
+                        <Tr
+                          key={m.id}
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => navigate(`/admin/members/${m.id}`)}
+                        >
+                          <Td className="font-medium text-gray-900">{m.full_name}</Td>
+                          <Td className="text-right font-semibold text-gray-900">{currency(m.savings_balance)}</Td>
+                          <Td className="text-right text-gray-500 text-xs">
+                            {totalSavings ? `${((m.savings_balance / (totalSavings ?? 1)) * 100).toFixed(1)}%` : '—'}
+                          </Td>
+                        </Tr>
+                      ))}
+                  </Tbody>
+                </Table>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+
+        {/* Members Portfolio Table */}
         <Card>
           <CardHeader>
             <div>
-              <h3 className="text-base font-semibold text-gray-900">
-                Members{hasDateFilter ? ' (filtered by date)' : ''}
-              </h3>
+              <h3 className="text-base font-semibold text-gray-900">Members Portfolio</h3>
               <p className="text-sm text-gray-500">
-                Showing {filteredMembers.length} of {members.length} member{members.length !== 1 ? 's' : ''}
+                {filteredPortfolio.length} member{filteredPortfolio.length !== 1 ? 's' : ''} · click a row to view full profile
               </p>
             </div>
           </CardHeader>
           <CardBody className="p-0">
-            {!filteredMembers || filteredMembers.length === 0 ? (
+            {filteredPortfolio.length === 0 ? (
               <p className="text-sm text-gray-500 p-6 text-center">No members found</p>
             ) : (
               <Table>
                 <Thead>
                   <Tr>
-                    <Th>Name</Th>
-                    <Th>Account Status</Th>
+                    <Th>Member</Th>
                     <Th>Membership</Th>
-                    <Th>Completed Shares</Th>
+                    <Th className="text-right">Total Equity</Th>
+                    <Th className="text-right">Savings</Th>
+                    <Th className="text-center">Active Loans</Th>
+                    <Th className="text-right">Loan Outstanding</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {(filteredMembers as Array<{
-                    id: string
-                    full_name: string
-                    account_status: string
-                    membership_status: { status: string; completed_shares: number } | null
-                  }>).map((member) => {
-                    const ms = member.membership_status
-                    return (
-                      <Tr key={member.id}>
-                        <Td>
-                          <span className="font-medium text-gray-900">{member.full_name}</span>
-                        </Td>
-                        <Td><StatusBadge status={member.account_status} /></Td>
-                        <Td>
-                          <StatusBadge status={ms?.status ?? 'pending'} />
-                        </Td>
-                        <Td>{formatNumber(ms?.completed_shares ?? 0)}</Td>
-                      </Tr>
-                    )
-                  })}
+                  {(filteredPortfolio as any[]).map(m => (
+                    <Tr
+                      key={m.id}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => navigate(`/admin/members/${m.id}`)}
+                    >
+                      <Td>
+                        <p className="font-medium text-gray-900">{m.full_name}</p>
+                        <p className="text-xs text-gray-400">{m.equity.completed} completed share{m.equity.completed !== 1 ? 's' : ''}</p>
+                      </Td>
+                      <Td><StatusBadge status={m.membership_status?.status ?? 'pending'} /></Td>
+                      <Td className="text-right font-semibold text-gray-900">{currency(m.equity.total)}</Td>
+                      <Td className="text-right font-semibold text-gray-900">
+                        {m.savings_balance > 0 ? currency(m.savings_balance) : <span className="text-gray-300">—</span>}
+                      </Td>
+                      <Td className="text-center">
+                        {m.loans.active > 0
+                          ? <span className="font-medium text-amber-700">{m.loans.active}</span>
+                          : <span className="text-gray-300">—</span>}
+                      </Td>
+                      <Td className="text-right">
+                        {m.loans.outstanding > 0
+                          ? <span className="font-semibold text-red-600">{currency(m.loans.outstanding)}</span>
+                          : <span className="text-gray-300">—</span>}
+                      </Td>
+                    </Tr>
+                  ))}
                 </Tbody>
               </Table>
             )}

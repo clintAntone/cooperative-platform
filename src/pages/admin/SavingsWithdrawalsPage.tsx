@@ -29,6 +29,7 @@ export function SavingsWithdrawalsPage() {
   const [rejectTarget, setRejectTarget] = useState<SavingsWithdrawalRequestWithMeta | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [approveTarget, setApproveTarget] = useState<SavingsWithdrawalRequestWithMeta | null>(null)
+  const [detailReq, setDetailReq] = useState<SavingsWithdrawalRequestWithMeta | null>(null)
 
   const { data, isLoading } = useAllSavingsWithdrawalRequests({
     statusFilter,
@@ -164,7 +165,7 @@ export function SavingsWithdrawalsPage() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">No requests found.</td></tr>
               ) : rows.map(req => (
-                <tr key={req.id} className="hover:bg-gray-50">
+                <tr key={req.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailReq(req)}>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(req.created_at)}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{req.profiles?.full_name ?? '—'}</p>
@@ -224,6 +225,64 @@ export function SavingsWithdrawalsPage() {
           </div>
         )}
       </div>
+
+      {/* Detail modal */}
+      <Modal isOpen={!!detailReq} onClose={() => setDetailReq(null)} title="Withdrawal Request Details" size="lg">
+        {detailReq && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-base font-semibold text-gray-900">{detailReq.profiles?.full_name ?? '—'}</p>
+                {detailReq.profiles?.employee_id && <p className="text-xs text-gray-500">{detailReq.profiles.employee_id}</p>}
+              </div>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusColors[detailReq.status]}`}>
+                {detailReq.status}
+              </span>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm border-t border-gray-100 pt-4">
+              <div><dt className="text-xs text-gray-500">Submitted</dt><dd className="font-medium text-gray-900 mt-0.5">{formatDateTime(detailReq.created_at)}</dd></div>
+              <div><dt className="text-xs text-gray-500">Requested Amount</dt><dd className="font-semibold text-gray-900 mt-0.5">{currency(detailReq.amount)}</dd></div>
+              <div>
+                <dt className="text-xs text-gray-500">Account Balance</dt>
+                <dd className="font-medium mt-0.5">
+                  {detailReq.savings_accounts ? (
+                    <span className={detailReq.amount > detailReq.savings_accounts.balance ? 'text-red-600' : 'text-gray-900'}>
+                      {currency(detailReq.savings_accounts.balance)}
+                      {detailReq.amount > detailReq.savings_accounts.balance && ' (insufficient)'}
+                    </span>
+                  ) : '—'}
+                </dd>
+              </div>
+              {detailReq.savings_accounts && (
+                <div>
+                  <dt className="text-xs text-gray-500">Balance After</dt>
+                  <dd className={`font-medium mt-0.5 ${(detailReq.savings_accounts.balance - detailReq.amount) < 500 ? 'text-red-600' : 'text-gray-900'}`}>
+                    {currency(detailReq.savings_accounts.balance - detailReq.amount)}
+                  </dd>
+                </div>
+              )}
+              {detailReq.reason && (
+                <div className="col-span-2"><dt className="text-xs text-gray-500">Reason</dt><dd className="text-gray-800 mt-0.5">{detailReq.reason}</dd></div>
+              )}
+              {detailReq.status === 'rejected' && detailReq.rejection_reason && (
+                <div className="col-span-2"><dt className="text-xs text-red-500">Rejection Reason</dt><dd className="text-red-700 mt-0.5">{detailReq.rejection_reason}</dd></div>
+              )}
+            </dl>
+            {detailReq.status === 'pending' && (
+              <div className="flex gap-3 pt-2 border-t border-gray-100">
+                <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => { setDetailReq(null); setRejectTarget(detailReq); setRejectReason('') }}>
+                  Reject
+                </Button>
+                <Button className="flex-1"
+                  onClick={() => { setDetailReq(null); setApproveTarget(detailReq) }}>
+                  Approve
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Approve confirmation modal */}
       <Modal

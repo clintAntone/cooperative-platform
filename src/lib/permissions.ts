@@ -100,3 +100,34 @@ export const BOARD_PERMISSIONS: PermissionKey[] = [
   'view_loan_portfolio',
   'view_cooperative_funds',
 ]
+
+// All permissions available for custom role configuration, grouped logically
+export const CUSTOM_ROLE_PERMISSION_GROUPS: { label: string; keys: PermissionKey[] }[] = [
+  {
+    label: 'Approvals & Operations',
+    keys: [
+      'approve_deposits',
+      'reject_deposits',
+      'approve_savings',
+      'reject_savings',
+      'approve_loan_apps',
+      'reject_loan_apps',
+      'approve_membership',
+      'approve_share_transfers',
+      'manage_damayan',
+      'record_branch_data',
+      'manage_loan_products',
+      'restructure_loans',
+    ],
+  },
+  {
+    label: 'View & Reports',
+    keys: [
+      'view_reports',
+      'view_members',
+      'view_branch_portfolio',
+      'view_loan_portfolio',
+      'view_cooperative_funds',
+    ],
+  },
+]

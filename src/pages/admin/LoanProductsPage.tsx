@@ -16,6 +16,20 @@ const CALC_OPTIONS = [
   { value: 'equal_principal', label: 'Equal Principal' },
 ]
 
+const FREQUENCY_OPTIONS = [
+  { value: 'monthly',     label: 'Monthly' },
+  { value: 'semi_monthly', label: 'Semi-Monthly (twice/month)' },
+  { value: 'bi_weekly',   label: 'Bi-Weekly (every 2 weeks)' },
+  { value: 'weekly',      label: 'Weekly' },
+]
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  monthly:      'Monthly',
+  semi_monthly: 'Semi-Monthly',
+  bi_weekly:    'Bi-Weekly',
+  weekly:       'Weekly',
+}
+
 const FEE_TYPE_OPTIONS = [
   { value: '', label: 'None' },
   { value: 'fixed', label: 'Fixed Amount' },
@@ -33,6 +47,7 @@ interface ProductFormValues {
   interest_rate: string
   interest_rate_period: 'monthly' | 'annual'
   calculation_method: 'flat' | 'reducing_balance' | 'equal_principal'
+  repayment_frequency: 'weekly' | 'bi_weekly' | 'semi_monthly' | 'monthly'
   min_amount: string
   max_amount: string
   min_term_months: string
@@ -51,6 +66,7 @@ const emptyForm = (): ProductFormValues => ({
   interest_rate: '',
   interest_rate_period: 'annual',
   calculation_method: 'reducing_balance',
+  repayment_frequency: 'monthly',
   min_amount: '0',
   max_amount: '',
   min_term_months: '1',
@@ -123,6 +139,7 @@ export function LoanProductsPage() {
       interest_rate: String(p.interest_rate),
       interest_rate_period: p.interest_rate_period ?? 'annual',
       calculation_method: p.calculation_method,
+      repayment_frequency: p.repayment_frequency ?? 'monthly',
       min_amount: String(p.min_amount),
       max_amount: p.max_amount != null ? String(p.max_amount) : '',
       min_term_months: String(p.min_term_months),
@@ -152,6 +169,7 @@ export function LoanProductsPage() {
       interest_rate: parseFloat(form.interest_rate),
       interest_rate_period: form.interest_rate_period,
       calculation_method: form.calculation_method,
+      repayment_frequency: form.repayment_frequency,
       min_amount: parseFloat(form.min_amount) || 0,
       max_amount: form.max_amount ? parseFloat(form.max_amount) : null,
       min_term_months: parseInt(form.min_term_months),
@@ -305,8 +323,8 @@ export function LoanProductsPage() {
                       </svg>
                     </div>
 
-                    {/* Term + Amount stats */}
-                    <div className="grid grid-cols-2 divide-x divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
+                    {/* Term + Amount + Frequency stats */}
+                    <div className="grid grid-cols-3 divide-x divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
                       <div className="px-3 py-2">
                         <p className="text-xs text-gray-400">Term</p>
                         <p className="text-sm font-semibold text-gray-800 mt-0.5">{p.min_term_months}–{p.max_term_months} <span className="font-normal text-gray-500">mo</span></p>
@@ -316,6 +334,10 @@ export function LoanProductsPage() {
                         <p className="text-sm font-semibold text-gray-800 mt-0.5 truncate" title={p.max_amount ? currency(p.max_amount) : 'Unlimited'}>
                           {p.max_amount ? currency(p.max_amount) : 'Unlimited'}
                         </p>
+                      </div>
+                      <div className="px-3 py-2">
+                        <p className="text-xs text-gray-400">Schedule</p>
+                        <p className="text-sm font-semibold text-gray-800 mt-0.5">{FREQUENCY_LABELS[p.repayment_frequency ?? 'monthly']}</p>
                       </div>
                     </div>
 
@@ -426,6 +448,19 @@ export function LoanProductsPage() {
                     </span>
                   )}
                 </div>
+              </div>
+              {/* Repayment frequency row */}
+              <div className="grid grid-cols-[4rem_1fr] items-center gap-3 px-3 py-2.5 bg-gray-50">
+                <span className="text-xs font-medium text-gray-500">Schedule</span>
+                <select
+                  value={form.repayment_frequency}
+                  onChange={e => setForm(prev => ({ ...prev, repayment_frequency: e.target.value as any }))}
+                  className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {FREQUENCY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

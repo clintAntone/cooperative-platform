@@ -14,7 +14,7 @@ function RootRedirect() {
   const { profile, loading } = useAuth()
   if (loading) return null
   const role = profile?.role
-  if (role === 'member' || role === 'collector') return <Navigate to="/dashboard" replace />
+  if (role === 'member') return <Navigate to="/dashboard" replace />
   if (role === 'board') return <Navigate to="/reports" replace />
   return <Navigate to="/reports" replace />
 }
@@ -51,20 +51,22 @@ const RulesPage = lazy(() => import('./pages/RulesPage').then(m => ({ default: m
 const SavingsPage = lazy(() => import('./pages/savings/SavingsPage').then(m => ({ default: m.SavingsPage })))
 const SavingsDepositRequestPage = lazy(() => import('./pages/savings/SavingsDepositRequestPage').then(m => ({ default: m.SavingsDepositRequestPage })))
 const SavingsWithdrawPage = lazy(() => import('./pages/savings/SavingsWithdrawPage').then(m => ({ default: m.SavingsWithdrawPage })))
-const SavingsDepositRequestsPage = lazy(() => import('./pages/admin/SavingsDepositRequestsPage').then(m => ({ default: m.SavingsDepositRequestsPage })))
+const AllDepositRequestsPage = lazy(() => import('./pages/admin/AllDepositRequestsPage').then(m => ({ default: m.AllDepositRequestsPage })))
 const SavingsWithdrawalsPage = lazy(() => import('./pages/admin/SavingsWithdrawalsPage').then(m => ({ default: m.SavingsWithdrawalsPage })))
+const AdminSavingsPage = lazy(() => import('./pages/admin/AdminSavingsPage').then(m => ({ default: m.AdminSavingsPage })))
+const OverviewPage = lazy(() => import('./pages/overview/OverviewPage').then(m => ({ default: m.OverviewPage })))
 
 // Admin / Staff pages
 const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })))
 const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
 const MembersPage = lazy(() => import('./pages/admin/MembersPage').then(m => ({ default: m.MembersPage })))
 const MemberDetailPage = lazy(() => import('./pages/admin/MemberDetailPage').then(m => ({ default: m.MemberDetailPage })))
-const DepositRequestsPage = lazy(() => import('./pages/admin/DepositRequestsPage').then(m => ({ default: m.DepositRequestsPage })))
 const LoanApplicationsPage = lazy(() => import('./pages/admin/LoanApplicationsPage').then(m => ({ default: m.LoanApplicationsPage })))
 const LoanProductsPage = lazy(() => import('./pages/admin/LoanProductsPage').then(m => ({ default: m.LoanProductsPage })))
 const AdminLoanDetailPage = lazy(() => import('./pages/admin/AdminLoanDetailPage').then(m => ({ default: m.AdminLoanDetailPage })))
+const AdminLoanApplicationDetailPage = lazy(() => import('./pages/admin/AdminLoanApplicationDetailPage').then(m => ({ default: m.AdminLoanApplicationDetailPage })))
 
-// Collector pages
+// Member batch deposit page
 const BatchDepositPage = lazy(() => import('./pages/collector/BatchDepositPage').then(m => ({ default: m.BatchDepositPage })))
 const BatchDepositsPage = lazy(() => import('./pages/admin/BatchDepositsPage').then(m => ({ default: m.BatchDepositsPage })))
 
@@ -74,6 +76,7 @@ const ConfigPage = lazy(() => import('./pages/admin/ConfigPage').then(m => ({ de
 const AppSettingsPage = lazy(() => import('./pages/admin/AppSettingsPage').then(m => ({ default: m.AppSettingsPage })))
 const PermissionsPage = lazy(() => import('./pages/admin/PermissionsPage').then(m => ({ default: m.PermissionsPage })))
 const UserDetailPage = lazy(() => import('./pages/admin/UserDetailPage').then(m => ({ default: m.UserDetailPage })))
+const RolesPage = lazy(() => import('./pages/admin/RolesPage').then(m => ({ default: m.RolesPage })))
 
 // Cooperative feature pages (admin/staff)
 const DividendsPage = lazy(() => import('./pages/admin/DividendsPage').then(m => ({ default: m.DividendsPage })))
@@ -128,8 +131,8 @@ export default function App() {
                 <Route path="/branches" element={<ErrorBoundary><BranchKPIPage /></ErrorBoundary>} />
               </Route>
 
-              {/* Member + Collector */}
-              <Route element={<AppLayout requiredRoles={['member', 'collector']} />}>
+              {/* Member */}
+              <Route element={<AppLayout requiredRoles={['member']} />}>
                 <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
                 <Route path="/equity" element={<ErrorBoundary><EquityPage /></ErrorBoundary>} />
                 <Route path="/equity/deposit-request" element={<ErrorBoundary><DepositRequestPage /></ErrorBoundary>} />
@@ -142,30 +145,29 @@ export default function App() {
                 <Route path="/savings/deposit-request" element={<ErrorBoundary><SavingsDepositRequestPage /></ErrorBoundary>} />
                 <Route path="/savings/withdraw" element={<ErrorBoundary><SavingsWithdrawPage /></ErrorBoundary>} />
                 <Route path="/damayan" element={<ErrorBoundary><DamayanPage /></ErrorBoundary>} />
-              </Route>
-
-              {/* Collector only */}
-              <Route element={<AppLayout requiredRoles={['collector']} />}>
                 <Route path="/batch-deposit" element={<ErrorBoundary><BatchDepositPage /></ErrorBoundary>} />
                 <Route path="/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
               </Route>
 
               {/* Board of Directors + Admin + Staff — read views */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff', 'board']} />}>
+                <Route path="/overview" element={<ErrorBoundary><OverviewPage /></ErrorBoundary>} />
                 <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
                 <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
                 <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
                 <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
+                <Route path="/admin/loans/applications/:id" element={<ErrorBoundary><AdminLoanApplicationDetailPage /></ErrorBoundary>} />
                 <Route path="/admin/loans/:id" element={<ErrorBoundary><AdminLoanDetailPage /></ErrorBoundary>} />
               </Route>
 
               {/* Admin + Staff — operational */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
                 <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
-                <Route path="/admin/deposit-requests" element={<ErrorBoundary><DepositRequestsPage /></ErrorBoundary>} />
+                <Route path="/admin/deposit-requests" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
+                <Route path="/admin/savings-deposits" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
                 <Route path="/admin/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
-                <Route path="/admin/savings-deposits" element={<ErrorBoundary><SavingsDepositRequestsPage /></ErrorBoundary>} />
+                <Route path="/admin/savings" element={<ErrorBoundary><AdminSavingsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-withdrawals" element={<ErrorBoundary><SavingsWithdrawalsPage /></ErrorBoundary>} />
                 <Route path="/admin/share-transfers" element={<ErrorBoundary><ShareTransfersPage /></ErrorBoundary>} />
                 <Route path="/admin/damayan" element={<ErrorBoundary><DamayanAdminPage /></ErrorBoundary>} />
@@ -184,6 +186,7 @@ export default function App() {
                 <Route path="/admin/config" element={<ErrorBoundary><ConfigPage /></ErrorBoundary>} />
                 <Route path="/admin/settings" element={<ErrorBoundary><AppSettingsPage /></ErrorBoundary>} />
                 <Route path="/admin/permissions" element={<ErrorBoundary><PermissionsPage /></ErrorBoundary>} />
+                <Route path="/admin/roles" element={<ErrorBoundary><RolesPage /></ErrorBoundary>} />
                 <Route path="/admin/users/:id" element={<ErrorBoundary><UserDetailPage /></ErrorBoundary>} />
               </Route>
 

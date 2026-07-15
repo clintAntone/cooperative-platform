@@ -26,6 +26,7 @@ function useAppBranding() {
   })
 }
 
+
 interface AppLayoutProps {
   requiredRoles?: string[]
 }
@@ -81,7 +82,7 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
       {isAdminOrStaff && (
         <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       )}
-      {profile && !profile.profile_completed_at && (profile.role === 'member' || profile.role === 'collector') && (
+      {profile && !profile.profile_completed_at && profile.role === 'member' && (
         <ProfileCompletionModal />
       )}
 

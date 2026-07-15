@@ -134,6 +134,63 @@ export function useAllBatchDeposits(status?: 'pending' | 'approved' | 'rejected'
   })
 }
 
+export interface BatchDepositWithMembers extends BatchDeposit {
+  member_names: string[]
+}
+
+// Admin: all batches with member names (for unified deposit requests view)
+export function useAllBatchDepositsForUnified(params?: {
+  statusFilter?: string
+  search?: string
+}) {
+  const statusFilter = params?.statusFilter ?? 'all'
+  const search = params?.search ?? ''
+
+  return useQuery({
+    queryKey: ['batch_deposits_unified', statusFilter, search],
+    queryFn: async (): Promise<BatchDepositWithMembers[]> => {
+      let query = supabase
+        .from('batch_deposits')
+        .select('*, batch_deposit_items(id, user_id, amount, deposit_request_id)')
+        .order('created_at', { ascending: false })
+
+      if (statusFilter && statusFilter !== 'all') {
+        query = query.eq('status', statusFilter)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+
+      // Two-step: fetch all member names from items
+      const allUserIds = [...new Set((data ?? []).flatMap((b: any) =>
+        (b.batch_deposit_items ?? []).map((i: any) => i.user_id)
+      ))]
+
+      const { data: profiles } = allUserIds.length > 0
+        ? await supabase.from('profiles').select('id, full_name').in('id', allUserIds)
+        : { data: [] }
+
+      const nameMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p.full_name as string]))
+
+      let rows = (data ?? []).map((b: any) => ({
+        ...b,
+        items: b.batch_deposit_items ?? [],
+        member_names: (b.batch_deposit_items ?? []).map((i: any) => nameMap[i.user_id] ?? '—'),
+      })) as BatchDepositWithMembers[]
+
+      if (search) {
+        const q = search.toLowerCase()
+        rows = rows.filter(r =>
+          r.member_names.some(n => n.toLowerCase().includes(q)) ||
+          (r.reference ?? '').toLowerCase().includes(q)
+        )
+      }
+
+      return rows
+    },
+  })
+}
+
 // Admin: single batch detail with member names
 export function useBatchDepositDetail(batchId: string) {
   return useQuery({
@@ -186,7 +243,8 @@ export function useApproveBatchDeposit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch_deposits'] })
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['batch_deposits_unified'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_all'] })
       toast({ title: 'Batch approved', description: 'All member deposits have been recorded', variant: 'success' })
     },
     onError: (err: any) => {
@@ -205,6 +263,7 @@ export function useRejectBatchDeposit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch_deposits'] })
+      queryClient.invalidateQueries({ queryKey: ['batch_deposits_unified'] })
       toast({ title: 'Batch rejected', variant: 'success' })
     },
     onError: (err: any) => {

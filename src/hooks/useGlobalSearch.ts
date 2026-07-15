@@ -60,7 +60,7 @@ export function useGlobalSearch(query: string) {
           .order('created_at', { ascending: false })
           .limit(5),
         supabase
-          .from('deposit_requests')
+          .from('equity_deposit_requests')
           .select('id, user_id, amount, status')
           .in('user_id', memberIds)
           .order('created_at', { ascending: false })

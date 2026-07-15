@@ -17,12 +17,13 @@ import { PageGuide } from '../../components/shared/PageGuide'
 import { formatDate, formatDateTime } from '../../lib/utils'
 import { cn } from '../../lib/utils'
 
-type TabValue = 'pending' | 'approved' | 'rejected'
+type TabValue = 'all' | 'pending' | 'approved' | 'rejected'
 
 const tabs: { label: string; value: TabValue }[] = [
   { label: 'Pending', value: 'pending' },
   { label: 'Approved', value: 'approved' },
   { label: 'Rejected', value: 'rejected' },
+  { label: 'All', value: 'all' },
 ]
 
 function isPdf(url: string): boolean {
@@ -416,7 +417,7 @@ export function BatchDepositsPage() {
   const [activeTab, setActiveTab] = useState<TabValue>('pending')
   const [reviewBatchId, setReviewBatchId] = useState<string | null>(null)
 
-  const { data: batches = [], isLoading } = useAllBatchDeposits(activeTab)
+  const { data: batches = [], isLoading } = useAllBatchDeposits(activeTab === 'all' ? undefined : activeTab)
 
   if (isLoading) return <SkeletonPage cards={0} rows={6} />
 
@@ -424,7 +425,7 @@ export function BatchDepositsPage() {
     <div>
       <Header
         title="Batch Deposits"
-        subtitle="Review batch deposit submissions from collectors"
+        subtitle="Review batch deposit submissions from members"
       />
 
       <div className="p-4 sm:p-6 space-y-4">
@@ -435,7 +436,7 @@ export function BatchDepositsPage() {
             'Review the batch summary: check member count, total amount, and individual entries.',
             'Approve the entire batch to post all contributions, or reject it to send it back for correction.',
           ]}
-          note="Batches cannot be partially approved — it is all or nothing. Ask the collector to resubmit if individual entries are wrong."
+          note="Batches cannot be partially approved — it is all or nothing. Ask the submitter to resubmit if individual entries are wrong."
         />
         {/* Tabs */}
         <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
@@ -470,7 +471,7 @@ export function BatchDepositsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <p className="text-sm text-gray-400">No {activeTab} batch deposits</p>
+              <p className="text-sm text-gray-400">No {activeTab === 'all' ? '' : activeTab + ' '}batch deposits</p>
             </div>
           ) : (
             <>

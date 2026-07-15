@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Header } from '../../components/layout/Header'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { SkeletonPage } from '../../components/shared/Skeleton'
 import { ReceiptModal } from '../../components/shared/ReceiptModal'
+import { BatchDepositModal } from '../../components/shared/BatchDepositModal'
 import { useEquityShares, useEquitySummary } from '../../hooks/useEquity'
 import { useMyDepositRequests } from '../../hooks/useDepositRequests'
 import { formatDate, getProgressPercent } from '../../lib/utils'
@@ -16,21 +16,20 @@ import { ShareTransferModal } from './ShareTransferModal'
 import type { EquityShare } from '../../types'
 
 export function EquityPage() {
-  const navigate = useNavigate()
   const { profile } = useAuth()
   const { data: shares, isLoading } = useEquityShares()
   const { data: summary } = useEquitySummary()
   const { data: myDepositRequests = [] } = useMyDepositRequests()
   const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
   const [transferShare, setTransferShare] = useState<EquityShare | null>(null)
+  const [visibleDepositCount, setVisibleDepositCount] = useState(5)
+  const [showDepositModal, setShowDepositModal] = useState(false)
 
   const profileIncomplete = !profile?.profile_completed_at
   const { format: currency } = useCurrency()
+  const hasInProgressShare = shares?.some(s => s.status === 'in_progress') ?? false
+  const firstCompletedShare = shares?.find(s => s.status === 'completed') ?? null
   if (isLoading) return <SkeletonPage cards={3} rows={4} />
-
-  const handleRequestDeposit = (share: EquityShare) => {
-    navigate(`/equity/deposit-request?share_id=${share.id}`)
-  }
 
   return (
     <div>
@@ -62,7 +61,44 @@ export function EquityPage() {
         }
       />
 
-      <div className="p-4 sm:p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-3 sm:space-y-6">
+        {/* Action buttons */}
+        {(hasInProgressShare || firstCompletedShare) && (
+          <div className="flex gap-2 justify-end">
+            {hasInProgressShare && (
+              <Button
+                size="sm"
+                onClick={() => setShowDepositModal(true)}
+                disabled={profileIncomplete}
+                title={profileIncomplete ? 'Complete your profile first' : undefined}
+              >
+                {/* Banknote with arrow up = deposit */}
+                <svg className="w-5 h-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="1" y="2" width="22" height="13" rx="2" />
+                  <circle cx="12" cy="8.5" r="2.5" />
+                  <line x1="12" y1="6.5" x2="12" y2="10.5" />
+                  <circle cx="4.5" cy="8.5" r="0.6" fill="currentColor" stroke="none" />
+                  <circle cx="19.5" cy="8.5" r="0.6" fill="currentColor" stroke="none" />
+                  <path d="M12 22v-7M9.5 18l2.5-3 2.5 3" />
+                </svg>
+                <span className="hidden sm:inline">Make a Deposit</span>
+              </Button>
+            )}
+            {firstCompletedShare && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTransferShare(firstCompletedShare)}
+              >
+                <svg className="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span className="hidden sm:inline">Transfer Share</span>
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Summary */}
         <div className="grid grid-cols-3 gap-3">
           {[
@@ -95,11 +131,9 @@ export function EquityPage() {
             },
           ].map(c => (
             <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                {c.icon}
-                <p className="text-xs text-gray-500 truncate">{c.label}</p>
-              </div>
-              <p className="text-sm sm:text-lg font-semibold text-gray-900 truncate">{c.value}</p>
+              <div className="mb-1.5">{c.icon}</div>
+              <p className="text-[10px] sm:text-xs text-gray-500 leading-tight mb-1">{c.label}</p>
+              <p className="text-sm sm:text-lg font-semibold text-gray-900">{c.value}</p>
             </div>
           ))}
         </div>
@@ -151,43 +185,18 @@ export function EquityPage() {
                           style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <p className="text-xs text-gray-400 mt-1.5">
-                        Target: {currency(share.target_amount)}
-                      </p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <p className="text-xs text-gray-400">Target: {currency(share.target_amount)}</p>
+                        {share.status === 'in_progress' && (
+                          <p className="text-xs text-gray-500">Remaining: <span className="font-medium text-gray-700">{currency(remaining)}</span></p>
+                        )}
+                      </div>
                     </div>
 
                     {share.status === 'completed' ? (
-                      <div className="space-y-2 mt-auto">
-                        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Completed {share.completed_at ? formatDate(share.completed_at) : ''}
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => setTransferShare(share)}
-                        >
-                          Transfer Share
-                        </Button>
-                      </div>
+                      <div className="mt-auto" />
                     ) : share.status === 'in_progress' ? (
                       <div className="space-y-2 mt-auto">
-                        <p className="text-xs text-gray-500">
-                          Remaining: <span className="font-medium text-gray-700">{currency(remaining)}</span>
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => handleRequestDeposit(share)}
-                          disabled={profileIncomplete}
-                          title={profileIncomplete ? 'Complete your profile first' : undefined}
-                        >
-                          Request Deposit
-                        </Button>
                         {profileIncomplete && (
                           <button
                             type="button"
@@ -213,7 +222,7 @@ export function EquityPage() {
           <div>
             <h2 className="text-base font-semibold text-gray-900 mb-3">My Deposit Requests</h2>
             <div className="space-y-2">
-              {myDepositRequests.slice(0, 10).map(req => {
+              {myDepositRequests.slice(0, visibleDepositCount).map(req => {
                 const clickable = !!req.receipt_url
                 return (
                   <div
@@ -241,6 +250,14 @@ export function EquityPage() {
                 )
               })}
             </div>
+            {visibleDepositCount < myDepositRequests.length && (
+              <button
+                onClick={() => setVisibleDepositCount(c => c + 5)}
+                className="mt-2 w-full py-2 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                Load more ({myDepositRequests.length - visibleDepositCount} remaining)
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -260,6 +277,12 @@ export function EquityPage() {
           onClose={() => setTransferShare(null)}
         />
       )}
+
+      <BatchDepositModal
+        isOpen={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
+        defaultType="shares"
+      />
     </div>
   )
 }

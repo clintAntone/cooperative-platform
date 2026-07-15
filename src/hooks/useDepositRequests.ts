@@ -32,10 +32,10 @@ export function useMyDepositRequests() {
   const effectiveUserId = useEffectiveUserId()
 
   return useQuery({
-    queryKey: ['deposit_requests_mine', effectiveUserId],
+    queryKey: ['equity_deposit_requests_mine', effectiveUserId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('deposit_requests')
+        .from('equity_deposit_requests')
         .select('id, user_id, share_id, amount, payment_method, reference, receipt_url, notes, status, reviewed_by, reviewed_at, rejection_reason, created_at, updated_at')
         .eq('user_id', effectiveUserId!)
         .order('created_at', { ascending: false })
@@ -84,13 +84,13 @@ export function useAllDepositRequests(params?: {
   const dateTo = params?.dateTo ?? ''
 
   return useQuery({
-    queryKey: ['deposit_requests_all', statusFilter, page, pageSize, search, sortKey, sortDir, dateFrom, dateTo],
+    queryKey: ['equity_deposit_requests_all', statusFilter, page, pageSize, search, sortKey, sortDir, dateFrom, dateTo],
     queryFn: async (): Promise<DepositRequestsPage> => {
       const from = page * pageSize
       const to = from + pageSize - 1
 
       let query = supabase
-        .from('deposit_requests')
+        .from('equity_deposit_requests')
         .select(
           `*, profiles!deposit_requests_user_id_fkey(full_name, employee_id), equity_shares!deposit_requests_share_id_fkey(share_number)`,
           { count: 'exact' }
@@ -133,12 +133,12 @@ export function usePendingDepositCount() {
   return useQuery({
     queryKey: ['pending_deposit_count'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('deposit_requests')
-        .select('id')
+      const { count, error } = await supabase
+        .from('batch_deposits')
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'pending')
       if (error) return 0
-      return data?.length ?? 0
+      return count ?? 0
     },
     refetchInterval: 60_000,
   })
@@ -162,7 +162,7 @@ export function useSubmitDepositRequest() {
   return useMutation({
     mutationFn: async (input: SubmitDepositRequestInput) => {
       const { data, error } = await supabase
-        .from('deposit_requests')
+        .from('equity_deposit_requests')
         .insert({
           user_id: user!.id,
           share_id: input.share_id,
@@ -184,8 +184,8 @@ export function useSubmitDepositRequest() {
       return data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_mine'] })
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_mine'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_all'] })
       toast({ title: 'Deposit request submitted', description: 'Waiting for admin review', variant: 'success' })
     },
   })
@@ -204,8 +204,8 @@ export function useApproveDepositRequest() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_mine'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_mine'] })
       toast({ title: 'Deposit approved', variant: 'success' })
       queryClient.invalidateQueries({ queryKey: ['equity_shares'] })
       queryClient.invalidateQueries({ queryKey: ['equity_contributions'] })
@@ -231,8 +231,8 @@ export function useRejectDepositRequest() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_mine'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_mine'] })
       toast({ title: 'Deposit rejected', variant: 'info' })
     },
   })
@@ -249,7 +249,7 @@ export function useBulkApproveDepositRequests() {
       if (failed > 0) throw new Error(`${failed} request(s) could not be approved`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_all'] })
       queryClient.invalidateQueries({ queryKey: ['equity_shares'] })
       queryClient.invalidateQueries({ queryKey: ['equity_summary'] })
       queryClient.invalidateQueries({ queryKey: ['membership_status'] })
@@ -257,7 +257,7 @@ export function useBulkApproveDepositRequests() {
       toast({ title: 'Selected deposits approved', variant: 'success' })
     },
     onError: (err: any) => {
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_all'] })
       toast({ title: err.message ?? 'Bulk approve partially failed', variant: 'error' })
     },
   })
@@ -276,11 +276,11 @@ export function useBulkRejectDepositRequests() {
       if (failed > 0) throw new Error(`${failed} request(s) could not be rejected`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_all'] })
       toast({ title: 'Selected deposits rejected', variant: 'info' })
     },
     onError: (err: any) => {
-      queryClient.invalidateQueries({ queryKey: ['deposit_requests_all'] })
+      queryClient.invalidateQueries({ queryKey: ['equity_deposit_requests_all'] })
       toast({ title: err.message ?? 'Bulk reject partially failed', variant: 'error' })
     },
   })

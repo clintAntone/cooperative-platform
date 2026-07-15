@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import { useImpersonation } from '../../context/ImpersonationContext'
 import { Card } from '../../components/ui/Card'
@@ -19,9 +19,19 @@ import { useSavingsAccount, useSavingsDepositRequests, useSavingsWithdrawalReque
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, formatDateTime, getProgressPercent } from '../../lib/utils'
 import { exportMemberStatementPdf } from '../../lib/exportPdf'
-import { supabase } from '../../lib/supabase'
-import { toast } from '../../lib/toast'
+import { useCustomRoles, useAssignCustomRole } from '../../hooks/useCustomRoles'
 import type { EquityContribution, DepositRequest } from '../../types'
+
+const customRoleColorMap: Record<string, string> = {
+  gray:   'bg-gray-100 text-gray-700',
+  blue:   'bg-blue-100 text-blue-700',
+  green:  'bg-green-100 text-green-700',
+  purple: 'bg-purple-100 text-purple-700',
+  red:    'bg-red-100 text-red-700',
+  yellow: 'bg-yellow-100 text-yellow-700',
+  orange: 'bg-orange-100 text-orange-700',
+  pink:   'bg-pink-100 text-pink-700',
+}
 
 interface ContributionDetailModalProps {
   contribution: EquityContribution | null
@@ -74,6 +84,8 @@ export function MemberDetailPage() {
   const deleteShare = useAdminDeleteShare(id!)
   const { data: shareLimit } = useShareLimit(id!)
 
+  const [showPersonalDetails, setShowPersonalDetails] = useState(false)
+  const [showNotesModal, setShowNotesModal] = useState(false)
   const [showOnlyPendingDeposits, setShowOnlyPendingDeposits] = useState(true)
   const [selectedContribution, setSelectedContribution] = useState<EquityContribution | null>(null)
   const [rejectTarget, setRejectTarget] = useState<DepositRequest | null>(null)
@@ -81,8 +93,8 @@ export function MemberDetailPage() {
   const [receiptModal, setReceiptModal] = useState<{ url: string; details: any } | null>(null)
   const [shareError, setShareError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [promoteConfirm, setPromoteConfirm] = useState(false)
-  const [demoteConfirm, setDemoteConfirm] = useState(false)
+  const [showAssignRole, setShowAssignRole] = useState(false)
+  const [selectedCustomRoleId, setSelectedCustomRoleId] = useState<string>('')
   const [newNote, setNewNote] = useState('')
 
   const { data: memberDocuments = [] } = useMemberDocuments(id!)
@@ -93,27 +105,10 @@ export function MemberDetailPage() {
   const { data: savingsInterestLogs = [] } = useSavingsInterestLogs(savingsAccount?.id)
   const addNote = useAddMemberNote(id!)
   const deleteNote = useDeleteMemberNote(id!)
+  const { data: customRoles = [] } = useCustomRoles()
+  const assignCustomRole = useAssignCustomRole()
 
   const queryClient = useQueryClient()
-
-  const changeRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: 'collector' | 'member' }) => {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role })
-        .eq('id', userId)
-      if (error) throw error
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['member_detail', variables.userId] })
-      queryClient.invalidateQueries({ queryKey: ['members_list'] })
-      const action = variables.role === 'collector' ? 'promoted to Collector' : 'demoted to Member'
-      toast({ title: `Member ${action}`, variant: 'success' })
-    },
-    onError: (err: any) => {
-      toast({ title: err.message ?? 'Failed to update role', variant: 'error' })
-    },
-  })
 
   if (isLoading) return <SkeletonDetailPage />
   if (!data) return <div className="p-6 text-gray-500">Member not found.</div>
@@ -122,11 +117,10 @@ export function MemberDetailPage() {
 
   const totalInvested = equityShares.reduce((sum, s) => sum + s.paid_amount, 0)
   const completedShares = equityShares.filter(s => s.status === 'completed').length
-  const pendingRequests = depositRequests.filter(r => r.status === 'pending').length
   const activeLoans = loans.filter((l: any) => l.status === 'active').length
 
   function findReceiptForContribution(contrib: EquityContribution): string | null {
-    return contrib.deposit_requests?.receipt_url ?? null
+    return contrib.equity_deposit_requests?.receipt_url ?? null
   }
 
   const handleApprove = (requestId: string) => {
@@ -164,28 +158,73 @@ export function MemberDetailPage() {
             </svg>
           </button>
           <div className="flex items-center gap-2 ml-auto">
-          {adminProfile?.role === 'admin' && profile.role === 'member' && (
-            <button
-              title="Promote to Collector"
-              onClick={() => setPromoteConfirm(true)}
-              className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7 11l5-5m0 0l5 5m-5-5v12" />
-              </svg>
-              <span className="hidden sm:inline">Promote to Collector</span>
-            </button>
+          {(adminProfile?.role === 'admin' || adminProfile?.role === 'staff') && (
+            <div className="flex items-center gap-2">
+              {(profile as any).custom_roles && (
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${customRoleColorMap[(profile as any).custom_roles?.color ?? 'gray'] ?? 'bg-gray-100 text-gray-700'}`}>
+                  {(profile as any).custom_roles?.name}
+                </span>
+              )}
+              {showAssignRole ? (
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={selectedCustomRoleId}
+                    onChange={e => setSelectedCustomRoleId(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">— No Role —</option>
+                    {customRoles.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={async () => {
+                      await assignCustomRole.mutateAsync({ userId: profile.id, customRoleId: selectedCustomRoleId || null })
+                      setShowAssignRole(false)
+                      queryClient.invalidateQueries({ queryKey: ['member_detail', profile.id] })
+                    }}
+                    disabled={assignCustomRole.isPending}
+                    className="px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setShowAssignRole(false)}
+                    className="px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setSelectedCustomRoleId((profile as any).custom_role_id ?? '')
+                    setShowAssignRole(true)
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
+                  </svg>
+                  <span className="hidden sm:inline">Assign Role</span>
+                </button>
+              )}
+            </div>
           )}
-          {adminProfile?.role === 'admin' && profile.role === 'collector' && (
+          {(adminProfile?.role === 'admin' || adminProfile?.role === 'staff') && (
             <button
-              title="Demote to Member"
-              onClick={() => setDemoteConfirm(true)}
-              className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+              onClick={() => setShowNotesModal(true)}
+              className="relative inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              <span className="hidden sm:inline">Demote to Member</span>
+              <span className="hidden sm:inline">Notes</span>
+              {memberNotes.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {memberNotes.length}
+                </span>
+              )}
             </button>
           )}
           {adminProfile?.role === 'admin' && (
@@ -261,8 +300,8 @@ export function MemberDetailPage() {
         {[
           { label: 'Total Invested', value: currency(totalInvested) },
           { label: 'Completed Shares', value: completedShares },
+          { label: 'Savings Balance', value: savingsAccount ? currency(savingsAccount.balance) : '—' },
           { label: 'Active Loans', value: activeLoans },
-          { label: 'Pending Requests', value: pendingRequests },
         ].map(c => (
           <Card key={c.label} className="p-3 sm:p-4 text-center">
             <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate" title={String(c.value)}>{c.value}</p>
@@ -270,6 +309,126 @@ export function MemberDetailPage() {
           </Card>
         ))}
       </div>
+
+      {/* ── Collapsible: Personal Details + Documents + Notes ───────── */}
+      <Card className="overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowPersonalDetails(o => !o)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+        >
+          <span className="text-sm font-medium text-gray-700">Personal Details &amp; Documents</span>
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${showPersonalDetails ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showPersonalDetails && (
+          <div className="border-t border-gray-100 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
+            {/* Personal info */}
+            <div className="p-4 space-y-3">
+              <dl className="divide-y divide-gray-100">
+                {[
+                  { label: 'Phone', value: profile.phone },
+                  { label: 'Date of Birth', value: (profile as any).date_of_birth ? formatDate((profile as any).date_of_birth) : null },
+                  { label: 'Civil Status', value: (profile as any).civil_status },
+                  { label: 'Address', value: (profile as any).address },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex justify-between gap-4 py-2 text-sm">
+                    <dt className="text-gray-400 flex-shrink-0">{label}</dt>
+                    <dd className="text-gray-900 text-right">{value ?? <span className="text-gray-300 italic text-xs">Not provided</span>}</dd>
+                  </div>
+                ))}
+              </dl>
+              {((profile as any).emergency_contact_name || (profile as any).emergency_contact_phone) && (
+                <>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-1">Emergency Contact</p>
+                  <dl className="divide-y divide-gray-100">
+                    {[
+                      { label: 'Name', value: (profile as any).emergency_contact_name },
+                      { label: 'Phone', value: (profile as any).emergency_contact_phone },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between gap-4 py-2 text-sm">
+                        <dt className="text-gray-400 flex-shrink-0">{label}</dt>
+                        <dd className="text-gray-900 text-right">{value ?? <span className="text-gray-300 italic text-xs">Not provided</span>}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
+              )}
+              <dl className="divide-y divide-gray-100">
+                <div className="flex justify-between gap-4 py-2 text-sm">
+                  <dt className="text-gray-400">Account Status</dt>
+                  <dd><StatusBadge status={profile.account_status} /></dd>
+                </div>
+                {membershipStatusValue && (
+                  <div className="flex justify-between gap-4 py-2 text-sm">
+                    <dt className="text-gray-400">Membership</dt>
+                    <dd><StatusBadge status={membershipStatusValue} /></dd>
+                  </div>
+                )}
+                {(profile as any).profile_completed_at && (
+                  <div className="flex justify-between gap-4 py-2 text-sm">
+                    <dt className="text-gray-400">Profile Completed</dt>
+                    <dd className="text-gray-900">{formatDate((profile as any).profile_completed_at)}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+
+            {/* Documents + Notes */}
+            <div className="divide-y divide-gray-100">
+              {/* Documents */}
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Documents</p>
+                  <span className="text-xs text-gray-400">{memberDocuments.length} file{memberDocuments.length !== 1 ? 's' : ''}</span>
+                </div>
+                {memberDocuments.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-gray-400">No documents uploaded yet</p>
+                    <p className="text-xs text-gray-300 mt-0.5">Documents submitted by the member will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {memberDocuments.map(doc => (
+                      <a
+                        key={doc.id}
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2.5 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center flex-shrink-0 group-hover:border-blue-200">
+                          <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-700">{doc.file_name}</p>
+                          <p className="text-xs text-gray-400">{DOCUMENT_TYPE_LABELS[doc.document_type]} · {formatDate(doc.uploaded_at)}</p>
+                        </div>
+                        <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Equity Shares */}
       <div>
@@ -647,94 +806,92 @@ export function MemberDetailPage() {
         )}
       </div>
 
-      {/* Documents */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Documents</h2>
-        {memberDocuments.length === 0 ? (
-          <Card className="p-6 text-center text-gray-400 text-sm">No documents uploaded yet.</Card>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {memberDocuments.map(doc => (
-              <a
-                key={doc.id}
-                href={doc.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 px-4 py-3 hover:border-blue-300 hover:bg-blue-50 transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 truncate">{doc.file_name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{DOCUMENT_TYPE_LABELS[doc.document_type]} · {formatDate(doc.uploaded_at)}</p>
-                </div>
-                <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Internal Notes Modal */}
+      <Modal
+        isOpen={showNotesModal}
+        onClose={() => { setShowNotesModal(false); setNewNote('') }}
+        title={`Notes — ${profile.full_name}`}
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-gray-400">
+            These notes are only visible to admins and staff. The member cannot see them.
+          </p>
 
-      {/* Admin Notes — admin/staff only */}
-      {(adminProfile?.role === 'admin' || adminProfile?.role === 'staff') && (
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Internal Notes</h2>
-          <Card className="p-4 space-y-4">
-            {/* Add note */}
-            <div className="flex gap-2">
-              <textarea
-                rows={2}
-                value={newNote}
-                onChange={e => setNewNote(e.target.value)}
-                placeholder="Add an internal note..."
-                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-gray-50"
-              />
-              <Button
-                size="sm"
+          {/* Composer */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+            <textarea
+              rows={3}
+              value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              placeholder="Write a note, e.g. 'Member called to discuss payment plan on Jul 15...'"
+              className="w-full px-3 pt-2.5 pb-1 text-sm bg-transparent focus:outline-none resize-none text-gray-800 placeholder-gray-400"
+            />
+            <div className="flex justify-end px-2 pb-2">
+              <button
                 disabled={!newNote.trim() || addNote.isPending}
-                loading={addNote.isPending}
                 onClick={async () => {
                   if (!newNote.trim()) return
                   await addNote.mutateAsync(newNote.trim())
                   setNewNote('')
                 }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                Add
-              </Button>
+                {addNote.isPending ? (
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                )}
+                Add Note
+              </button>
             </div>
+          </div>
 
-            {/* Notes list */}
-            {memberNotes.length === 0 ? (
-              <p className="text-xs text-gray-400 italic">No notes yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {memberNotes.map(note => (
-                  <div key={note.id} className="flex gap-3 group">
-                    <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2.5 text-sm text-gray-800 leading-relaxed">
-                      {note.note}
-                      <p className="text-[10px] text-gray-400 mt-1.5">
-                        {note.author_name} · {formatDateTime(note.created_at)}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => deleteNote.mutate(note.id)}
-                      className="opacity-0 group-hover:opacity-100 self-start mt-2 text-gray-400 hover:text-red-600 transition-all"
-                      title="Delete note"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
+          {/* Notes list */}
+          {memberNotes.length === 0 ? (
+            <div className="text-center py-6">
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-2">
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
               </div>
-            )}
-          </Card>
+              <p className="text-sm text-gray-400">No notes yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {memberNotes.map(note => (
+                <div key={note.id} className="group flex gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                    {note.author_name?.charAt(0)?.toUpperCase() ?? '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm text-gray-800 leading-relaxed">
+                      {note.note}
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1 px-1">
+                      {note.author_name} · {formatDateTime(note.created_at)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => deleteNote.mutate(note.id)}
+                    className="opacity-0 group-hover:opacity-100 self-start mt-1 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                    title="Delete note"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </Modal>
 
       {/* Contribution detail modal */}
       <ContributionDetailModal
@@ -833,65 +990,6 @@ export function MemberDetailPage() {
         </div>
       </Modal>
 
-      {/* Promote to Collector modal */}
-      <Modal
-        isOpen={promoteConfirm}
-        onClose={() => setPromoteConfirm(false)}
-        title="Promote to Collector"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Promote <span className="font-semibold">{profile.full_name}</span> to Collector?
-            They will be able to submit batch deposits on behalf of other members.
-          </p>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" onClick={() => setPromoteConfirm(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              loading={changeRoleMutation.isPending}
-              onClick={async () => {
-                await changeRoleMutation.mutateAsync({ userId: profile.id, role: 'collector' })
-                setPromoteConfirm(false)
-              }}
-            >
-              Promote to Collector
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Demote to Member modal */}
-      <Modal
-        isOpen={demoteConfirm}
-        onClose={() => setDemoteConfirm(false)}
-        title="Demote to Member"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Demote <span className="font-semibold">{profile.full_name}</span> back to Member?
-            They will no longer be able to submit batch deposits.
-          </p>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" onClick={() => setDemoteConfirm(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              loading={changeRoleMutation.isPending}
-              onClick={async () => {
-                await changeRoleMutation.mutateAsync({ userId: profile.id, role: 'member' })
-                setDemoteConfirm(false)
-              }}
-            >
-              Demote to Member
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }

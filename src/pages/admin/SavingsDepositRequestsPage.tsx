@@ -3,6 +3,7 @@ import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
+import { InlineReceiptViewer } from '../../components/shared/InlineReceiptViewer'
 import {
   useAllSavingsDepositRequests,
   useApproveSavingsDeposit,
@@ -30,7 +31,8 @@ export function SavingsDepositRequestsPage() {
   const [search, setSearch] = useState('')
   const [rejectTarget, setRejectTarget] = useState<SavingsDepositRequestWithMeta | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-  const [approveTarget, setApproveTarget] = useState<SavingsDepositRequestWithMeta | null>(null)
+  const [detailReq, setDetailReq] = useState<SavingsDepositRequestWithMeta | null>(null)
+  const [confirmingApproveInDetail, setConfirmingApproveInDetail] = useState(false)
   const [showReleaseConfirm, setShowReleaseConfirm] = useState(false)
 
   const { data: lastRelease } = useLastInterestRelease()
@@ -162,7 +164,7 @@ export function SavingsDepositRequestsPage() {
               <div className="text-xs text-gray-500 capitalize">{req.payment_method.replace('_', ' ')} {req.reference ? `· ${req.reference}` : ''}</div>
               {req.status === 'pending' && (
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" className="flex-1" onClick={() => setApproveTarget(req)}>Approve</Button>
+                  <Button size="sm" className="flex-1" onClick={() => { setDetailReq(req); setConfirmingApproveInDetail(true) }}>Approve</Button>
                   <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setRejectTarget(req); setRejectReason('') }}>Reject</Button>
                 </div>
               )}
@@ -193,7 +195,7 @@ export function SavingsDepositRequestsPage() {
               ) : rows.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">No requests found.</td></tr>
               ) : rows.map(req => (
-                <tr key={req.id} className="hover:bg-gray-50">
+                <tr key={req.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setDetailReq(req)}>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(req.created_at)}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{req.profiles?.full_name ?? '—'}</p>
@@ -212,34 +214,26 @@ export function SavingsDepositRequestsPage() {
                       <p className="text-xs text-red-500 mt-0.5 max-w-xs">{req.rejection_reason}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    {req.status === 'pending' && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setApproveTarget(req)}
-                          className="text-xs text-green-600 hover:text-green-800 font-medium"
-                        >
-                          Approve
-                        </button>
-                        <span className="text-gray-300">|</span>
-                        <button
-                          onClick={() => { setRejectTarget(req); setRejectReason('') }}
-                          className="text-xs text-red-600 hover:text-red-800 font-medium"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                    {req.receipt_url && (
-                      <a
-                        href={req.receipt_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:text-blue-800"
-                      >
-                        View Receipt
-                      </a>
-                    )}
+                  <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    <div className="flex flex-col gap-1 items-start">
+                      {req.status === 'pending' && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => { setDetailReq(req); setConfirmingApproveInDetail(true) }}
+                            className="text-xs text-green-600 hover:text-green-800 font-medium"
+                          >
+                            Approve
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            onClick={() => { setRejectTarget(req); setRejectReason('') }}
+                            className="text-xs text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -259,38 +253,76 @@ export function SavingsDepositRequestsPage() {
         )}
       </div>
 
-      {/* Approve confirmation modal */}
-      <Modal
-        isOpen={!!approveTarget}
-        onClose={() => setApproveTarget(null)}
-        title="Approve Savings Deposit"
-        size="sm"
-      >
-        {approveTarget && (
+      {/* Detail modal */}
+      <Modal isOpen={!!detailReq} onClose={() => { setDetailReq(null); setConfirmingApproveInDetail(false) }} title="Deposit Request Details" size="lg">
+        {detailReq && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Approve <strong>{currency(approveTarget.amount)}</strong> deposit from{' '}
-              <strong>{approveTarget.profiles?.full_name}</strong>?
-              This will credit their savings account.
-            </p>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setApproveTarget(null)}>Cancel</Button>
-              <Button
-                className="flex-1"
-                loading={approve.isPending}
-                onClick={() =>
-                  approve.mutate(approveTarget.id, {
-                    onSuccess: () => setApproveTarget(null),
-                    onError: (err: any) => alert(err.message ?? 'Failed to approve'),
-                  })
-                }
-              >
-                Approve
-              </Button>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-base font-semibold text-gray-900">{detailReq.profiles?.full_name ?? '—'}</p>
+                {detailReq.profiles?.employee_id && <p className="text-xs text-gray-500">{detailReq.profiles.employee_id}</p>}
+              </div>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusColors[detailReq.status]}`}>
+                {detailReq.status}
+              </span>
             </div>
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm border-t border-gray-100 pt-4">
+              <div><dt className="text-xs text-gray-500">Submitted</dt><dd className="font-medium text-gray-900 mt-0.5">{formatDateTime(detailReq.created_at)}</dd></div>
+              <div><dt className="text-xs text-gray-500">Amount</dt><dd className="font-semibold text-gray-900 mt-0.5">{currency(detailReq.amount)}</dd></div>
+              <div><dt className="text-xs text-gray-500">Payment Method</dt><dd className="font-medium text-gray-900 mt-0.5 capitalize">{detailReq.payment_method.replace('_', ' ')}</dd></div>
+              <div><dt className="text-xs text-gray-500">Reference</dt><dd className="font-medium text-gray-900 mt-0.5 font-mono">{detailReq.reference ?? '—'}</dd></div>
+              {detailReq.notes && <div className="col-span-2"><dt className="text-xs text-gray-500">Notes</dt><dd className="font-medium text-gray-900 mt-0.5">{detailReq.notes}</dd></div>}
+              {detailReq.status === 'rejected' && detailReq.rejection_reason && (
+                <div className="col-span-2"><dt className="text-xs text-red-500">Rejection Reason</dt><dd className="text-red-700 mt-0.5">{detailReq.rejection_reason}</dd></div>
+              )}
+            </dl>
+            {detailReq.receipt_url && (
+              <InlineReceiptViewer url={detailReq.receipt_url} />
+            )}
+            {detailReq.status === 'pending' && (
+              <div className="pt-2 border-t border-gray-100 space-y-3">
+                {confirmingApproveInDetail ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
+                    <p className="text-sm text-gray-800 font-medium">Confirm approval</p>
+                    <p className="text-sm text-gray-600">
+                      Approve <strong>{currency(detailReq.amount)}</strong> deposit from{' '}
+                      <strong>{detailReq.profiles?.full_name}</strong>? This will credit their savings account.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1"
+                        onClick={() => setConfirmingApproveInDetail(false)}
+                        disabled={approve.isPending}>
+                        Cancel
+                      </Button>
+                      <Button size="sm" className="flex-1"
+                        loading={approve.isPending}
+                        onClick={() => {
+                          approve.mutate(detailReq.id, {
+                            onSuccess: () => { setConfirmingApproveInDetail(false); setDetailReq(null) },
+                            onError: (err: any) => alert(err.message ?? 'Failed to approve'),
+                          })
+                        }}>
+                        Confirm Approve
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => { setDetailReq(null); setRejectTarget(detailReq); setRejectReason('') }}>
+                      Reject
+                    </Button>
+                    <Button className="flex-1" onClick={() => setConfirmingApproveInDetail(true)}>
+                      Approve
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Modal>
+
 
       {/* Reject modal */}
       <Modal

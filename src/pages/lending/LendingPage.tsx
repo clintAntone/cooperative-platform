@@ -9,8 +9,9 @@ import { StatusBadge } from '../../components/shared/StatusBadge'
 import { SkeletonPage } from '../../components/shared/Skeleton'
 import { Table, Thead, Tbody, Th, Tr, Td } from '../../components/ui/Table'
 import { LoanApplicationForm } from './LoanApplicationForm'
-import { useLoanApplications, useLoans, useMyCoMakerRequests, useRespondToCoMakerRequest, useMyApplicationCoMakers } from '../../hooks/useLoans'
+import { useLoanApplications, useLoans, useMyCoMakerRequests, useRespondToCoMakerRequest, useMyApplicationCoMakers, useCancelLoanApplication } from '../../hooks/useLoans'
 import { useMembershipStatus } from '../../hooks/useMembership'
+import { useSavingsAccount } from '../../hooks/useSavings'
 import { useAuth } from '../../context/AuthContext'
 import { formatDate } from '../../lib/utils'
 import { useCurrency } from '../../hooks/useCurrency'
@@ -42,6 +43,8 @@ export function LendingPage() {
   const { data: coMakerRequests = [] } = useMyCoMakerRequests()
   const respondToCoMaker = useRespondToCoMakerRequest()
   const { data: myAppCoMakers = [] } = useMyApplicationCoMakers()
+  const cancelApplication = useCancelLoanApplication()
+  const { data: savingsAccount } = useSavingsAccount()
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false)
 
   const { format: currency } = useCurrency()
@@ -51,12 +54,22 @@ export function LendingPage() {
 
   const isActiveMember = membershipStatus?.status === 'active'
   const hasCompletedShares = (membershipStatus?.completed_shares ?? 0) > 0
+  const savingsBalance = savingsAccount?.balance ?? 0
+  const MIN_SAVINGS_FOR_LOAN = 500
+  const hasSufficientSavings = savingsBalance >= MIN_SAVINGS_FOR_LOAN
   const activeLoans = loans?.filter(l => l.status === 'active') ?? []
+
+  const FREQUENCY_LABEL: Record<string, string> = {
+    weekly:       'Weekly',
+    bi_weekly:    'Bi-Weekly',
+    semi_monthly: 'Semi-Monthly',
+    monthly:      'Monthly',
+  }
   const hasPendingApplication = applications?.some(
     a => a.status === 'draft' || a.status === 'submitted' || a.status === 'under_review'
   ) ?? false
   const hasActiveLoan = activeLoans.length > 0
-  const canApply = isActiveMember && hasCompletedShares && !hasPendingApplication && !hasActiveLoan && loanConfigured
+  const canApply = isActiveMember && hasCompletedShares && hasSufficientSavings && !hasPendingApplication && !hasActiveLoan && loanConfigured
 
   if (!loanConfigured) {
     return (
@@ -195,6 +208,23 @@ export function LendingPage() {
             </div>
           </div>
         )}
+        {isActiveMember && hasCompletedShares && !hasSufficientSavings && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-yellow-800">Insufficient savings balance</p>
+              <p className="text-sm text-yellow-700 mt-0.5">
+                A minimum savings balance of {currency(MIN_SAVINGS_FOR_LOAN)} is required to apply for a loan.
+                {savingsAccount
+                  ? ` Your current balance is ${currency(savingsBalance)}.`
+                  : ' You have no savings account yet — complete a share first.'}
+              </p>
+            </div>
+          </div>
+        )}
         {isActiveMember && hasCompletedShares && hasActiveLoan && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
             <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -320,7 +350,9 @@ export function LendingPage() {
                       <span className="font-medium text-gray-900">{currency(loan.outstanding)}</span>
                       <span className="text-gray-500">Interest</span>
                       <span className="text-gray-700">{loan.interest_rate}%</span>
-                      <span className="text-gray-500">Due Date</span>
+                      <span className="text-gray-500">Payment</span>
+                      <span className="text-gray-700">{FREQUENCY_LABEL[loan.repayment_frequency ?? 'monthly']}</span>
+                      <span className="text-gray-500">Final Due</span>
                       <span className="text-gray-700">{formatDate(loan.due_date)}</span>
                     </div>
                     <button
@@ -340,7 +372,8 @@ export function LendingPage() {
                       <Th>Principal</Th>
                       <Th>Outstanding</Th>
                       <Th>Interest Rate</Th>
-                      <Th>Due Date</Th>
+                      <Th>Payment</Th>
+                      <Th>Final Due</Th>
                       <Th>Status</Th>
                       <Th></Th>
                     </Tr>
@@ -353,6 +386,7 @@ export function LendingPage() {
                           <span className="font-medium text-gray-900">{currency(loan.outstanding)}</span>
                         </Td>
                         <Td>{loan.interest_rate}% p.a.</Td>
+                        <Td>{FREQUENCY_LABEL[loan.repayment_frequency ?? 'monthly']}</Td>
                         <Td>{formatDate(loan.due_date)}</Td>
                         <Td><StatusBadge status={loan.status} /></Td>
                         <Td>
@@ -441,6 +475,14 @@ export function LendingPage() {
                             )}
                           </div>
                         )}
+                        {(app.status === 'draft' || app.status === 'submitted') && (
+                          <button
+                            onClick={() => { if (confirm('Cancel this loan application?')) cancelApplication.mutate(app.id) }}
+                            className="mt-2 text-xs text-red-500 hover:text-red-700"
+                          >
+                            Cancel application
+                          </button>
+                        )}
                       </div>
                     )
                   })}
@@ -456,6 +498,7 @@ export function LendingPage() {
                         <Th>Status</Th>
                         <Th>Co-makers</Th>
                         <Th>Applied On</Th>
+                        <Th></Th>
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -512,6 +555,16 @@ export function LendingPage() {
                               )}
                             </Td>
                             <Td>{formatDate(app.created_at)}</Td>
+                            <Td>
+                              {(app.status === 'draft' || app.status === 'submitted') && (
+                                <button
+                                  onClick={() => { if (confirm('Cancel this loan application?')) cancelApplication.mutate(app.id) }}
+                                  className="text-xs text-red-500 hover:text-red-700 whitespace-nowrap"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                            </Td>
                           </Tr>
                         )
                       })}

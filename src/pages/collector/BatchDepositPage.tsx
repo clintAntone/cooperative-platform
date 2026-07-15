@@ -12,6 +12,7 @@ import { uploadReceipt } from '../../hooks/useDepositRequests'
 import { useCurrency } from '../../hooks/useCurrency'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { toast } from '../../lib/toast'
 
 const paymentMethodOptions = [
   { value: 'mobile_money', label: 'Mobile Banking' },
@@ -37,6 +38,38 @@ interface MemberEntry {
   employee_id: string
   amount: number
   isSelf: boolean
+  shareRemaining: number | null   // null = loading; -1 = no share found
+  savingsAccountId: string | null // null = no active savings account
+}
+
+type DepositType = 'shares' | 'savings'
+
+async function fetchMemberMeta(userId: string): Promise<{ shareRemaining: number; savingsAccountId: string | null }> {
+  const [sharesResult, savingsResult] = await Promise.all([
+    supabase
+      .from('equity_shares')
+      .select('target_amount, paid_amount, status')
+      .eq('user_id', userId),
+    supabase
+      .from('savings_accounts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle(),
+  ])
+
+  const shares = (sharesResult.data ?? []) as { target_amount: number; paid_amount: number; status: string }[]
+  // Remaining = total target minus total paid (across all non-completed shares)
+  const incompleteShares = shares.filter(s => s.status !== 'completed')
+  const shareRemaining = incompleteShares.reduce(
+    (sum, s) => sum + Math.max(0, s.target_amount - s.paid_amount),
+    0
+  )
+
+  return {
+    shareRemaining,
+    savingsAccountId: savingsResult.data?.id ?? null,
+  }
 }
 
 export function BatchDepositPage() {
@@ -45,6 +78,7 @@ export function BatchDepositPage() {
   const { format: currency } = useCurrency()
   const submitBatch = useSubmitBatchDeposit()
 
+  const [depositType, setDepositType] = useState<DepositType>('shares')
   const [employeeIdInput, setEmployeeIdInput] = useState('')
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [isLooking, setIsLooking] = useState(false)
@@ -58,16 +92,24 @@ export function BatchDepositPage() {
   const [success, setSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Auto-add the collector themselves on mount
+  // Auto-add the submitter on mount
   useEffect(() => {
     if (user && profile) {
-      setMembers([{
+      const entry: MemberEntry = {
         user_id: user.id,
         full_name: profile.full_name,
         employee_id: profile.employee_id ?? '',
         amount: 0,
         isSelf: true,
-      }])
+        shareRemaining: null,
+        savingsAccountId: null,
+      }
+      setMembers([entry])
+      fetchMemberMeta(user.id).then(meta => {
+        setMembers(prev =>
+          prev.map(m => m.user_id === user.id ? { ...m, ...meta } : m)
+        )
+      })
     }
   }, [user, profile])
 
@@ -94,7 +136,7 @@ export function BatchDepositPage() {
         .from('profiles')
         .select('id, full_name, employee_id')
         .eq('employee_id', empId)
-        .in('role', ['member', 'collector'])
+        .in('role', ['member'])
         .eq('account_status', 'active')
         .maybeSingle()
 
@@ -110,15 +152,26 @@ export function BatchDepositPage() {
         return
       }
 
-      setMembers(prev => [...prev, {
+      // Add with loading state for meta
+      const newEntry: MemberEntry = {
         user_id: data.id,
         full_name: data.full_name,
         employee_id: data.employee_id ?? empId,
         amount: 0,
         isSelf: false,
-      }])
+        shareRemaining: null,
+        savingsAccountId: null,
+      }
+      setMembers(prev => [...prev, newEntry])
       setEmployeeIdInput('')
       setMembersError(null)
+
+      // Fetch meta in background
+      fetchMemberMeta(data.id).then(meta => {
+        setMembers(prev =>
+          prev.map(m => m.user_id === data.id ? { ...m, ...meta } : m)
+        )
+      })
     } catch (err: any) {
       setLookupError(err.message ?? 'Lookup failed. Please try again.')
     } finally {
@@ -159,27 +212,55 @@ export function BatchDepositPage() {
     setUploadError(null)
     setMembersError(null)
 
-    // Need collector + at least 1 other
-    if (members.length < 2) {
-      setMembersError('Add at least one more member to the batch.')
+    if (members.length < 1) {
+      setMembersError('At least one member must be in the batch.')
       return
     }
 
+    // Validate amounts > 0
     const newAmountErrors: Record<string, string> = {}
     for (const m of members) {
       if (!m.amount || m.amount <= 0) {
         newAmountErrors[m.user_id] = 'Amount must be greater than 0'
       }
     }
+
+    if (depositType === 'shares') {
+      // Validate share cap
+      for (const m of members) {
+        if (m.shareRemaining === null) {
+          newAmountErrors[m.user_id] = 'Share data is still loading. Please wait.'
+          continue
+        }
+        if (m.shareRemaining <= 0) {
+          newAmountErrors[m.user_id] = 'This member has no remaining share balance to deposit.'
+          continue
+        }
+        if (m.amount > m.shareRemaining) {
+          newAmountErrors[m.user_id] =
+            `Exceeds share balance. Maximum allowed: ${currency(m.shareRemaining)}`
+        }
+      }
+    }
+
+    if (depositType === 'savings') {
+      for (const m of members) {
+        if (!m.savingsAccountId) {
+          newAmountErrors[m.user_id] =
+            'This member does not have an active savings account. Shares must be completed first.'
+        }
+      }
+    }
+
     if (Object.keys(newAmountErrors).length > 0) {
       setAmountErrors(newAmountErrors)
       return
     }
 
-    // Duplicate reference check
-    if (values.reference?.trim()) {
+    // Duplicate reference check (shares only — savings has no batch table)
+    if (depositType === 'shares' && values.reference?.trim()) {
       const { data: existing } = await supabase
-        .from('deposit_requests')
+        .from('equity_deposit_requests')
         .select('id')
         .eq('reference', values.reference.trim())
         .limit(1)
@@ -205,22 +286,43 @@ export function BatchDepositPage() {
       }
     }
 
-    await submitBatch.mutateAsync({
-      payment_method: values.payment_method,
-      reference: values.reference,
-      receipt_url: receiptUrl,
-      notes: values.notes,
-      items: members.map(m => ({ user_id: m.user_id, amount: m.amount })),
-    })
+    if (depositType === 'shares') {
+      await submitBatch.mutateAsync({
+        payment_method: values.payment_method,
+        reference: values.reference,
+        receipt_url: receiptUrl,
+        notes: values.notes,
+        items: members.map(m => ({ user_id: m.user_id, amount: m.amount })),
+      })
+    } else {
+      // Savings: insert individual savings_deposit_requests for each member
+      const inserts = members.map(m => ({
+        user_id: m.user_id,
+        account_id: m.savingsAccountId!,
+        amount: m.amount,
+        payment_method: values.payment_method,
+        reference: values.reference ?? null,
+        receipt_url: receiptUrl ?? null,
+        notes: values.notes ?? null,
+        status: 'pending',
+      }))
+
+      const { error } = await supabase.from('savings_deposit_requests').insert(inserts)
+      if (error) {
+        toast({ title: error.message ?? 'Failed to submit savings deposit', variant: 'error' })
+        return
+      }
+      toast({ title: 'Savings deposit submitted', description: 'Waiting for admin review', variant: 'success' })
+    }
 
     setSuccess(true)
-    setTimeout(() => navigate('/batch-deposits'), 2000)
+    setTimeout(() => navigate(depositType === 'savings' ? '/savings' : '/batch-deposits'), 2000)
   }
 
   if (profile && !profile.profile_completed_at) {
     return (
       <div>
-        <Header title="Batch Deposit" subtitle="Submit deposits for multiple members" />
+        <Header title="Deposit" subtitle="Submit a deposit for equity shares or savings" />
         <div className="p-4 sm:p-6">
           <Card className="max-w-lg mx-auto p-8 text-center">
             <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -230,7 +332,7 @@ export function BatchDepositPage() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">Profile Incomplete</h3>
             <p className="text-sm text-gray-500 mb-4">
-              You need to complete your profile before you can submit a batch deposit.
+              You need to complete your profile before you can submit a deposit.
             </p>
             <div className="flex gap-3 justify-center">
               <Button onClick={() => navigate('/dashboard')} variant="outline" size="sm">
@@ -249,7 +351,7 @@ export function BatchDepositPage() {
   if (success) {
     return (
       <div>
-        <Header title="Batch Deposit" subtitle="Submit deposits for multiple members" />
+        <Header title="Deposit" subtitle="Submit a deposit for equity shares or savings" />
         <div className="p-4 sm:p-6">
           <Card className="max-w-lg mx-auto p-8 text-center">
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -257,8 +359,8 @@ export function BatchDepositPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">Batch Submitted!</h3>
-            <p className="text-sm text-gray-500">Your batch deposit has been submitted for admin review.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Deposit Submitted!</h3>
+            <p className="text-sm text-gray-500">Your deposit has been submitted for admin review.</p>
             <p className="text-xs text-gray-400 mt-3">Redirecting...</p>
           </Card>
         </div>
@@ -269,11 +371,11 @@ export function BatchDepositPage() {
   return (
     <div>
       <Header
-        title="Batch Deposit"
-        subtitle="Submit deposits for multiple members at once"
+        title="Deposit"
+        subtitle="Submit a deposit for equity shares or savings"
         actions={
           <Button variant="ghost" size="sm" onClick={() => navigate('/batch-deposits')}>
-            My Batches
+            My History
           </Button>
         }
       />
@@ -281,13 +383,57 @@ export function BatchDepositPage() {
       <div className="p-4 sm:p-6 space-y-6">
         <Card className="max-w-2xl mx-auto">
           <CardHeader>
-            <h2 className="text-base font-semibold text-gray-900">Batch Deposit Form</h2>
+            <h2 className="text-base font-semibold text-gray-900">Deposit Form</h2>
             <p className="text-sm text-gray-500 mt-0.5">
-              You are included by default. Add at least one more member by employee ID.
+              Submit deposits for one or multiple members on one receipt. You are included by default.
             </p>
           </CardHeader>
           <CardBody>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+              {/* Deposit type selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Deposit To <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setDepositType('shares'); setAmountErrors({}) }}
+                    className={`flex items-center gap-2.5 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      depositType === 'shares'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                    </svg>
+                    <div className="text-left">
+                      <p className="font-semibold">Equity Shares</p>
+                      <p className="text-xs font-normal text-gray-500">Share capital deposit</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDepositType('savings'); setAmountErrors({}) }}
+                    className={`flex items-center gap-2.5 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      depositType === 'savings'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <div className="text-left">
+                      <p className="font-semibold">Savings</p>
+                      <p className="text-xs font-normal text-gray-500">Savings account deposit</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* Payment method */}
               <Select
                 label="Payment Method"
@@ -367,7 +513,7 @@ export function BatchDepositPage() {
               {/* Add member by employee ID */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Add Member by Employee ID <span className="text-red-500">*</span>
+                  Add Member by Employee ID
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -399,44 +545,70 @@ export function BatchDepositPage() {
                   Members in batch ({members.length})
                 </p>
                 <div className="space-y-2">
-                  {members.map(m => (
-                    <div key={m.user_id} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${m.isSelf ? 'bg-blue-50 border border-blue-100' : 'bg-gray-50'}`}>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium text-gray-800 truncate">{m.full_name}</p>
-                          {m.isSelf && (
-                            <span className="text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wide flex-shrink-0">You</span>
+                  {members.map(m => {
+                    const isLoadingMeta = m.shareRemaining === null
+                    const hasShareCapacity = m.shareRemaining !== null && m.shareRemaining > 0
+                    const hasSavings = !!m.savingsAccountId
+
+                    return (
+                      <div key={m.user_id} className={`rounded-lg border px-3 py-2.5 ${
+                        m.isSelf ? 'bg-blue-50 border-blue-100' : 'bg-gray-50 border-gray-100'
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-medium text-gray-800 truncate">{m.full_name}</p>
+                              {m.isSelf && (
+                                <span className="text-[10px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wide flex-shrink-0">You</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400">{m.employee_id}</p>
+
+                            {/* Share/savings meta info */}
+                            {isLoadingMeta ? (
+                              <p className="text-xs text-gray-400 mt-0.5">Loading account info…</p>
+                            ) : depositType === 'shares' ? (
+                              <p className={`text-xs mt-0.5 ${hasShareCapacity ? 'text-gray-500' : 'text-red-500'}`}>
+                                {hasShareCapacity
+                                  ? `Remaining share balance: ${currency(m.shareRemaining!)}`
+                                  : 'No remaining share balance'}
+                              </p>
+                            ) : (
+                              <p className={`text-xs mt-0.5 ${hasSavings ? 'text-gray-500' : 'text-red-500'}`}>
+                                {hasSavings ? 'Savings account active' : 'No active savings account'}
+                              </p>
+                            )}
+
+                            {amountErrors[m.user_id] && (
+                              <p className="text-xs text-red-600 mt-0.5">{amountErrors[m.user_id]}</p>
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={m.amount || ''}
+                            onChange={e => updateAmount(m.user_id, e.target.value)}
+                            className={`w-28 border rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0 ${
+                              amountErrors[m.user_id] ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                            }`}
+                          />
+                          {!m.isSelf && (
+                            <button
+                              type="button"
+                              onClick={() => removeMember(m.user_id)}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0 mt-0.5"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400">{m.employee_id}</p>
-                        {amountErrors[m.user_id] && (
-                          <p className="text-xs text-red-600 mt-0.5">{amountErrors[m.user_id]}</p>
-                        )}
                       </div>
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={m.amount || ''}
-                        onChange={e => updateAmount(m.user_id, e.target.value)}
-                        className={`w-28 border rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                          amountErrors[m.user_id] ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                        }`}
-                      />
-                      {!m.isSelf && (
-                        <button
-                          type="button"
-                          onClick={() => removeMember(m.user_id)}
-                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
 
                 {members.length >= 2 && (
@@ -449,7 +621,7 @@ export function BatchDepositPage() {
 
               {submitBatch.error && (
                 <p className="text-sm text-red-600">
-                  {(submitBatch.error as Error).message ?? 'Failed to submit batch deposit'}
+                  {(submitBatch.error as Error).message ?? 'Failed to submit deposit'}
                 </p>
               )}
 
@@ -458,7 +630,7 @@ export function BatchDepositPage() {
                   Cancel
                 </Button>
                 <Button type="submit" className="flex-1" loading={isSubmitting || submitBatch.isPending}>
-                  Submit Batch
+                  Submit Deposit
                 </Button>
               </div>
             </form>

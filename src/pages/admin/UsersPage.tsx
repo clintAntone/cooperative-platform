@@ -51,7 +51,6 @@ const roleColors: Record<UserRole, string> = {
   admin: 'bg-purple-100 text-purple-800',
   staff: 'bg-blue-100 text-blue-800',
   member: 'bg-gray-100 text-gray-700',
-  collector: 'bg-indigo-100 text-indigo-800',
   board: 'bg-amber-100 text-amber-800',
 }
 
@@ -348,7 +347,7 @@ export function UsersPage() {
   const requiresReason =
     editState?.field === 'account_status' &&
     (editState.newValue === 'suspended' || editState.newValue === 'inactive') &&
-    (editState.user.role === 'member' || editState.user.role === 'collector') &&
+    editState.user.role === 'member' &&
     (editState.user.completed_shares ?? 0) > 0
 
   const handleConfirm = () => {
@@ -387,7 +386,7 @@ export function UsersPage() {
     total: users.length,
     admin: users.filter(u => u.role === 'admin').length,
     staff: users.filter(u => u.role === 'staff').length,
-    member: users.filter(u => u.role === 'member' || u.role === 'collector').length,
+    member: users.filter(u => u.role === 'member').length,
     active: users.filter(u => u.account_status === 'active').length,
     suspended: users.filter(u => u.account_status === 'suspended').length,
   }
@@ -482,7 +481,6 @@ export function UsersPage() {
             <option value="admin">Admin</option>
             <option value="staff">Staff</option>
             <option value="member">Member</option>
-            <option value="collector">Collector</option>
           </select>
         </div>
 
@@ -630,7 +628,6 @@ export function UsersPage() {
                 {editState.field === 'role' ? (
                   <>
                     <option value="member">Member</option>
-                    <option value="collector">Collector</option>
                     <option value="staff">Staff</option>
                     <option value="board">Board of Directors</option>
                     <option value="admin">Admin</option>
@@ -659,7 +656,7 @@ export function UsersPage() {
 
             {editState.field === 'account_status' &&
               (editState.newValue === 'suspended' || editState.newValue === 'inactive') &&
-              (editState.user.role === 'member' || editState.user.role === 'collector') && (
+              editState.user.role === 'member' && (
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-gray-700">
                   Reason{(editState.user.completed_shares ?? 0) > 0 ? ' *' : ''}

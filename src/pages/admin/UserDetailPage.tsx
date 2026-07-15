@@ -33,7 +33,6 @@ const roleColors: Record<UserRole, string> = {
   admin: 'bg-purple-100 text-purple-800',
   staff: 'bg-blue-100 text-blue-800',
   member: 'bg-gray-100 text-gray-700',
-  collector: 'bg-indigo-100 text-indigo-800',
   board: 'bg-amber-100 text-amber-800',
 }
 

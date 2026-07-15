@@ -91,6 +91,17 @@ export function LoanDetailPage() {
     ? Math.min(100, Math.round((loan.amount_paid / loan.total_repayable) * 100))
     : 0
 
+  const nextInstallment = schedule?.find(
+    s => s.status === 'pending' || s.status === 'partial' || s.status === 'overdue'
+  )
+
+  const FREQUENCY_LABEL: Record<string, string> = {
+    weekly:       'Weekly',
+    bi_weekly:    'Every 2 Weeks',
+    semi_monthly: 'Twice a Month',
+    monthly:      'Monthly',
+  }
+
   return (
     <div>
       <Header
@@ -125,6 +136,42 @@ export function LoanDetailPage() {
             </div>
           </Card>
         </div>
+
+        {/* Next Payment Due */}
+        {loan.status === 'active' && nextInstallment && (
+          <div className={`rounded-xl border px-4 py-4 flex items-center justify-between gap-4 ${
+            nextInstallment.status === 'overdue'
+              ? 'bg-red-50 border-red-200'
+              : 'bg-blue-50 border-blue-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                nextInstallment.status === 'overdue' ? 'bg-red-100' : 'bg-blue-100'
+              }`}>
+                <svg className={`w-5 h-5 ${nextInstallment.status === 'overdue' ? 'text-red-600' : 'text-blue-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className={`text-xs font-semibold uppercase tracking-wide ${nextInstallment.status === 'overdue' ? 'text-red-500' : 'text-blue-500'}`}>
+                  {nextInstallment.status === 'overdue' ? 'Overdue Payment' : 'Next Payment Due'}
+                </p>
+                <p className={`text-sm font-medium mt-0.5 ${nextInstallment.status === 'overdue' ? 'text-red-800' : 'text-blue-800'}`}>
+                  {formatDate(nextInstallment.due_date)}
+                  <span className="ml-2 text-xs font-normal opacity-70">
+                    Installment #{nextInstallment.installment_no} · {FREQUENCY_LABEL[loan.repayment_frequency ?? 'monthly']}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className={`text-lg font-bold ${nextInstallment.status === 'overdue' ? 'text-red-700' : 'text-blue-700'}`}>
+                {currency(nextInstallment.total_due - nextInstallment.amount_paid)}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">remaining</p>
+            </div>
+          </div>
+        )}
 
         {/* Progress */}
         <Card>
@@ -165,6 +212,12 @@ export function LoanDetailPage() {
                 <dt className="text-xs text-gray-500">Calculation Method</dt>
                 <dd className="text-sm font-medium text-gray-900 mt-0.5 capitalize">
                   {loan.calculation_method.replace('_', ' ')}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Payment Schedule</dt>
+                <dd className="text-sm font-medium text-gray-900 mt-0.5">
+                  {FREQUENCY_LABEL[loan.repayment_frequency ?? 'monthly']}
                 </dd>
               </div>
               <div>
