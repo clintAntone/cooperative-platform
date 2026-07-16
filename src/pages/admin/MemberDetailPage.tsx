@@ -143,90 +143,149 @@ export function MemberDetailPage() {
   const membershipStatusValue = (membershipStatus as any)?.status as string | undefined
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      {/* Header */}
-      <div className="space-y-3">
-        {/* Nav row: back + actions */}
-        <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={() => navigate('/admin/members')}
-            title="Back to Members"
-            className="inline-flex items-center justify-center w-9 h-9 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2 ml-auto">
-          {(adminProfile?.role === 'admin' || adminProfile?.role === 'staff') && (
-            <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-4">
+      {/* Header — member identity */}
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center gap-4">
+        {/* Back button — mobile only */}
+        <button
+          onClick={() => navigate('/admin/members')}
+          title="Back to Members"
+          className="sm:hidden inline-flex items-center justify-center w-9 h-9 flex-shrink-0 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        {/* Avatar + member info */}
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className={`hidden sm:flex w-11 h-11 rounded-full flex-shrink-0 items-center justify-center text-white font-semibold text-base ${
+            membershipStatusValue === 'active'    ? 'bg-green-500' :
+            membershipStatusValue === 'pending'   ? 'bg-yellow-400' :
+            membershipStatusValue === 'suspended' ? 'bg-red-500' :
+            'bg-gray-400'
+          }`}>
+            {profile.full_name.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg font-bold text-gray-900 truncate" title={profile.full_name}>{profile.full_name}</h1>
+              {membershipStatusValue && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  membershipStatusValue === 'active'    ? 'bg-green-100 text-green-700' :
+                  membershipStatusValue === 'pending'   ? 'bg-yellow-100 text-yellow-700' :
+                  membershipStatusValue === 'suspended' ? 'bg-red-100 text-red-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {membershipStatusValue.charAt(0).toUpperCase() + membershipStatusValue.slice(1)}
+                </span>
+              )}
               {(profile as any).custom_roles && (
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${customRoleColorMap[(profile as any).custom_roles?.color ?? 'gray'] ?? 'bg-gray-100 text-gray-700'}`}>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${customRoleColorMap[(profile as any).custom_roles?.color ?? 'gray'] ?? 'bg-gray-100 text-gray-700'}`}>
                   {(profile as any).custom_roles?.name}
                 </span>
               )}
-              {showAssignRole ? (
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={selectedCustomRoleId}
-                    onChange={e => setSelectedCustomRoleId(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  >
-                    <option value="">— No Role —</option>
-                    {customRoles.map(r => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={async () => {
-                      await assignCustomRole.mutateAsync({ userId: profile.id, customRoleId: selectedCustomRoleId || null })
-                      setShowAssignRole(false)
-                      queryClient.invalidateQueries({ queryKey: ['member_detail', profile.id] })
-                    }}
-                    disabled={assignCustomRole.isPending}
-                    className="px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setShowAssignRole(false)}
-                    className="px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    setSelectedCustomRoleId((profile as any).custom_role_id ?? '')
-                    setShowAssignRole(true)
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
-                  </svg>
-                  <span className="hidden sm:inline">Assign Role</span>
-                </button>
-              )}
             </div>
-          )}
-          {(adminProfile?.role === 'admin' || adminProfile?.role === 'staff') && (
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {profile.employee_id && (
+                <span className="text-xs text-gray-500 font-mono">{profile.employee_id}</span>
+              )}
+              <span className="text-gray-300 hidden sm:inline">·</span>
+              <span className="text-xs text-gray-500">Joined {formatDate(profile.created_at)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Export PDF — right side of header */}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            const statementRows = contributions.map(c => ({
+              date: formatDate(c.contribution_at),
+              type: 'Contribution',
+              description: `${c.payment_method.replace('_', ' ')}${c.reference ? ` — Ref: ${c.reference}` : ''}`,
+              amount: c.amount,
+            }))
+            exportMemberStatementPdf(
+              profile.full_name,
+              statementRows,
+              {
+                totalContributions: totalInvested,
+                completedShares,
+                membershipStatus: membershipStatusValue ?? 'pending',
+              }
+            )
+          }}
+        >
+          <svg className="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span className="hidden sm:inline">Export PDF</span>
+        </Button>
+      </div>
+
+      {/* Action buttons — below header */}
+      {(adminProfile?.role === 'admin' || adminProfile?.role === 'staff') && (
+        <div className="px-4 sm:px-6 flex items-center justify-end gap-2">
+          {showAssignRole ? (
+            <div className="flex items-center gap-1.5">
+              <select
+                value={selectedCustomRoleId}
+                onChange={e => setSelectedCustomRoleId(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">— No Role —</option>
+                {customRoles.map(r => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={async () => {
+                  await assignCustomRole.mutateAsync({ userId: profile.id, customRoleId: selectedCustomRoleId || null })
+                  setShowAssignRole(false)
+                  queryClient.invalidateQueries({ queryKey: ['member_detail', profile.id] })
+                }}
+                disabled={assignCustomRole.isPending}
+                className="px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setShowAssignRole(false)}
+                className="px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
             <button
-              onClick={() => setShowNotesModal(true)}
-              className="relative inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={() => {
+                setSelectedCustomRoleId((profile as any).custom_role_id ?? '')
+                setShowAssignRole(true)
+              }}
+              className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
               </svg>
-              <span className="hidden sm:inline">Notes</span>
-              {memberNotes.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
-                  {memberNotes.length}
-                </span>
-              )}
+              Assign Role
             </button>
           )}
+          <button
+            onClick={() => setShowNotesModal(true)}
+            className="relative inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Notes
+            {memberNotes.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                {memberNotes.length}
+              </span>
+            )}
+          </button>
           {adminProfile?.role === 'admin' && (
             <button
               title="View as this member"
@@ -238,63 +297,19 @@ export function MemberDetailPage() {
                 })
                 navigate('/dashboard')
               }}
-              className="inline-flex items-center gap-1.5 px-3 h-9 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-8 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              <span className="hidden sm:inline">View as Member</span>
+              View as Member
             </button>
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              const statementRows = contributions.map(c => ({
-                date: formatDate(c.contribution_at),
-                type: 'Contribution',
-                description: `${c.payment_method.replace('_', ' ')}${c.reference ? ` — Ref: ${c.reference}` : ''}`,
-                amount: c.amount,
-              }))
-              exportMemberStatementPdf(
-                profile.full_name,
-                statementRows,
-                {
-                  totalContributions: totalInvested,
-                  completedShares,
-                  membershipStatus: membershipStatusValue ?? 'pending',
-                }
-              )
-            }}
-          >
-            <svg className="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            <span className="hidden sm:inline">Export Statement PDF</span>
-          </Button>
-          </div>
         </div>
-        {/* Member info */}
-        <div>
-          <div className="flex items-center gap-2">
-            {membershipStatusValue && (
-              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                membershipStatusValue === 'active'    ? 'bg-green-500' :
-                membershipStatusValue === 'pending'   ? 'bg-yellow-400' :
-                membershipStatusValue === 'suspended' ? 'bg-red-500' :
-                'bg-gray-400'
-              }`} />
-            )}
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate" title={profile.full_name}>{profile.full_name}</h1>
-          </div>
-          {profile.employee_id && (
-            <p className="text-sm text-gray-500 font-mono mt-0.5">{profile.employee_id}</p>
-          )}
-          <p className="text-sm text-gray-500">Joined {formatDate(profile.created_at)}</p>
-        </div>
-      </div>
+      )}
 
+      <div className="px-4 sm:px-6 pb-6 space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -990,6 +1005,7 @@ export function MemberDetailPage() {
         </div>
       </Modal>
 
+      </div> {/* end padded content wrapper */}
     </div>
   )
 }

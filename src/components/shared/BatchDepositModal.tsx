@@ -210,7 +210,6 @@ export function BatchDepositModal({ isOpen, onClose, defaultType = 'shares' }: B
       for (const m of members) {
         if (m.shareRemaining === null) { newAmountErrors[m.user_id] = 'Share data is still loading. Please wait.'; continue }
         if (m.shareRemaining <= 0) { newAmountErrors[m.user_id] = 'No remaining share balance.'; continue }
-        if (m.amount > m.shareRemaining) newAmountErrors[m.user_id] = `Exceeds share balance. Max: ${currency(m.shareRemaining)}`
       }
     }
 
