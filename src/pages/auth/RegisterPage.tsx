@@ -116,7 +116,8 @@ export function RegisterPage() {
       verifiedEmployee.employee_id,
     )
     if (error) {
-      setServerError(error.message ?? 'Registration failed. Please try again.')
+      const msg = error.message?.trim()
+      setServerError(msg && msg !== '{}' ? msg : 'Registration failed. Please try again.')
     } else {
       setSuccess(true)
       setTimeout(() => navigate('/login'), 4000)
