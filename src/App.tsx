@@ -66,10 +66,6 @@ const LoanProductsPage = lazy(() => import('./pages/admin/LoanProductsPage').the
 const AdminLoanDetailPage = lazy(() => import('./pages/admin/AdminLoanDetailPage').then(m => ({ default: m.AdminLoanDetailPage })))
 const AdminLoanApplicationDetailPage = lazy(() => import('./pages/admin/AdminLoanApplicationDetailPage').then(m => ({ default: m.AdminLoanApplicationDetailPage })))
 
-// Member batch deposit page
-const BatchDepositPage = lazy(() => import('./pages/collector/BatchDepositPage').then(m => ({ default: m.BatchDepositPage })))
-const BatchDepositsPage = lazy(() => import('./pages/admin/BatchDepositsPage').then(m => ({ default: m.BatchDepositsPage })))
-
 // Admin-only pages
 const AdminPage = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })))
 const ConfigPage = lazy(() => import('./pages/admin/ConfigPage').then(m => ({ default: m.ConfigPage })))
@@ -145,8 +141,7 @@ export default function App() {
                 <Route path="/savings/deposit-request" element={<ErrorBoundary><SavingsDepositRequestPage /></ErrorBoundary>} />
                 <Route path="/savings/withdraw" element={<ErrorBoundary><SavingsWithdrawPage /></ErrorBoundary>} />
                 <Route path="/damayan" element={<ErrorBoundary><DamayanPage /></ErrorBoundary>} />
-                <Route path="/batch-deposit" element={<ErrorBoundary><BatchDepositPage /></ErrorBoundary>} />
-                <Route path="/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
+
               </Route>
 
               {/* Board of Directors + Admin + Staff — read views */}
@@ -165,7 +160,7 @@ export default function App() {
                 <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
                 <Route path="/admin/deposit-requests" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-deposits" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
-                <Route path="/admin/batch-deposits" element={<ErrorBoundary><BatchDepositsPage /></ErrorBoundary>} />
+
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings" element={<ErrorBoundary><AdminSavingsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-withdrawals" element={<ErrorBoundary><SavingsWithdrawalsPage /></ErrorBoundary>} />

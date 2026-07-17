@@ -25,6 +25,7 @@ import {
   useRejectBatchDeposit,
   type BatchDepositWithMembers,
 } from '../../hooks/useBatchDeposits'
+import { BatchDepositModal } from '../../components/shared/BatchDepositModal'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate } from '../../lib/utils'
 import { cn } from '../../lib/utils'
@@ -130,6 +131,7 @@ export function AllDepositRequestsPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
+  const [showBatchModal, setShowBatchModal] = useState(false)
 
   // Detail / approval state
   const [detailReq, setDetailReq] = useState<UnifiedRow | null>(null)
@@ -223,6 +225,16 @@ export function AllDepositRequestsPage() {
         title="Deposit Requests"
         subtitle="Review and approve member equity and savings deposit requests"
         actions={
+          <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowBatchModal(true)}
+            className="inline-flex items-center gap-1.5 border border-blue-300 rounded-lg px-2.5 py-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="hidden sm:inline">New Batch</span>
+          </button>
           <button
             onClick={() => {
               const rows = combined.map(r => ({
@@ -244,8 +256,10 @@ export function AllDepositRequestsPage() {
             </svg>
             <span className="hidden sm:inline">Export</span>
           </button>
+          </div>
         }
       />
+      <BatchDepositModal isOpen={showBatchModal} onClose={() => setShowBatchModal(false)} />
 
       <div className="p-4 sm:p-6 space-y-4">
         <PageGuide

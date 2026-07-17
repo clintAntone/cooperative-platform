@@ -4,7 +4,6 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useImpersonation } from '../../context/ImpersonationContext'
 import { usePendingCoMakerCount } from '../../hooks/useLoans'
-import { usePendingDepositCount } from '../../hooks/useDepositRequests'
 import { useAppBranding } from '../../hooks/useAppBranding'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
@@ -322,16 +321,6 @@ const navGroups: NavGroup[] = [
         ),
       },
       {
-        path: '/admin/batch-deposits',
-        label: 'Batch Entry',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-          </svg>
-        ),
-      },
-      {
         path: '/admin/share-transfers',
         label: 'Share Transfers',
         icon: (
@@ -510,12 +499,11 @@ interface NavItemRowProps {
   isPinned: boolean
   onTogglePin: () => void
   pendingCoMakerCount: number
-  pendingDepositCount: number
   pendingMemberDepositCount: number
   pendingLoanCount: number
 }
 
-function NavItemRow({ item, isPinned, onTogglePin, pendingCoMakerCount, pendingDepositCount, pendingMemberDepositCount, pendingLoanCount }: NavItemRowProps) {
+function NavItemRow({ item, isPinned, onTogglePin, pendingCoMakerCount, pendingMemberDepositCount, pendingLoanCount }: NavItemRowProps) {
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -543,11 +531,7 @@ function NavItemRow({ item, isPinned, onTogglePin, pendingCoMakerCount, pendingD
             {pendingCoMakerCount}
           </span>
         )}
-        {item.path === '/admin/batch-deposits' && pendingDepositCount > 0 && (
-          <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-yellow-400 text-gray-900 text-[10px] font-bold">
-            {pendingDepositCount}
-          </span>
-        )}
+
         {item.path === '/admin/deposit-requests' && pendingMemberDepositCount > 0 && (
           <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-yellow-400 text-gray-900 text-[10px] font-bold">
             {pendingMemberDepositCount}
@@ -588,7 +572,6 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
   const { impersonatedUser } = useImpersonation()
   const { data: branding } = useAppBranding()
   const { data: pendingCoMakerCount = 0 } = usePendingCoMakerCount()
-  const { data: pendingDepositCount = 0 } = usePendingDepositCount()
   const { data: pendingMemberDepositCount = 0 } = usePendingMemberDepositCount()
   const { data: pendingLoanCount = 0 } = usePendingLoanApplicationCount()
   const [confirmSignOut, setConfirmSignOut] = React.useState(false)
@@ -714,7 +697,6 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
                     isPinned
                     onTogglePin={() => togglePin(item.path)}
                     pendingCoMakerCount={pendingCoMakerCount}
-                    pendingDepositCount={pendingDepositCount}
                     pendingMemberDepositCount={pendingMemberDepositCount}
                     pendingLoanCount={pendingLoanCount}
                   />
@@ -760,8 +742,7 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
                         isPinned={pinnedPaths.includes(item.path)}
                         onTogglePin={() => togglePin(item.path)}
                         pendingCoMakerCount={pendingCoMakerCount}
-                        pendingDepositCount={pendingDepositCount}
-                        pendingMemberDepositCount={pendingMemberDepositCount}
+                            pendingMemberDepositCount={pendingMemberDepositCount}
                         pendingLoanCount={pendingLoanCount}
                       />
                     ))}
