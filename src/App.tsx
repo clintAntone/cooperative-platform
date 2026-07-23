@@ -56,6 +56,9 @@ const SavingsWithdrawalsPage = lazy(() => import('./pages/admin/SavingsWithdrawa
 const AdminSavingsPage = lazy(() => import('./pages/admin/AdminSavingsPage').then(m => ({ default: m.AdminSavingsPage })))
 const OverviewPage = lazy(() => import('./pages/overview/OverviewPage').then(m => ({ default: m.OverviewPage })))
 
+// Staff pages
+const WeeklyPostingPage = lazy(() => import('./pages/staff/WeeklyPostingPage').then(m => ({ default: m.WeeklyPostingPage })))
+
 // Admin / Staff pages
 const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })))
 const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
@@ -161,6 +164,7 @@ export default function App() {
                 <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
                 <Route path="/admin/deposit-requests" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-deposits" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
+                <Route path="/admin/post-deposits" element={<ErrorBoundary><WeeklyPostingPage /></ErrorBoundary>} />
 
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings" element={<ErrorBoundary><AdminSavingsPage /></ErrorBoundary>} />
