@@ -48,6 +48,14 @@ export function MembersPage() {
   const [page, setPage] = useState(0)
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
 
+  // Create member modal
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({ first_name: '', middle_name: '', last_name: '', email: '' })
+  const [createPassword, setCreatePassword] = useState('')
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null)
+  const [emailChecking, setEmailChecking] = useState(false)
+  const [createdMember, setCreatedMember] = useState<{ full_name: string; member_id: string; email: string; password: string } | null>(null)
+
   // Bulk selection
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
   const [showBulkModal, setShowBulkModal] = useState<'activate' | 'suspend' | null>(null)
@@ -96,6 +104,40 @@ export function MembersPage() {
     },
   })
 
+  function generatePassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'
+    return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  }
+
+  const createMember = useMutation({
+    mutationFn: async (payload: { first_name: string; middle_name: string; last_name: string; email: string; password: string }) => {
+      const { data, error } = await supabase.functions.invoke('create-member', { body: payload })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      return data as { id: string; member_id: string; full_name: string }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['members_list'] })
+      setCreatedMember({ full_name: data.full_name, member_id: data.member_id, email: createForm.email, password: createPassword })
+      setCreateForm({ first_name: '', middle_name: '', last_name: '', email: '' })
+      setEmailAvailable(null)
+    },
+    onError: (err: any) => {
+      toast({ title: err.message ?? 'Failed to create member', variant: 'error' })
+    },
+  })
+
+  async function checkEmail(email: string) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailAvailable(null); return }
+    setEmailChecking(true)
+    try {
+      const { data } = await supabase.rpc('is_email_available', { p_email: email })
+      setEmailAvailable(data ?? null)
+    } finally {
+      setEmailChecking(false)
+    }
+  }
+
   const handleSort = (key: typeof sortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
@@ -120,9 +162,19 @@ export function MembersPage() {
         subtitle="View and manage cooperative members"
         actions={
           activeTab === 'members' ? (
-            <button
-              onClick={() => {
-                const rows = filtered.map(m => ({
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { const pw = generatePassword(); setCreatePassword(pw); setShowCreateModal(true); setCreatedMember(null); setCreateForm({ first_name: '', middle_name: '', last_name: '', email: '' }); setEmailAvailable(null) }}
+                className="inline-flex items-center gap-1.5 bg-blue-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="hidden sm:inline">Create Member</span>
+              </button>
+              <button
+                onClick={() => {
+                  const rows = filtered.map(m => ({
                   Name: m.full_name,
                   'Employee ID': m.employee_id ?? '',
                   'Membership Status': (m.membership_status as any)?.status ?? 'pending',
@@ -139,7 +191,8 @@ export function MembersPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
               </svg>
               <span className="hidden sm:inline">Export</span>
-            </button>
+              </button>
+            </div>
           ) : undefined
         }
       />
@@ -286,8 +339,10 @@ export function MembersPage() {
                           </th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900"
                               onClick={() => handleSort('full_name')}>
-                            Name <SortIcon active={sortKey === 'full_name'} dir={sortDir} />
+                            First Name <SortIcon active={sortKey === 'full_name'} dir={sortDir} />
                           </th>
+                          <th className="text-left px-4 py-3 font-medium text-gray-600">Middle Name</th>
+                          <th className="text-left px-4 py-3 font-medium text-gray-600">Last Name</th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Employee ID</th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Membership</th>
@@ -310,7 +365,7 @@ export function MembersPage() {
                       <tbody className="divide-y divide-gray-100">
                         {paged.length === 0 && (
                           <tr>
-                            <td colSpan={9} className="text-center py-10 text-gray-400">
+                            <td colSpan={11} className="text-center py-10 text-gray-400">
                               No users found
                             </td>
                           </tr>
@@ -332,9 +387,9 @@ export function MembersPage() {
                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
                             </td>
-                            <td className="px-4 py-3">
-                              <p className="font-medium text-gray-900">{member.full_name}</p>
-                            </td>
+                            <td className="px-4 py-3 font-medium text-gray-900">{member.first_name ?? member.full_name}</td>
+                            <td className="px-4 py-3 text-gray-600">{member.middle_name ?? <span className="text-gray-300">—</span>}</td>
+                            <td className="px-4 py-3 font-medium text-gray-900">{member.last_name ?? <span className="text-gray-300">—</span>}</td>
                             <td className="px-4 py-3 font-mono text-xs text-gray-600">
                               {member.employee_id ?? <span className="text-gray-400">—</span>}
                             </td>
@@ -464,6 +519,130 @@ export function MembersPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Create Member Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => { setShowCreateModal(false); setCreatedMember(null) }}
+        title="Create Member Account"
+        size="sm"
+      >
+        {createdMember ? (
+          <div className="space-y-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+              <svg className="w-8 h-8 text-green-600 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="font-semibold text-green-800">Member created successfully</p>
+              <p className="text-sm text-green-700 mt-0.5">{createdMember.full_name}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-500">Employee ID</span>
+                <span className="font-mono font-medium text-gray-900">{createdMember.member_id}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-500">Email</span>
+                <span className="font-medium text-gray-900">{createdMember.email}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-500">Password</span>
+                <span className="font-mono font-medium text-gray-900 select-all">{createdMember.password}</span>
+              </div>
+            </div>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Share these credentials with the member. The password will not be shown again.
+            </p>
+            <div className="flex justify-end gap-3 pt-1">
+              <Button onClick={() => { setShowCreateModal(false); setCreatedMember(null) }}>Done</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">First Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={createForm.first_name}
+                  onChange={e => setCreateForm(f => ({ ...f, first_name: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Juan"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Last Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={createForm.last_name}
+                  onChange={e => setCreateForm(f => ({ ...f, last_name: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="dela Cruz"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Middle Name <span className="text-gray-400 text-xs">(optional)</span></label>
+              <input
+                type="text"
+                value={createForm.middle_name}
+                onChange={e => setCreateForm(f => ({ ...f, middle_name: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Santos"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Email <span className="text-red-500">*</span></label>
+              <input
+                type="email"
+                value={createForm.email}
+                onChange={e => {
+                  const val = e.target.value
+                  setCreateForm(f => ({ ...f, email: val }))
+                  setEmailAvailable(null)
+                  clearTimeout((window as any).__emailCheckTimer)
+                  ;(window as any).__emailCheckTimer = setTimeout(() => checkEmail(val), 500)
+                }}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  emailAvailable === false ? 'border-red-400' : emailAvailable === true ? 'border-green-400' : 'border-gray-300'
+                }`}
+                placeholder="juan@example.com"
+              />
+              {emailChecking && <p className="text-xs text-gray-400">Checking availability...</p>}
+              {emailAvailable === false && <p className="text-xs text-red-600">This email is already registered.</p>}
+              {emailAvailable === true && <p className="text-xs text-green-600">Email is available.</p>}
+            </div>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Auto-generated Password</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={createPassword}
+                  className="flex-1 border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-mono text-gray-700 select-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCreatePassword(generatePassword())}
+                  className="px-3 py-2 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
+                >
+                  Regenerate
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="secondary" onClick={() => setShowCreateModal(false)}>Cancel</Button>
+              <Button
+                loading={createMember.isPending}
+                disabled={!createForm.first_name || !createForm.last_name || !createForm.email || emailAvailable === false || emailChecking}
+                onClick={() => createMember.mutate({ ...createForm, password: createPassword })}
+              >
+                Create Member
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Accept as Member confirmation modal */}

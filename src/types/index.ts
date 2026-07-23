@@ -41,6 +41,9 @@ export type ConfigValueType = 'string' | 'number' | 'boolean' | 'enum'
 export interface Profile {
   id: string
   full_name: string
+  first_name: string | null
+  middle_name: string | null
+  last_name: string | null
   phone: string | null
   role: UserRole
   account_status: AccountStatus
