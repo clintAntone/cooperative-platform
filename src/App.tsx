@@ -16,7 +16,7 @@ function RootRedirect() {
   const role = profile?.role
   if (role === 'member') return <Navigate to="/dashboard" replace />
   if (role === 'board') return <Navigate to="/reports" replace />
-  return <Navigate to="/reports" replace />
+  return <Navigate to="/overview" replace />
 }
 
 function PageFallback() {
@@ -34,37 +34,33 @@ const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage').
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })))
 const ProfileCompletionPage = lazy(() => import('./pages/auth/ProfileCompletionPage').then(m => ({ default: m.ProfileCompletionPage })))
 
-// Member pages
+// Member pages — simplified
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })))
-const EquityPage = lazy(() => import('./pages/equity/EquityPage').then(m => ({ default: m.EquityPage })))
-const DepositRequestPage = lazy(() => import('./pages/equity/DepositRequestPage').then(m => ({ default: m.DepositRequestPage })))
-const MembershipPage = lazy(() => import('./pages/membership/MembershipPage').then(m => ({ default: m.MembershipPage })))
 const LendingPage = lazy(() => import('./pages/lending/LendingPage').then(m => ({ default: m.LendingPage })))
 const LoanDetailPage = lazy(() => import('./pages/lending/LoanDetailPage').then(m => ({ default: m.LoanDetailPage })))
 const LoanCalculatorPage = lazy(() => import('./pages/lending/LoanCalculatorPage').then(m => ({ default: m.LoanCalculatorPage })))
-const ActivityPage = lazy(() => import('./pages/activity/ActivityPage').then(m => ({ default: m.ActivityPage })))
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage').then(m => ({ default: m.ProfilePage })))
 const FaqPage = lazy(() => import('./pages/FaqPage').then(m => ({ default: m.FaqPage })))
-const RulesPage = lazy(() => import('./pages/RulesPage').then(m => ({ default: m.RulesPage })))
 
-// Savings pages
-const SavingsPage = lazy(() => import('./pages/savings/SavingsPage').then(m => ({ default: m.SavingsPage })))
-const SavingsDepositRequestPage = lazy(() => import('./pages/savings/SavingsDepositRequestPage').then(m => ({ default: m.SavingsDepositRequestPage })))
-const SavingsWithdrawPage = lazy(() => import('./pages/savings/SavingsWithdrawPage').then(m => ({ default: m.SavingsWithdrawPage })))
-const AllDepositRequestsPage = lazy(() => import('./pages/admin/AllDepositRequestsPage').then(m => ({ default: m.AllDepositRequestsPage })))
-const SavingsWithdrawalsPage = lazy(() => import('./pages/admin/SavingsWithdrawalsPage').then(m => ({ default: m.SavingsWithdrawalsPage })))
-const AdminSavingsPage = lazy(() => import('./pages/admin/AdminSavingsPage').then(m => ({ default: m.AdminSavingsPage })))
-const OverviewPage = lazy(() => import('./pages/overview/OverviewPage').then(m => ({ default: m.OverviewPage })))
+// Staff pages
+const WeeklyPostingPage = lazy(() => import('./pages/staff/WeeklyPostingPage').then(m => ({ default: m.WeeklyPostingPage })))
 
 // Admin / Staff pages
+const OverviewPage = lazy(() => import('./pages/overview/OverviewPage').then(m => ({ default: m.OverviewPage })))
 const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })))
-const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
 const MembersPage = lazy(() => import('./pages/admin/MembersPage').then(m => ({ default: m.MembersPage })))
 const MemberDetailPage = lazy(() => import('./pages/admin/MemberDetailPage').then(m => ({ default: m.MemberDetailPage })))
 const LoanApplicationsPage = lazy(() => import('./pages/admin/LoanApplicationsPage').then(m => ({ default: m.LoanApplicationsPage })))
 const LoanProductsPage = lazy(() => import('./pages/admin/LoanProductsPage').then(m => ({ default: m.LoanProductsPage })))
 const AdminLoanDetailPage = lazy(() => import('./pages/admin/AdminLoanDetailPage').then(m => ({ default: m.AdminLoanDetailPage })))
 const AdminLoanApplicationDetailPage = lazy(() => import('./pages/admin/AdminLoanApplicationDetailPage').then(m => ({ default: m.AdminLoanApplicationDetailPage })))
+const AllDepositRequestsPage = lazy(() => import('./pages/admin/AllDepositRequestsPage').then(m => ({ default: m.AllDepositRequestsPage })))
+const SavingsWithdrawalsPage = lazy(() => import('./pages/admin/SavingsWithdrawalsPage').then(m => ({ default: m.SavingsWithdrawalsPage })))
+const AdminSavingsPage = lazy(() => import('./pages/admin/AdminSavingsPage').then(m => ({ default: m.AdminSavingsPage })))
+const ShareTransfersPage = lazy(() => import('./pages/admin/ShareTransfersPage').then(m => ({ default: m.ShareTransfersPage })))
+const DamayanAdminPage = lazy(() => import('./pages/admin/DamayanAdminPage').then(m => ({ default: m.DamayanAdminPage })))
+const BranchesPage = lazy(() => import('./pages/admin/BranchesPage').then(m => ({ default: m.BranchesPage })))
+const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
 
 // Admin-only pages
 const BulkImportPage = lazy(() => import('./pages/admin/BulkImportPage').then(m => ({ default: m.BulkImportPage })))
@@ -74,16 +70,10 @@ const AppSettingsPage = lazy(() => import('./pages/admin/AppSettingsPage').then(
 const PermissionsPage = lazy(() => import('./pages/admin/PermissionsPage').then(m => ({ default: m.PermissionsPage })))
 const UserDetailPage = lazy(() => import('./pages/admin/UserDetailPage').then(m => ({ default: m.UserDetailPage })))
 const RolesPage = lazy(() => import('./pages/admin/RolesPage').then(m => ({ default: m.RolesPage })))
-
-// Cooperative feature pages (admin/staff)
 const DividendsPage = lazy(() => import('./pages/admin/DividendsPage').then(m => ({ default: m.DividendsPage })))
-const ShareTransfersPage = lazy(() => import('./pages/admin/ShareTransfersPage').then(m => ({ default: m.ShareTransfersPage })))
-const DamayanAdminPage = lazy(() => import('./pages/admin/DamayanAdminPage').then(m => ({ default: m.DamayanAdminPage })))
-const BranchesPage = lazy(() => import('./pages/admin/BranchesPage').then(m => ({ default: m.BranchesPage })))
 const RebatesPage = lazy(() => import('./pages/admin/RebatesPage').then(m => ({ default: m.RebatesPage })))
 
-// Member cooperative pages
-const DamayanPage = lazy(() => import('./pages/damayan/DamayanPage').then(m => ({ default: m.DamayanPage })))
+// Board
 const BranchKPIPage = lazy(() => import('./pages/branches/BranchKPIPage').then(m => ({ default: m.BranchKPIPage })))
 
 const queryClient = new QueryClient({
@@ -111,11 +101,9 @@ export default function App() {
               <Route path="/register" element={<ErrorBoundary><RegisterPage /></ErrorBoundary>} />
               <Route path="/forgot-password" element={<ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
               <Route path="/reset-password" element={<ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
-
-              {/* Profile completion — no sidebar, same layout as auth pages */}
               <Route path="/complete-profile" element={<ErrorBoundary><ProfileCompletionPage /></ErrorBoundary>} />
 
-              {/* Root redirect — authenticated only, role-aware */}
+              {/* Root redirect */}
               <Route element={<AppLayout />}>
                 <Route path="/" element={<RootRedirect />} />
               </Route>
@@ -123,32 +111,23 @@ export default function App() {
               {/* All authenticated users */}
               <Route element={<AppLayout />}>
                 <Route path="/faq" element={<ErrorBoundary><FaqPage /></ErrorBoundary>} />
-                <Route path="/rules" element={<ErrorBoundary><RulesPage /></ErrorBoundary>} />
                 <Route path="/profile" element={<ErrorBoundary><ProfilePage /></ErrorBoundary>} />
-                <Route path="/branches" element={<ErrorBoundary><BranchKPIPage /></ErrorBoundary>} />
               </Route>
 
               {/* Member */}
               <Route element={<AppLayout requiredRoles={['member']} />}>
                 <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-                <Route path="/equity" element={<ErrorBoundary><EquityPage /></ErrorBoundary>} />
-                <Route path="/equity/deposit-request" element={<ErrorBoundary><DepositRequestPage /></ErrorBoundary>} />
-                <Route path="/membership" element={<ErrorBoundary><MembershipPage /></ErrorBoundary>} />
-                <Route path="/lending" element={<ErrorBoundary><LendingPage /></ErrorBoundary>} />
-                <Route path="/lending/calculator" element={<ErrorBoundary><LoanCalculatorPage /></ErrorBoundary>} />
-                <Route path="/lending/:id" element={<ErrorBoundary><LoanDetailPage /></ErrorBoundary>} />
-                <Route path="/activity" element={<ErrorBoundary><ActivityPage /></ErrorBoundary>} />
-                <Route path="/savings" element={<ErrorBoundary><SavingsPage /></ErrorBoundary>} />
-                <Route path="/savings/deposit-request" element={<ErrorBoundary><SavingsDepositRequestPage /></ErrorBoundary>} />
-                <Route path="/savings/withdraw" element={<ErrorBoundary><SavingsWithdrawPage /></ErrorBoundary>} />
-                <Route path="/damayan" element={<ErrorBoundary><DamayanPage /></ErrorBoundary>} />
-
+                <Route path="/loans" element={<ErrorBoundary><LendingPage /></ErrorBoundary>} />
+                <Route path="/loans/calculator" element={<ErrorBoundary><LoanCalculatorPage /></ErrorBoundary>} />
+                <Route path="/loans/:id" element={<ErrorBoundary><LoanDetailPage /></ErrorBoundary>} />
+                <Route path="/loans/apply" element={<ErrorBoundary><LendingPage /></ErrorBoundary>} />
               </Route>
 
-              {/* Board of Directors + Admin + Staff — read views */}
+              {/* Board + Admin + Staff — read views */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff', 'board']} />}>
                 <Route path="/overview" element={<ErrorBoundary><OverviewPage /></ErrorBoundary>} />
                 <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
+                <Route path="/branches" element={<ErrorBoundary><BranchKPIPage /></ErrorBoundary>} />
                 <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
                 <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
                 <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
@@ -158,10 +137,9 @@ export default function App() {
 
               {/* Admin + Staff — operational */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
+                <Route path="/staff/post-deposits" element={<ErrorBoundary><WeeklyPostingPage /></ErrorBoundary>} />
                 <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
                 <Route path="/admin/deposit-requests" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
-                <Route path="/admin/savings-deposits" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
-
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings" element={<ErrorBoundary><AdminSavingsPage /></ErrorBoundary>} />
                 <Route path="/admin/savings-withdrawals" element={<ErrorBoundary><SavingsWithdrawalsPage /></ErrorBoundary>} />
@@ -187,7 +165,7 @@ export default function App() {
                 <Route path="/admin/users/:id" element={<ErrorBoundary><UserDetailPage /></ErrorBoundary>} />
               </Route>
 
-              {/* Fallback — redirect based on role */}
+              {/* Fallback */}
               <Route path="*" element={<RootRedirect />} />
             </Routes>
           </Suspense>
