@@ -221,28 +221,39 @@ const navGroups: NavGroup[] = [
     roles: ['admin', 'staff'],
     items: [
       {
-        path: '/staff/post-deposits',
-        label: 'Post Deposits',
+        path: '/admin/deposit-requests',
+        label: 'Requests',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        ),
+      },
+      {
+        path: '/staff/post-deposits',
+        label: 'Post Manually',
+        roles: ['admin'],
+        icon: (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         ),
       },
     ],
   },
   {
-    label: 'Member Accounts',
+    label: 'Savings',
     roles: ['admin', 'staff'],
     items: [
       {
-        path: '/admin/deposit-requests',
-        label: 'Deposit Requests',
+        path: '/admin/savings-withdrawals',
+        label: 'Withdrawals',
         icon: (
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         ),
       },
@@ -253,16 +264,6 @@ const navGroups: NavGroup[] = [
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-          </svg>
-        ),
-      },
-      {
-        path: '/admin/savings-withdrawals',
-        label: 'Savings Withdrawals',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
         ),
       },
@@ -337,22 +338,6 @@ const navGroups: NavGroup[] = [
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: 'Data',
-    roles: ['admin'],
-    items: [
-      {
-        path: '/admin/bulk-import',
-        label: 'Bulk Import',
-        icon: (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
         ),
       },
@@ -531,9 +516,17 @@ export function Sidebar({ isOpen, onClose, onSearchOpen }: SidebarProps) {
 
   // Collapsed state per group label, persisted in localStorage
   const storageKey = 'sidebar_collapsed_groups'
+  const collapsedDefaults: Record<string, boolean> = {
+    'Savings': true,
+    'Loans': true,
+    'Cooperative': true,
+    'Settings': true,
+  }
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey) ?? '{}') }
-    catch { return {} }
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKey) ?? '{}')
+      return { ...collapsedDefaults, ...stored }
+    } catch { return collapsedDefaults }
   })
 
   // Pinned items (paths), persisted in localStorage

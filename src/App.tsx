@@ -63,7 +63,6 @@ const BranchesPage = lazy(() => import('./pages/admin/BranchesPage').then(m => (
 const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
 
 // Admin-only pages
-const BulkImportPage = lazy(() => import('./pages/admin/BulkImportPage').then(m => ({ default: m.BulkImportPage })))
 const AdminPage = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })))
 const ConfigPage = lazy(() => import('./pages/admin/ConfigPage').then(m => ({ default: m.ConfigPage })))
 const AppSettingsPage = lazy(() => import('./pages/admin/AppSettingsPage').then(m => ({ default: m.AppSettingsPage })))
@@ -135,9 +134,13 @@ export default function App() {
                 <Route path="/admin/loans/:id" element={<ErrorBoundary><AdminLoanDetailPage /></ErrorBoundary>} />
               </Route>
 
+              {/* Admin only — post deposits */}
+              <Route element={<AppLayout requiredRoles={['admin']} />}>
+                <Route path="/staff/post-deposits" element={<ErrorBoundary><WeeklyPostingPage /></ErrorBoundary>} />
+              </Route>
+
               {/* Admin + Staff — operational */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff']} />}>
-                <Route path="/staff/post-deposits" element={<ErrorBoundary><WeeklyPostingPage /></ErrorBoundary>} />
                 <Route path="/admin/users" element={<ErrorBoundary><UsersPage /></ErrorBoundary>} />
                 <Route path="/admin/deposit-requests" element={<ErrorBoundary><AllDepositRequestsPage /></ErrorBoundary>} />
                 <Route path="/admin/loan-products" element={<ErrorBoundary><LoanProductsPage /></ErrorBoundary>} />
@@ -156,7 +159,6 @@ export default function App() {
 
               {/* Admin only */}
               <Route element={<AppLayout requiredRoles={['admin']} />}>
-                <Route path="/admin/bulk-import" element={<ErrorBoundary><BulkImportPage /></ErrorBoundary>} />
                 <Route path="/admin" element={<ErrorBoundary><AdminPage /></ErrorBoundary>} />
                 <Route path="/admin/config" element={<ErrorBoundary><ConfigPage /></ErrorBoundary>} />
                 <Route path="/admin/settings" element={<ErrorBoundary><AppSettingsPage /></ErrorBoundary>} />

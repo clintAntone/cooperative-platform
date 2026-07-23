@@ -30,6 +30,9 @@ CREATE TABLE system_config_history (
 CREATE TABLE profiles (
   id                      UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name               VARCHAR NOT NULL,
+  first_name              VARCHAR,
+  middle_name             VARCHAR,
+  last_name               VARCHAR,
   phone                   VARCHAR,
   role                    VARCHAR CHECK (role IN ('admin','member','staff','board')) NOT NULL DEFAULT 'member',
   account_status          VARCHAR CHECK (account_status IN ('active','suspended','inactive')) NOT NULL DEFAULT 'active',
@@ -748,10 +751,13 @@ CREATE POLICY profile_custom_roles_admin ON profile_custom_roles FOR ALL USING (
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, phone, role, account_status, employee_id)
+  INSERT INTO public.profiles (id, full_name, first_name, middle_name, last_name, phone, role, account_status, employee_id)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', 'Unknown'),
+    NEW.raw_user_meta_data->>'first_name',
+    NEW.raw_user_meta_data->>'middle_name',
+    NEW.raw_user_meta_data->>'last_name',
     NEW.raw_user_meta_data->>'phone',
     'member',
     'active',
@@ -795,6 +801,15 @@ CREATE TRIGGER on_member_profile_created
 CREATE TRIGGER on_member_role_assigned
   AFTER UPDATE OF role ON profiles
   FOR EACH ROW EXECUTE FUNCTION auto_create_share_for_member();
+
+-- Check email availability (used on admin create-member form)
+CREATE OR REPLACE FUNCTION is_email_available(p_email TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT NOT EXISTS (SELECT 1 FROM auth.users WHERE LOWER(email) = LOWER(p_email));
+$$;
+GRANT EXECUTE ON FUNCTION is_email_available(TEXT) TO authenticated;
 
 -- Check employee ID availability (used on register page, anon accessible)
 CREATE OR REPLACE FUNCTION is_employee_id_available(p_employee_id TEXT)
@@ -1088,33 +1103,52 @@ GRANT EXECUTE ON FUNCTION log_admin_action(TEXT, UUID, JSONB) TO authenticated;
 CREATE OR REPLACE FUNCTION approve_deposit_request(p_request_id UUID)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  v_req       equity_deposit_requests%ROWTYPE;
-  v_share     equity_shares%ROWTYPE;
-  v_leftover  DECIMAL(15,2);
-  v_to_credit DECIMAL(15,2);
+  v_req          equity_deposit_requests%ROWTYPE;
+  v_share        equity_shares%ROWTYPE;
+  v_leftover     DECIMAL(15,2);
+  v_to_credit    DECIMAL(15,2);
+  v_share_price  DECIMAL(15,2);
+  v_share_number INT;
+  v_new_share_id UUID;
 BEGIN
   IF get_user_role(auth.uid()) NOT IN ('admin','staff') THEN RAISE EXCEPTION 'Access denied'; END IF;
   SELECT * INTO v_req FROM equity_deposit_requests WHERE id = p_request_id;
   IF v_req.status != 'pending' THEN RAISE EXCEPTION 'Request is not pending'; END IF;
 
   v_leftover := v_req.amount;
+
+  -- Fill existing in_progress shares in order
   FOR v_share IN
     SELECT * FROM equity_shares
     WHERE user_id = v_req.user_id AND status = 'in_progress'
-      AND (id = v_req.share_id OR share_number > (
-        SELECT share_number FROM equity_shares WHERE id = v_req.share_id
-      ))
-    ORDER BY CASE WHEN id = v_req.share_id THEN 0 ELSE 1 END, share_number ASC
+    ORDER BY share_number ASC
   LOOP
     EXIT WHEN v_leftover <= 0;
     v_to_credit := LEAST(v_leftover, v_share.target_amount - v_share.paid_amount);
     INSERT INTO equity_contributions (user_id, share_id, amount, payment_method, reference, recorded_by)
     VALUES (v_req.user_id, v_share.id, v_to_credit, v_req.payment_method, v_req.reference, auth.uid());
+    UPDATE equity_shares SET
+      paid_amount = paid_amount + v_to_credit,
+      status = CASE WHEN paid_amount + v_to_credit >= target_amount THEN 'completed' ELSE status END,
+      completed_at = CASE WHEN paid_amount + v_to_credit >= target_amount AND completed_at IS NULL THEN now() ELSE completed_at END,
+      updated_at = now()
+    WHERE id = v_share.id;
     v_leftover := v_leftover - v_to_credit;
   END LOOP;
+
+  -- If leftover remains, auto-create a new share and deposit into it
   IF v_leftover > 0 THEN
+    SELECT COALESCE(config_value::DECIMAL, 5000) INTO v_share_price
+      FROM system_config WHERE config_key = 'share_price';
+    SELECT COALESCE(MAX(share_number), 0) + 1 INTO v_share_number
+      FROM equity_shares WHERE user_id = v_req.user_id;
+    INSERT INTO equity_shares (user_id, share_number, target_amount, paid_amount, status)
+    VALUES (v_req.user_id, v_share_number, v_share_price, 0, 'in_progress')
+    RETURNING id INTO v_new_share_id;
+
     INSERT INTO equity_contributions (user_id, share_id, amount, payment_method, reference, recorded_by)
-    VALUES (v_req.user_id, v_req.share_id, v_leftover, v_req.payment_method, v_req.reference, auth.uid());
+    VALUES (v_req.user_id, v_new_share_id, v_leftover, v_req.payment_method, v_req.reference, auth.uid());
+    UPDATE equity_shares SET paid_amount = v_leftover, updated_at = now() WHERE id = v_new_share_id;
   END IF;
 
   UPDATE equity_deposit_requests
@@ -1566,6 +1600,8 @@ DECLARE
   v_dest         VARCHAR;
   v_paid         DECIMAL(15,2);
   v_target       DECIMAL(15,2);
+  v_share_price  DECIMAL(15,2);
+  v_share_number INT;
 BEGIN
   IF get_user_role(auth.uid()) NOT IN ('admin','staff') THEN RAISE EXCEPTION 'Access denied'; END IF;
   IF p_amount <= 0 THEN RAISE EXCEPTION 'Amount must be positive'; END IF;
@@ -1576,7 +1612,16 @@ BEGIN
   IF v_dest = 'shares' THEN
     SELECT id INTO v_share_id FROM equity_shares
     WHERE user_id = p_user_id AND status = 'in_progress' ORDER BY created_at ASC LIMIT 1;
-    IF v_share_id IS NULL THEN RAISE EXCEPTION 'Member has no active share to deposit into'; END IF;
+    -- No active share: auto-create a new one using the configured share price
+    IF v_share_id IS NULL THEN
+      SELECT COALESCE(config_value::DECIMAL, 5000) INTO v_share_price
+        FROM system_config WHERE config_key = 'share_price';
+      SELECT COALESCE(MAX(share_number), 0) + 1 INTO v_share_number
+        FROM equity_shares WHERE user_id = p_user_id;
+      INSERT INTO equity_shares (user_id, share_number, target_amount, paid_amount, status)
+      VALUES (p_user_id, v_share_number, v_share_price, 0, 'in_progress')
+      RETURNING id INTO v_share_id;
+    END IF;
 
     INSERT INTO equity_contributions (user_id, share_id, amount, payment_method, reference, recorded_by, contribution_at)
     VALUES (p_user_id, v_share_id, p_amount, 'bank_transfer', p_reference, p_recorded_by, p_date);

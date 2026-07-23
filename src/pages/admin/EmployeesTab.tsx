@@ -29,8 +29,12 @@ const EMPLOYEE_API_URL = import.meta.env.DEV
   ? `/api/pos/employees`
   : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pos-employees`
 
+function toTitleCase(str: string) {
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function fullName(emp: PosEmployee) {
-  return [emp.first_name, emp.middle_name, emp.last_name].filter(Boolean).join(' ')
+  return [emp.first_name, emp.middle_name, emp.last_name].filter((n): n is string => !!n).map(toTitleCase).join(' ')
 }
 
 function membershipColor(status: string | null) {
@@ -202,18 +206,20 @@ export function EmployeesTab() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Employee ID</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Coop Status</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Membership</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Shares</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Action</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Employee ID</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">First Name</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Middle Name</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Last Name</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Coop Status</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Membership</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Shares</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-10 text-gray-400">No employees found</td>
+                  <td colSpan={8} className="text-center py-10 text-gray-400">No employees found</td>
                 </tr>
               )}
               {filtered.map(emp => {
@@ -221,8 +227,10 @@ export function EmployeesTab() {
                 const isJoined = !!profile
                 return (
                   <tr key={emp.employee_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-500 font-mono text-xs">{emp.employee_id}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{fullName(emp)}</td>
+                    <td className="px-4 py-3 text-gray-500 font-mono text-xs whitespace-nowrap">{emp.employee_id}</td>
+                    <td className="px-4 py-3 text-gray-900 whitespace-nowrap">{toTitleCase(emp.first_name)}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{emp.middle_name ? toTitleCase(emp.middle_name) : <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 text-gray-900 whitespace-nowrap">{toTitleCase(emp.last_name)}</td>
                     <td className="px-4 py-3">
                       {isJoined ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
