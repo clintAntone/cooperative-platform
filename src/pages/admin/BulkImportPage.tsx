@@ -10,7 +10,7 @@ import { toast } from '../../lib/toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ImportTab = 'shares' | 'deposits' | 'loans'
+type ImportTab = 'shares' | 'savings' | 'loans'
 
 interface ShareRow {
   _row: number
@@ -24,7 +24,7 @@ interface ShareRow {
   errors: string[]
 }
 
-interface DepositRow {
+interface SavingsRow {
   _row: number
   employee_id: string
   amount: number
@@ -33,7 +33,6 @@ interface DepositRow {
   date: string
   // resolved
   user_id?: string
-  share_id?: string
   member_name?: string
   errors: string[]
 }
@@ -68,8 +67,8 @@ function downloadTemplate(tab: ImportTab) {
       { employee_id: 'EMP-04-01-ABCD1234', target_amount: 5000, paid_amount: 0, status: 'in_progress' },
       { employee_id: 'EMP-04-02-EFGH5678', target_amount: 5000, paid_amount: 2500, status: 'in_progress' },
     ]
-  } else if (tab === 'deposits') {
-    filename = 'deposits_import_template'
+  } else if (tab === 'savings') {
+    filename = 'savings_import_template'
     rows = [
       { employee_id: 'EMP-04-01-ABCD1234', amount: 1000, payment_method: 'cash', reference: 'REF-001', date: '2026-07-23' },
       { employee_id: 'EMP-04-02-EFGH5678', amount: 2500, payment_method: 'bank_transfer', reference: '', date: '2026-07-23' },
@@ -166,10 +165,10 @@ export function BulkImportPage() {
   const [shareImporting, setShareImporting] = useState(false)
   const [shareResult, setShareResult] = useState<{ ok: number; failed: number } | null>(null)
 
-  // Deposits
-  const [depositRows, setDepositRows] = useState<DepositRow[] | null>(null)
-  const [depositImporting, setDepositImporting] = useState(false)
-  const [depositResult, setDepositResult] = useState<{ ok: number; failed: number } | null>(null)
+  // Savings
+  const [savingsRows, setSavingsRows] = useState<SavingsRow[] | null>(null)
+  const [savingsImporting, setSavingsImporting] = useState(false)
+  const [savingsResult, setSavingsResult] = useState<{ ok: number; failed: number } | null>(null)
 
   // Loans
   const [loanRows, setLoanRows] = useState<LoanRow[] | null>(null)
@@ -252,10 +251,10 @@ export function BulkImportPage() {
     if (failed > 0) toast({ title: `${failed} row${failed > 1 ? 's' : ''} failed`, variant: 'error' })
   }
 
-  // ── Parse & validate deposits ────────────────────────────────────────────
+  // ── Parse & validate savings ─────────────────────────────────────────────
 
-  const parseDeposits = async (file: File) => {
-    setDepositRows(null); setDepositResult(null)
+  const parseSavings = async (file: File) => {
+    setSavingsRows(null); setSavingsResult(null)
     const buf = await file.arrayBuffer()
     const wb = XLSX.read(buf)
     const ws = wb.Sheets[wb.SheetNames[0]]
@@ -264,11 +263,7 @@ export function BulkImportPage() {
     const { data: profiles } = await supabase.from('profiles').select('id, employee_id, full_name').eq('role', 'member')
     const empMap = Object.fromEntries((profiles ?? []).map(p => [p.employee_id?.toUpperCase(), p]))
 
-    // Fetch active shares for each member
-    const { data: shares } = await supabase.from('equity_shares').select('id, user_id, status').eq('status', 'in_progress')
-    const shareMap = Object.fromEntries((shares ?? []).map(s => [s.user_id, s.id]))
-
-    const rows: DepositRow[] = raw.map((r, i) => {
+    const rows: SavingsRow[] = raw.map((r, i) => {
       const errors: string[] = []
       const emp_id = String(r['employee_id'] ?? '').trim().toUpperCase()
       const amount = parseFloat(String(r['amount'] ?? ''))
@@ -283,9 +278,6 @@ export function BulkImportPage() {
       const profile = empMap[emp_id]
       if (emp_id && !profile) errors.push(`Employee ID "${emp_id}" not found`)
 
-      const share_id = profile ? shareMap[profile.id] : undefined
-      if (profile && !share_id) errors.push('Member has no active (in_progress) share')
-
       return {
         _row: i + 2,
         employee_id: emp_id,
@@ -294,25 +286,23 @@ export function BulkImportPage() {
         reference,
         date,
         user_id: profile?.id,
-        share_id,
         member_name: profile?.full_name,
         errors,
       }
     })
 
-    setDepositRows(rows)
+    setSavingsRows(rows)
   }
 
-  const importDeposits = async () => {
-    if (!depositRows) return
-    const valid = depositRows.filter(r => r.errors.length === 0)
-    setDepositImporting(true)
+  const importSavings = async () => {
+    if (!savingsRows) return
+    const valid = savingsRows.filter(r => r.errors.length === 0)
+    setSavingsImporting(true)
     let ok = 0; let failed = 0
 
     for (const row of valid) {
-      const { error } = await supabase.rpc('admin_record_contribution_direct' as any, {
+      const { error } = await supabase.rpc('admin_record_savings_direct' as any, {
         p_user_id: row.user_id,
-        p_share_id: row.share_id,
         p_amount: row.amount,
         p_payment_method: row.payment_method,
         p_reference: row.reference || null,
@@ -322,9 +312,9 @@ export function BulkImportPage() {
       if (error) { failed++; console.error(error) } else { ok++ }
     }
 
-    setDepositImporting(false)
-    setDepositResult({ ok, failed })
-    if (ok > 0) toast({ title: `${ok} deposit${ok > 1 ? 's' : ''} imported`, variant: 'success' })
+    setSavingsImporting(false)
+    setSavingsResult({ ok, failed })
+    if (ok > 0) toast({ title: `${ok} savings record${ok > 1 ? 's' : ''} imported`, variant: 'success' })
     if (failed > 0) toast({ title: `${failed} row${failed > 1 ? 's' : ''} failed`, variant: 'error' })
   }
 
@@ -428,7 +418,7 @@ export function BulkImportPage() {
 
   const tabs: { value: ImportTab; label: string }[] = [
     { value: 'shares', label: 'Shares' },
-    { value: 'deposits', label: 'Deposits' },
+    { value: 'savings', label: 'Savings' },
     { value: 'loans', label: 'Loans' },
   ]
 
@@ -436,7 +426,7 @@ export function BulkImportPage() {
     <div>
       <Header
         title="Bulk Import"
-        subtitle="Upload Excel files to import shares, deposits, or loans in bulk"
+        subtitle="Upload Excel files to import shares, savings, or loans in bulk"
       />
 
       <div className="p-4 sm:p-6 space-y-5">
@@ -542,46 +532,46 @@ export function BulkImportPage() {
           </div>
         )}
 
-        {/* ── Deposits tab ───────────────────────────────────────── */}
-        {tab === 'deposits' && (
+        {/* ── Savings tab ────────────────────────────────────────── */}
+        {tab === 'savings' && (
           <div className="space-y-4">
             <Card>
               <CardBody>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Import Deposits</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">Import Savings</h3>
                     <p className="text-xs text-gray-500 mt-0.5">Required: <code className="bg-gray-100 px-1 rounded">employee_id</code>, <code className="bg-gray-100 px-1 rounded">amount</code>, <code className="bg-gray-100 px-1 rounded">payment_method</code> — Optional: <code className="bg-gray-100 px-1 rounded">reference</code>, <code className="bg-gray-100 px-1 rounded">date</code></p>
-                    <p className="text-xs text-amber-600 mt-0.5">Member must have an active (in_progress) share. Deposits are applied directly to that share.</p>
+                    <p className="text-xs text-amber-600 mt-0.5">A savings account will be auto-created if the member doesn't have one yet.</p>
                   </div>
-                  <button onClick={() => downloadTemplate('deposits')} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
+                  <button onClick={() => downloadTemplate('savings')} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
                     Download Template
                   </button>
                 </div>
-                <DropZone onFile={parseDeposits} />
+                <DropZone onFile={parseSavings} />
               </CardBody>
             </Card>
 
-            {depositRows && (
+            {savingsRows && (
               <Card>
                 <CardBody>
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <span className="text-sm font-semibold text-gray-900">{depositRows.length} rows parsed</span>
-                      <span className="ml-2 text-xs text-gray-500">{depositRows.filter(r => r.errors.length === 0).length} valid · {depositRows.filter(r => r.errors.length > 0).length} with errors</span>
+                      <span className="text-sm font-semibold text-gray-900">{savingsRows.length} rows parsed</span>
+                      <span className="ml-2 text-xs text-gray-500">{savingsRows.filter(r => r.errors.length === 0).length} valid · {savingsRows.filter(r => r.errors.length > 0).length} with errors</span>
                     </div>
                     <Button
                       size="sm"
-                      onClick={importDeposits}
-                      loading={depositImporting}
-                      disabled={depositImporting || depositRows.filter(r => r.errors.length === 0).length === 0}
+                      onClick={importSavings}
+                      loading={savingsImporting}
+                      disabled={savingsImporting || savingsRows.filter(r => r.errors.length === 0).length === 0}
                     >
-                      Import {depositRows.filter(r => r.errors.length === 0).length} Deposits
+                      Import {savingsRows.filter(r => r.errors.length === 0).length} Savings Records
                     </Button>
                   </div>
-                  {depositResult && (
-                    <div className={`mb-3 px-3 py-2 rounded-lg text-sm ${depositResult.failed > 0 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                      {depositResult.ok} imported successfully{depositResult.failed > 0 ? `, ${depositResult.failed} failed` : ''}.
+                  {savingsResult && (
+                    <div className={`mb-3 px-3 py-2 rounded-lg text-sm ${savingsResult.failed > 0 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                      {savingsResult.ok} imported successfully{savingsResult.failed > 0 ? `, ${savingsResult.failed} failed` : ''}.
                     </div>
                   )}
                   <div className="overflow-x-auto rounded-lg border border-gray-100">
@@ -594,7 +584,7 @@ export function BulkImportPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {depositRows.map(row => (
+                        {savingsRows.map(row => (
                           <tr key={row._row} className={row.errors.length > 0 ? 'bg-red-50' : ''}>
                             <td className="px-3 py-2 text-gray-400">{row._row}</td>
                             <td className="px-3 py-2 font-mono text-gray-700">{row.employee_id}</td>
