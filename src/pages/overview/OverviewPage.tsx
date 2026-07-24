@@ -1,18 +1,18 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-// @ts-ignore - recharts not in devDependencies yet
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+// @ts-ignore
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { supabase } from '../../lib/supabase'
 import { useCurrency } from '../../hooks/useCurrency'
 import { useLoanPortfolioStats } from '../../hooks/useLoans'
-import { useMonthlyContributions } from '../../hooks/useReports'
 import { useMembershipBreakdown } from '../../hooks/useMembership'
 import { useBranches, useAllBranchIncome, useAllBranchExpenses } from '../../hooks/useBranches'
+import { useMonthlyContributions, useMonthlyNewMembers } from '../../hooks/useReports'
 import { Header } from '../../components/layout/Header'
 import { StatusBadge } from '../../components/shared/StatusBadge'
-import { formatDate } from '../../lib/utils'
+import { formatDate, formatNumber } from '../../lib/utils'
 import { exportToExcel } from '../../lib/exportExcel'
 import { exportMembersPdf, exportLoanPortfolioPdf } from '../../lib/exportPdf'
 import type { ExpenseCategory } from '../../types'
@@ -46,59 +46,6 @@ function KpiCard({
       <p className="text-xs text-gray-500 mb-1">{label}</p>
       <p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-    </div>
-  )
-}
-
-// ─── Export dropdown ─────────────────────────────────────────────────────────
-
-function ExportDropdown({ onMembersXls, onMembersPdf, onLoansPdf }: {
-  onMembersXls: () => void
-  onMembersPdf: () => void
-  onLoansPdf: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-        </svg>
-        Generate Report
-        <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg border border-gray-200 shadow-lg z-20 py-1">
-          {[
-            { label: 'Members — Excel (.xlsx)', action: onMembersXls },
-            { label: 'Members — PDF', action: onMembersPdf },
-            { label: 'Loan Portfolio — PDF', action: onLoansPdf },
-          ].map(item => (
-            <button
-              key={item.label}
-              onClick={() => { item.action(); setOpen(false) }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -372,76 +319,64 @@ function useLoanAgingReport() {
   })
 }
 
-// Used by export dropdown in OverviewPage
-function useMemberPortfolioReport() {
+function usePendingLoanApplications() {
   return useQuery({
-    queryKey: ['member_portfolio_report'],
-    staleTime: 60_000,
+    queryKey: ['overview_pending_loan_applications'],
     queryFn: async () => {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, account_status, membership_status(status, completed_shares)')
-        .eq('role', 'member')
-        .order('full_name')
+      const { data, error } = await supabase
+        .from('loan_applications')
+        .select('id')
+        .in('status', ['submitted', 'under_review'])
       if (error) throw error
-      const userIds = (profiles ?? []).map((p: any) => p.id)
-      if (userIds.length === 0) return []
-      const [sharesRes, savingsRes, loansRes] = await Promise.all([
-        supabase.from('equity_shares').select('user_id, paid_amount, status').in('user_id', userIds),
-        supabase.from('savings_accounts').select('user_id, balance').in('user_id', userIds),
-        supabase.from('loans').select('user_id, outstanding, status').in('user_id', userIds),
-      ])
-      const equityMap: Record<string, { total: number; completed: number }> = {}
-      for (const s of (sharesRes.data ?? []) as any[]) {
-        if (!equityMap[s.user_id]) equityMap[s.user_id] = { total: 0, completed: 0 }
-        equityMap[s.user_id].total += s.paid_amount ?? 0
-        if (s.status === 'completed') equityMap[s.user_id].completed += 1
-      }
-      const savingsMap: Record<string, number> = {}
-      for (const s of (savingsRes.data ?? []) as any[]) savingsMap[s.user_id] = s.balance ?? 0
-      const loanMap: Record<string, { active: number; outstanding: number }> = {}
-      for (const l of (loansRes.data ?? []) as any[]) {
-        if (!loanMap[l.user_id]) loanMap[l.user_id] = { active: 0, outstanding: 0 }
-        if (l.status === 'active') { loanMap[l.user_id].active += 1; loanMap[l.user_id].outstanding += l.outstanding ?? 0 }
-      }
-      return (profiles ?? []).map((p: any) => ({
-        id: p.id,
-        full_name: p.full_name,
-        account_status: p.account_status,
-        membership_status: Array.isArray(p.membership_status) ? p.membership_status[0] ?? null : p.membership_status ?? null,
-        equity: equityMap[p.id] ?? { total: 0, completed: 0 },
-        savings_balance: savingsMap[p.id] ?? 0,
-        loans: loanMap[p.id] ?? { active: 0, outstanding: 0 },
-      }))
+      return data?.length ?? 0
     },
   })
 }
 
-function useAllLoansExport() {
-  return useQuery({
-    queryKey: ['all_loans_export'],
-    staleTime: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('loans')
-        .select('principal, outstanding, status, disbursed_at, user_id')
-        .order('disbursed_at', { ascending: false })
-      if (error) throw error
-      const userIds = [...new Set((data as any[]).map(r => r.user_id).filter(Boolean))]
-      let nameMap: Record<string, string> = {}
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
-        if (profiles) nameMap = Object.fromEntries((profiles as any[]).map(p => [p.id, p.full_name]))
-      }
-      return (data as any[]).map(r => ({
-        member_name: nameMap[r.user_id] ?? 'Unknown',
-        amount: r.principal,
-        outstanding: r.outstanding,
-        status: r.status,
-        disbursed_at: r.disbursed_at,
-      }))
-    },
-  })
+// ─── Pending Actions Bar ──────────────────────────────────────────────────────
+
+function PendingActionsBar({
+  pendingDeposits,
+  pendingSavingsDeposits,
+  pendingSavingsWithdrawals,
+  pendingLoanApplications,
+}: {
+  pendingDeposits: number
+  pendingSavingsDeposits: number
+  pendingSavingsWithdrawals: number
+  pendingLoanApplications: number
+}) {
+  const navigate = useNavigate()
+  const total = pendingDeposits + pendingSavingsDeposits + pendingSavingsWithdrawals + pendingLoanApplications
+
+  if (total === 0) return null
+
+  const chips = [
+    { label: 'Equity Deposits', count: pendingDeposits, route: '/admin/deposits' },
+    { label: 'Savings Deposits', count: pendingSavingsDeposits, route: '/admin/savings-deposits' },
+    { label: 'Savings Withdrawals', count: pendingSavingsWithdrawals, route: '/admin/savings-withdrawals' },
+    { label: 'Loan Applications', count: pendingLoanApplications, route: '/admin/loans/applications' },
+  ].filter(c => c.count > 0)
+
+  return (
+    <div className="bg-amber-50 border-b border-amber-100 px-4 sm:px-6 py-2 flex items-center gap-2 overflow-x-auto">
+      <span className="text-xs text-amber-700 font-semibold uppercase tracking-wide whitespace-nowrap flex-shrink-0">Needs Attention</span>
+      <div className="flex items-center gap-2 flex-wrap">
+        {chips.map(chip => (
+          <button
+            key={chip.route}
+            onClick={() => navigate(chip.route)}
+            className="inline-flex items-center gap-1.5 bg-white border border-amber-300 rounded-full px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100 transition-colors whitespace-nowrap"
+          >
+            {chip.label}
+            <span className="bg-amber-500 text-white rounded-full text-xs font-bold px-1.5 py-0.5 min-w-[20px] text-center leading-none">
+              {chip.count}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ─── Modal data hooks ─────────────────────────────────────────────────────────
@@ -871,7 +806,6 @@ function EquityTab() {
   const { data: membership } = useMembershipBreakdown()
   const { data: completedShares = 0 } = useCompletedSharesCount()
   const { data: pendingDeposits = 0 } = usePendingDepositCountOverview()
-  const { data: chartData = [] } = useMonthlyContributions()
   const { data: memberReport = [], isLoading: reportLoading } = useMemberEquityReport()
   const [selectedMember, setSelectedMember] = useState<{ userId: string; fullName: string } | null>(null)
 
@@ -904,24 +838,6 @@ function EquityTab() {
           sub="Awaiting admin approval"
           valueClass={pendingDeposits > 0 ? 'text-amber-600' : 'text-gray-900'}
         />
-      </div>
-
-      {/* Monthly contributions chart */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Contributions (Last 12 Months)</h3>
-        {chartData.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No contribution data available.</p>
-        ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => currency(v)} width={90} />
-              <Tooltip formatter={(v: number) => [currency(v), 'Amount']} />
-              <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
       </div>
 
       {/* Per-member equity table */}
@@ -1488,47 +1404,116 @@ function MemberAccountsTab() {
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Reports tab ──────────────────────────────────────────────────────────────
 
-const TABS = ['Member Accounts', 'Loans', 'Cooperative'] as const
-type Tab = typeof TABS[number]
+function useMemberListForReport(dateFrom: string, dateTo: string) {
+  return useQuery({
+    queryKey: ['report_member_list', dateFrom, dateTo],
+    queryFn: async () => {
+      let q = supabase
+        .from('profiles')
+        .select('id, full_name, account_status, employee_id, created_at, membership_status(status, completed_shares)')
+        .eq('role', 'member')
+        .order('full_name')
+      if (dateFrom) q = q.gte('created_at', dateFrom)
+      if (dateTo) q = q.lte('created_at', dateTo + 'T23:59:59')
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []).map((m: any) => ({
+        ...m,
+        membership_status: Array.isArray(m.membership_status) ? m.membership_status[0] ?? null : m.membership_status ?? null,
+      }))
+    },
+  })
+}
 
-export function OverviewPage() {
-  const [tab, setTab] = useState<Tab>('Member Accounts')
+function useAllLoansForExport() {
+  return useQuery({
+    queryKey: ['overview_all_loans_export'],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loans')
+        .select('principal, outstanding, status, disbursed_at, user_id')
+        .order('disbursed_at', { ascending: false })
+      if (error) throw error
+      const userIds = [...new Set((data as any[]).map(r => r.user_id).filter(Boolean))]
+      let nameMap: Record<string, string> = {}
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
+        if (profiles) nameMap = Object.fromEntries((profiles as any[]).map(p => [p.id, p.full_name]))
+      }
+      return (data as any[]).map(r => ({
+        member_name: nameMap[r.user_id] ?? 'Unknown',
+        amount: r.principal,
+        outstanding: r.outstanding,
+        status: r.status,
+        disbursed_at: r.disbursed_at,
+      }))
+    },
+  })
+}
 
-  // Data for exports
-  const { data: memberPortfolio = [] } = useMemberPortfolioReport()
+function ReportsTab() {
+  const { format: currency, symbol: currencySymbol } = useCurrency()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [reportType, setReportType] = useState<'members' | 'loans'>('members')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const hasDateFilter = !!(dateFrom || dateTo)
+
+  const { data: membershipBreakdown } = useMembershipBreakdown()
   const { data: loanStats } = useLoanPortfolioStats()
-  const { data: allLoansExport = [] } = useAllLoansExport()
+  const { data: totalEquity = 0 } = useTotalEquity()
+  const { data: contributions = [] } = useMonthlyContributions()
+  const { data: newMembers = [] } = useMonthlyNewMembers()
+  const { data: membersRaw = [], isLoading: membersLoading } = useMemberListForReport(dateFrom, dateTo)
+  const { data: allLoansExport = [] } = useAllLoansForExport()
 
-  const handleMembersXls = () => {
-    exportToExcel(
-      (memberPortfolio as any[]).map(m => ({
-        Name: m.full_name,
-        'Membership Status': m.membership_status?.status ?? 'pending',
-        'Completed Shares': m.equity?.completed ?? 0,
-        'Total Equity': m.equity?.total ?? 0,
-        'Savings Balance': m.savings_balance ?? 0,
-        'Active Loans': m.loans?.active ?? 0,
-        'Loan Outstanding': m.loans?.outstanding ?? 0,
-      })),
-      'members-report'
-    )
+  const totalMembers = membershipBreakdown ? Object.values(membershipBreakdown).reduce((a, b) => a + b, 0) : 0
+
+  const filteredMembers = (membersRaw as any[]).filter((m: any) => {
+    const matchesSearch = m.full_name.toLowerCase().includes(search.toLowerCase())
+    const ms = m.membership_status?.status ?? 'pending'
+    const matchesStatus = statusFilter === 'all' || ms === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  function closeModal() {
+    setModalOpen(false)
+    setReportType('members')
+    setSearch('')
+    setStatusFilter('all')
+    setDateFrom('')
+    setDateTo('')
   }
 
-  const handleMembersPdf = () => {
+  function handleExcelExport() {
+    const rows = filteredMembers.map((m: any) => ({
+      Name: m.full_name,
+      'Employee ID': m.employee_id ?? '',
+      'Membership Status': m.membership_status?.status ?? 'pending',
+      'Completed Shares': m.membership_status?.completed_shares ?? 0,
+      Joined: m.created_at,
+    }))
+    exportToExcel(rows, 'members-report')
+  }
+
+  function handleMembersPdfExport() {
     exportMembersPdf(
-      (memberPortfolio as any[]).map(m => ({
+      filteredMembers.map((m: any) => ({
         full_name: m.full_name,
         account_status: m.account_status,
         membership_status: m.membership_status?.status ?? 'pending',
-        completed_shares: m.equity?.completed ?? 0,
+        completed_shares: m.membership_status?.completed_shares ?? 0,
       })),
-      `${memberPortfolio.length} members`
+      `${filteredMembers.length} member${filteredMembers.length !== 1 ? 's' : ''}${hasDateFilter ? ' (filtered by date)' : ''}`
     )
   }
 
-  const handleLoansPdf = () => {
+  function handleLoansPdfExport() {
     exportLoanPortfolioPdf(allLoansExport, {
       totalDisbursed: loanStats?.totalDisbursed ?? 0,
       totalOutstanding: loanStats?.totalOutstanding ?? 0,
@@ -1538,17 +1523,275 @@ export function OverviewPage() {
   }
 
   return (
+    <div className="space-y-6">
+      {/* Header row with Generate Report button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-500">Analytics overview and printable reports for the cooperative.</p>
+        </div>
+        <button
+          onClick={() => setModalOpen(true)}
+          className="inline-flex items-center gap-2 bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Generate Report
+        </button>
+      </div>
+
+      {/* Generate Report Modal */}
+      {modalOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">Generate Report</h2>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="overflow-y-auto px-6 py-5 space-y-5">
+              {/* Report type selector */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Report Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: 'members', label: 'Members List', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+                    { value: 'loans', label: 'Loan Portfolio', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setReportType(opt.value)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 text-sm font-medium transition-all text-left ${
+                        reportType === opt.value
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d={opt.icon} />
+                      </svg>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Members filters */}
+              {reportType === 'members' && (
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">Filters</label>
+
+                  {/* Search */}
+                  <div className="relative">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search by name…"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {search && (
+                      <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Membership Status</label>
+                    <select
+                      value={statusFilter}
+                      onChange={e => setStatusFilter(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="all">All statuses</option>
+                      <option value="active">Active</option>
+                      <option value="pending">Pending</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
+
+                  {/* Date range */}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Joined Date Range</label>
+                    <div className="flex items-center gap-2">
+                      <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <span className="text-xs text-gray-400">–</span>
+                      <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      {hasDateFilter && (
+                        <button onClick={() => { setDateFrom(''); setDateTo('') }}
+                          className="flex-shrink-0 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1.5 hover:bg-gray-50">
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Preview count */}
+                  <div className={`rounded-lg px-3 py-2.5 text-sm flex items-center gap-2 ${membersLoading ? 'bg-gray-50 text-gray-400' : 'bg-blue-50 text-blue-700'}`}>
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {membersLoading
+                      ? 'Loading members…'
+                      : <><strong>{filteredMembers.length}</strong>&nbsp;member{filteredMembers.length !== 1 ? 's' : ''} will be included in this report.</>
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* Loans info */}
+              {reportType === 'loans' && (
+                <div className="bg-blue-50 rounded-lg px-3 py-2.5 text-sm flex items-center gap-2 text-blue-700">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Includes all <strong>{allLoansExport.length}</strong> loan record{allLoansExport.length !== 1 ? 's' : ''} with outstanding balances and status.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Modal footer */}
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex items-center justify-between gap-3">
+              <button onClick={closeModal} className="text-sm text-gray-500 hover:text-gray-700 font-medium">Cancel</button>
+              <div className="flex gap-2">
+                {reportType === 'members' ? (
+                  <>
+                    <button
+                      onClick={handleExcelExport}
+                      disabled={membersLoading || filteredMembers.length === 0}
+                      className="inline-flex items-center gap-1.5 bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+                      Export Excel
+                    </button>
+                    <button
+                      onClick={handleMembersPdfExport}
+                      disabled={membersLoading || filteredMembers.length === 0}
+                      className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+                      Export PDF
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleLoansPdfExport}
+                    className="inline-flex items-center gap-1.5 bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>
+                    Export PDF
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <KpiCard label="Total Members" value={formatNumber(totalMembers)} sub="All roles" />
+        <KpiCard label="Active Members" value={formatNumber(membershipBreakdown?.active ?? 0)} sub={`${formatNumber(membershipBreakdown?.pending ?? 0)} pending`} valueClass="text-green-700" />
+        <KpiCard label="Total Equity Raised" value={currency(totalEquity)} sub="All contributions" />
+        <KpiCard label="Active Loans" value={formatNumber(loanStats?.activeLoans ?? 0)} sub={`${currency(loanStats?.totalOutstanding ?? 0)} outstanding`} valueClass="text-amber-600" />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Contributions (Last 12 Months)</h3>
+          {contributions.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No data yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={contributions} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} width={55} />
+                <Tooltip formatter={(v: number) => [currency(v), 'Amount']} />
+                <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">New Members (Last 12 Months)</h3>
+          {newMembers.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No data yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={newMembers} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={35} />
+                <Tooltip formatter={(v: number) => [v, 'New Members']} />
+                <Line type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Membership breakdown */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+        <h3 className="text-sm font-semibold text-gray-700 mb-4">Membership Breakdown</h3>
+        <div className="space-y-3">
+          {membershipBreakdown && Object.entries(membershipBreakdown).map(([status, count]) => (
+            <div key={status} className="flex items-center gap-3">
+              <StatusBadge status={status} />
+              <div className="flex-1 bg-gray-100 rounded-full h-2">
+                <div className="h-2 rounded-full bg-blue-500" style={{ width: totalMembers > 0 ? `${(count / totalMembers) * 100}%` : '0%' }} />
+              </div>
+              <span className="text-sm font-semibold text-gray-900 w-8 text-right">{formatNumber(count)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+const TABS = ['Member Accounts', 'Loans', 'Cooperative', 'Reports'] as const
+type Tab = typeof TABS[number]
+
+export function OverviewPage() {
+  const [tab, setTab] = useState<Tab>('Member Accounts')
+
+  const { data: pendingDeposits = 0 } = usePendingDepositCountOverview()
+  const { data: pendingSavingsDeposits = 0 } = usePendingSavingsDeposits()
+  const { data: pendingSavingsWithdrawals = 0 } = usePendingSavingsWithdrawals()
+  const { data: pendingLoanApplications = 0 } = usePendingLoanApplications()
+
+  return (
     <div>
       <Header
         title="Overview"
-        subtitle="Equity, savings, loans, and branch performance"
-        actions={
-          <ExportDropdown
-            onMembersXls={handleMembersXls}
-            onMembersPdf={handleMembersPdf}
-            onLoansPdf={handleLoansPdf}
-          />
-        }
+        subtitle="Operations, analytics, and printable reports"
+      />
+
+      <PendingActionsBar
+        pendingDeposits={pendingDeposits}
+        pendingSavingsDeposits={pendingSavingsDeposits}
+        pendingSavingsWithdrawals={pendingSavingsWithdrawals}
+        pendingLoanApplications={pendingLoanApplications}
       />
 
       {/* Tab bar */}
@@ -1575,6 +1818,7 @@ export function OverviewPage() {
         {tab === 'Member Accounts' && <MemberAccountsTab />}
         {tab === 'Loans' && <LoansTab />}
         {tab === 'Cooperative' && <BranchesTab />}
+        {tab === 'Reports' && <ReportsTab />}
       </div>
     </div>
   )

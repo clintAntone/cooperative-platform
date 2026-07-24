@@ -15,8 +15,8 @@ function RootRedirect() {
   if (loading) return null
   const role = profile?.role
   if (role === 'member') return <Navigate to="/dashboard" replace />
-  if (role === 'board') return <Navigate to="/reports" replace />
-  return <Navigate to="/reports" replace />
+  if (role === 'board') return <Navigate to="/overview" replace />
+  return <Navigate to="/overview" replace />
 }
 
 function PageFallback() {
@@ -60,7 +60,6 @@ const OverviewPage = lazy(() => import('./pages/overview/OverviewPage').then(m =
 const WeeklyPostingPage = lazy(() => import('./pages/staff/WeeklyPostingPage').then(m => ({ default: m.WeeklyPostingPage })))
 
 // Admin / Staff pages
-const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })))
 const UsersPage = lazy(() => import('./pages/admin/UsersPage').then(m => ({ default: m.UsersPage })))
 const MembersPage = lazy(() => import('./pages/admin/MembersPage').then(m => ({ default: m.MembersPage })))
 const MemberDetailPage = lazy(() => import('./pages/admin/MemberDetailPage').then(m => ({ default: m.MemberDetailPage })))
@@ -151,7 +150,7 @@ export default function App() {
               {/* Board of Directors + Admin + Staff — read views */}
               <Route element={<AppLayout requiredRoles={['admin', 'staff', 'board']} />}>
                 <Route path="/overview" element={<ErrorBoundary><OverviewPage /></ErrorBoundary>} />
-                <Route path="/reports" element={<ErrorBoundary><ReportsPage /></ErrorBoundary>} />
+                <Route path="/reports" element={<Navigate to="/overview" replace />} />
                 <Route path="/admin/members" element={<ErrorBoundary><MembersPage /></ErrorBoundary>} />
                 <Route path="/admin/members/:id" element={<ErrorBoundary><MemberDetailPage /></ErrorBoundary>} />
                 <Route path="/admin/loans" element={<ErrorBoundary><LoanApplicationsPage /></ErrorBoundary>} />
