@@ -105,7 +105,7 @@ export function ProfileCompletionModal() {
         {/* Header */}
         <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-gray-100">
           <div className="flex items-start justify-between">
-            <h2 className="text-xl font-bold text-gray-900">Complete your profile</h2>
+            <h2 className="text-xl font-bold text-gray-900">Additional Information</h2>
             <button
               onClick={() => setDismissed(true)}
               className="ml-4 flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
@@ -117,7 +117,7 @@ export function ProfileCompletionModal() {
             </button>
           </div>
           <p className="mt-1 text-sm text-gray-500">
-            Fill in your details before you can use the platform.
+            Please fill in your additional details to complete your membership.
           </p>
         </div>
 

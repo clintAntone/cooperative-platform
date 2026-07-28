@@ -33,6 +33,7 @@ const RegisterPage = lazy(() => import('./pages/auth/RegisterPage').then(m => ({
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })))
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })))
 const ProfileCompletionPage = lazy(() => import('./pages/auth/ProfileCompletionPage').then(m => ({ default: m.ProfileCompletionPage })))
+const CompleteRegistrationPage = lazy(() => import('./pages/auth/CompleteRegistrationPage').then(m => ({ default: m.CompleteRegistrationPage })))
 
 // Member pages
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })))
@@ -116,6 +117,7 @@ export default function App() {
 
               {/* Profile completion — no sidebar, same layout as auth pages */}
               <Route path="/complete-profile" element={<ErrorBoundary><ProfileCompletionPage /></ErrorBoundary>} />
+              <Route path="/complete-registration" element={<ErrorBoundary><CompleteRegistrationPage /></ErrorBoundary>} />
 
               {/* Root redirect — authenticated only, role-aware */}
               <Route element={<AppLayout />}>

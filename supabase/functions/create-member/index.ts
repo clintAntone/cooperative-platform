@@ -51,47 +51,77 @@ serve(async (req) => {
   }
 
   const body = await req.json()
-  const { first_name, middle_name, last_name, email, password } = body
+  const { first_name, middle_name, last_name, email, password, provided_employee_id } = body
 
-  if (!first_name || !last_name || !email || !password) {
-    return new Response(JSON.stringify({ error: 'first_name, last_name, email, and password are required' }), {
+  // provided_employee_id = POS employee ID; triggers temp-credentials mode
+  const isTempCredentials = !!provided_employee_id
+
+  if (!first_name || !last_name || !password) {
+    return new Response(JSON.stringify({ error: 'first_name, last_name, and password are required' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  // Check email availability
-  const { data: existingUsers } = await adminClient.auth.admin.listUsers()
-  const emailTaken = existingUsers?.users?.some(u => u.email?.toLowerCase() === email.toLowerCase().trim())
-  if (emailTaken) {
-    return new Response(JSON.stringify({ error: 'This email address is already registered.' }), {
-      status: 409,
+  if (!isTempCredentials && !email) {
+    return new Response(JSON.stringify({ error: 'email is required' }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  // Generate next MEM-XXXX employee ID
-  const { data: lastMember } = await adminClient
-    .from('profiles')
-    .select('employee_id')
-    .like('employee_id', 'MEM-%')
-    .order('employee_id', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  let authEmail: string
+  let employeeId: string
 
-  let nextNum = 1
-  if (lastMember?.employee_id) {
-    const parsed = parseInt(lastMember.employee_id.replace('MEM-', ''), 10)
-    if (!isNaN(parsed)) nextNum = parsed + 1
+  if (isTempCredentials) {
+    employeeId = provided_employee_id as string
+
+    // Check this employee_id doesn't already have an account
+    const { data: existing } = await adminClient
+      .from('profiles')
+      .select('id')
+      .eq('employee_id', employeeId)
+      .maybeSingle()
+
+    if (existing) {
+      return new Response(JSON.stringify({ error: 'An account already exists for this employee.' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    authEmail = `${employeeId.toLowerCase()}@onboarding.temp`
+  } else {
+    // Standard flow: check email availability via profiles-based RPC, then generate MEM-XXXX
+    const { data: emailAvailable } = await adminClient.rpc('is_email_available', { p_email: email.toLowerCase().trim() })
+    if (emailAvailable === false) {
+      return new Response(JSON.stringify({ error: 'This email address is already registered.' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { data: lastMember } = await adminClient
+      .from('profiles')
+      .select('employee_id')
+      .like('employee_id', 'MEM-%')
+      .order('employee_id', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    let nextNum = 1
+    if (lastMember?.employee_id) {
+      const parsed = parseInt(lastMember.employee_id.replace('MEM-', ''), 10)
+      if (!isNaN(parsed)) nextNum = parsed + 1
+    }
+    employeeId = `MEM-${String(nextNum).padStart(4, '0')}`
+    authEmail = email.toLowerCase().trim()
   }
-  const memberId = `MEM-${String(nextNum).padStart(4, '0')}`
 
-  // Build full_name from parts
   const full_name = [first_name, middle_name, last_name].filter(Boolean).join(' ')
 
-  // Create auth user — handle_new_user trigger will create the profile
   const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-    email: email.toLowerCase().trim(),
+    email: authEmail,
     password,
     email_confirm: true,
     user_metadata: {
@@ -99,7 +129,7 @@ serve(async (req) => {
       first_name,
       middle_name: middle_name ?? null,
       last_name,
-      employee_id: memberId,
+      employee_id: employeeId,
     },
   })
 
@@ -110,8 +140,27 @@ serve(async (req) => {
     })
   }
 
+  // For temp credentials mode, mark profile as requiring onboarding.
+  // The handle_new_user trigger fires synchronously, but we retry briefly
+  // in case of any replication lag on self-hosted Supabase.
+  if (isTempCredentials && newUser.user?.id) {
+    const userId = newUser.user.id
+    let marked = false
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 300))
+      const { error: updateErr } = await adminClient
+        .from('profiles')
+        .update({ requires_onboarding: true })
+        .eq('id', userId)
+      if (!updateErr) { marked = true; break }
+    }
+    if (!marked) {
+      console.error(`Failed to set requires_onboarding for user ${userId} after 5 attempts`)
+    }
+  }
+
   return new Response(
-    JSON.stringify({ id: newUser.user?.id, member_id: memberId, full_name }),
+    JSON.stringify({ id: newUser.user?.id, member_id: employeeId, full_name }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
 })

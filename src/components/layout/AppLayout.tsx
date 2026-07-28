@@ -70,6 +70,8 @@ export function AppLayout({ requiredRoles }: AppLayoutProps) {
 
   if (!user) return <Navigate to="/login" replace />
 
+  if (profile?.requires_onboarding) return <Navigate to="/login" replace />
+
   // When impersonating, admins bypass route role guards so they can view member pages.
   if (!isImpersonating && requiredRoles && profile && !requiredRoles.includes(profile.role)) {
     const fallback = profile.role === 'member' ? '/dashboard' : '/reports'

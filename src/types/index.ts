@@ -55,6 +55,7 @@ export interface Profile {
   emergency_contact_name: string | null
   emergency_contact_phone: string | null
   profile_completed_at: string | null
+  requires_onboarding: boolean
   created_at: string
   updated_at: string
 }

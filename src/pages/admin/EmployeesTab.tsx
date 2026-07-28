@@ -5,6 +5,7 @@ import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { SkeletonPage } from '../../components/shared/Skeleton'
+import { toast } from '../../lib/toast'
 
 interface PosEmployee {
   employee_id: string
@@ -23,6 +24,12 @@ interface CoopProfile {
 
 interface LinkModalState {
   employee: PosEmployee
+}
+
+interface CreateAccountResult {
+  employee: PosEmployee
+  member_id: string
+  password: string
 }
 
 const EMPLOYEE_API_URL = import.meta.env.DEV
@@ -50,6 +57,10 @@ export function EmployeesTab() {
   const [linkModal, setLinkModal] = useState<LinkModalState | null>(null)
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [linkError, setLinkError] = useState<string | null>(null)
+  const [createAccountEmployee, setCreateAccountEmployee] = useState<PosEmployee | null>(null)
+  const [createdAccount, setCreatedAccount] = useState<CreateAccountResult | null>(null)
+  const [createAccountError, setCreateAccountError] = useState<string | null>(null)
+  const [copied, setCopied] = useState<'id' | 'password' | null>(null)
 
   const { data: posEmployees = [], isLoading: loadingPos, error: posError, refetch, isFetching } = useQuery({
     queryKey: ['pos-employees'],
@@ -103,6 +114,44 @@ export function EmployeesTab() {
       setLinkError(err.message ?? 'Failed to link employee')
     },
   })
+
+  function generatePassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'
+    return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  }
+
+  const createAccount = useMutation({
+    mutationFn: async ({ employee, password }: { employee: PosEmployee; password: string }) => {
+      const { data, error } = await supabase.functions.invoke('create-member', {
+        body: {
+          first_name: employee.first_name,
+          middle_name: employee.middle_name ?? undefined,
+          last_name: employee.last_name,
+          password,
+          provided_employee_id: employee.employee_id,
+        },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      return data as { id: string; member_id: string; full_name: string }
+    },
+    onSuccess: (_data, { employee, password }) => {
+      queryClient.invalidateQueries({ queryKey: ['coop-profiles-for-employees'] })
+      setCreatedAccount({ employee, member_id: employee.employee_id, password })
+      setCreateAccountEmployee(null)
+      setCreateAccountError(null)
+    },
+    onError: (err: any) => {
+      setCreateAccountError(err.message ?? 'Failed to create account')
+    },
+  })
+
+  function copyToClipboard(text: string, field: 'id' | 'password') {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(field)
+      setTimeout(() => setCopied(null), 2000)
+    })
+  }
 
   const linkedMap = new Map<string, CoopProfile>()
   for (const profile of coopProfiles) {
@@ -254,15 +303,32 @@ export function EmployeesTab() {
                       {profile ? (profile.completed_shares ?? 0) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      {!isJoined && unlinkedProfiles.length > 0 && (
-                        <button
-                          onClick={() => { setLinkModal({ employee: emp }); setSelectedProfileId(''); setLinkError(null) }}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Link Account
-                        </button>
-                      )}
                       {isJoined && <span className="text-xs text-gray-400">{profile?.full_name}</span>}
+                      {!isJoined && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setCreateAccountEmployee(emp)
+                              setCreatedAccount(null)
+                              setCreateAccountError(null)
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Create Account
+                          </button>
+                          {unlinkedProfiles.length > 0 && (
+                            <>
+                              <span className="text-gray-300">·</span>
+                              <button
+                                onClick={() => { setLinkModal({ employee: emp }); setSelectedProfileId(''); setLinkError(null) }}
+                                className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+                              >
+                                Link
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )
@@ -271,6 +337,115 @@ export function EmployeesTab() {
           </table>
         </div>
       </Card>
+
+      {/* Create Account modal */}
+      {createAccountEmployee && !createdAccount && (
+        <Modal
+          isOpen
+          title="Create Account for Employee"
+          onClose={() => { setCreateAccountEmployee(null); setCreateAccountError(null) }}
+        >
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <p className="font-medium text-gray-900">
+                {[createAccountEmployee.first_name, createAccountEmployee.middle_name, createAccountEmployee.last_name]
+                  .filter(Boolean).map(s => toTitleCase(s as string)).join(' ')}
+              </p>
+              <p className="text-gray-500 text-xs font-mono mt-0.5">{createAccountEmployee.employee_id}</p>
+            </div>
+            <p className="text-sm text-gray-600">
+              A temporary account will be created. The employee will log in using their <strong>Employee ID</strong> and the password below, then set their own email and a new password.
+            </p>
+            {createAccountError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{createAccountError}</p>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="secondary" onClick={() => { setCreateAccountEmployee(null); setCreateAccountError(null) }}>
+                Cancel
+              </Button>
+              <Button
+                disabled={createAccount.isPending}
+                loading={createAccount.isPending}
+                onClick={() => {
+                  const password = generatePassword()
+                  createAccount.mutate({ employee: createAccountEmployee, password })
+                }}
+              >
+                Create Account
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Created Account credentials modal */}
+      {createdAccount && (
+        <Modal
+          isOpen
+          title="Account Created"
+          onClose={() => { setCreatedAccount(null); setCopied(null) }}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm font-medium">
+                Account created for{' '}
+                {[createdAccount.employee.first_name, createdAccount.employee.middle_name, createdAccount.employee.last_name]
+                  .filter(Boolean).map(s => toTitleCase(s as string)).join(' ')}
+              </p>
+            </div>
+            <p className="text-sm text-gray-600">
+              Share these credentials with the employee. They will be asked to set their own email and password on first login.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-1">Employee ID (Username)</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 text-sm font-mono text-gray-900">
+                    {createdAccount.member_id}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(createdAccount.member_id, 'id')}
+                    className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                    title="Copy"
+                  >
+                    {copied === 'id'
+                      ? <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    }
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-1">Temporary Password</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 text-sm font-mono text-gray-900">
+                    {createdAccount.password}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(createdAccount.password, 'password')}
+                    className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                    title="Copy"
+                  >
+                    {copied === 'password'
+                      ? <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">These credentials are shown once. Make sure to share them with the employee now.</p>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => { setCreatedAccount(null); setCopied(null); toast({ title: 'Done', variant: 'success' }) }}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {linkModal && (
         <Modal

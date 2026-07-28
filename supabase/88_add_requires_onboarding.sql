@@ -1,0 +1,1 @@
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS requires_onboarding BOOLEAN NOT NULL DEFAULT false;
