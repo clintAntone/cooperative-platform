@@ -20,6 +20,7 @@ interface CoopProfile {
   employee_id: string | null
   membership_status: string | null
   completed_shares: number | null
+  requires_onboarding: boolean
 }
 
 interface LinkModalState {
@@ -61,6 +62,8 @@ export function EmployeesTab() {
   const [createdAccount, setCreatedAccount] = useState<CreateAccountResult | null>(null)
   const [createAccountError, setCreateAccountError] = useState<string | null>(null)
   const [copied, setCopied] = useState<'id' | 'password' | null>(null)
+  const [resetTarget, setResetTarget] = useState<{ profile: CoopProfile; employee: PosEmployee } | null>(null)
+  const [resetResult, setResetResult] = useState<{ employee_id: string; password: string } | null>(null)
 
   const { data: posEmployees = [], isLoading: loadingPos, error: posError, refetch, isFetching } = useQuery({
     queryKey: ['pos-employees'],
@@ -83,7 +86,7 @@ export function EmployeesTab() {
     queryFn: async (): Promise<CoopProfile[]> => {
       const { data, error } = await supabase
         .from('profiles')
-        .select(`id, full_name, employee_id, membership_status ( status, completed_shares )`)
+        .select(`id, full_name, employee_id, requires_onboarding, membership_status ( status, completed_shares )`)
       if (error) throw error
       return (data ?? []).map((p: any) => ({
         id: p.id,
@@ -91,6 +94,7 @@ export function EmployeesTab() {
         employee_id: p.employee_id,
         membership_status: p.membership_status?.status ?? null,
         completed_shares: p.membership_status?.completed_shares ?? null,
+        requires_onboarding: p.requires_onboarding ?? false,
       }))
     },
   })
@@ -143,6 +147,24 @@ export function EmployeesTab() {
     },
     onError: (err: any) => {
       setCreateAccountError(err.message ?? 'Failed to create account')
+    },
+  })
+
+  const resetPassword = useMutation({
+    mutationFn: async (profileId: string) => {
+      const { data, error } = await supabase.functions.invoke('reset-temp-password', {
+        body: { profile_id: profileId },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      return data as { employee_id: string; password: string }
+    },
+    onSuccess: (data) => {
+      setResetResult(data)
+      setResetTarget(null)
+    },
+    onError: (err: any) => {
+      toast({ title: err.message ?? 'Failed to reset password', variant: 'error' })
     },
   })
 
@@ -257,14 +279,13 @@ export function EmployeesTab() {
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Last Name</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Coop Status</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Membership</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Shares</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center py-10 text-gray-400">No employees found</td>
+                  <td colSpan={7} className="text-center py-10 text-gray-400">No employees found</td>
                 </tr>
               )}
               {filtered.map(emp => {
@@ -299,11 +320,15 @@ export function EmployeesTab() {
                         <span className="text-gray-300 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {profile ? (profile.completed_shares ?? 0) : <span className="text-gray-300 text-xs">—</span>}
-                    </td>
                     <td className="px-4 py-3">
-                      {isJoined && <span className="text-xs text-gray-400">{profile?.full_name}</span>}
+                      {isJoined && profile?.requires_onboarding && (
+                        <button
+                          onClick={() => setResetTarget({ profile: profile!, employee: emp })}
+                          className="text-xs text-orange-600 hover:text-orange-800 font-medium"
+                        >
+                          Reset Password
+                        </button>
+                      )}
                       {!isJoined && (
                         <div className="flex items-center gap-2">
                           <button
@@ -442,6 +467,99 @@ export function EmployeesTab() {
               <Button onClick={() => { setCreatedAccount(null); setCopied(null); toast({ title: 'Done', variant: 'success' }) }}>
                 Done
               </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Reset Password confirmation modal */}
+      {resetTarget && (
+        <Modal
+          isOpen
+          title="Reset Temporary Password"
+          onClose={() => setResetTarget(null)}
+        >
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <p className="font-medium text-gray-900">
+                {[resetTarget.employee.first_name, resetTarget.employee.middle_name, resetTarget.employee.last_name]
+                  .filter(Boolean).map(s => toTitleCase(s as string)).join(' ')}
+              </p>
+              <p className="text-gray-500 text-xs font-mono mt-0.5">{resetTarget.employee.employee_id}</p>
+            </div>
+            <p className="text-sm text-gray-600">
+              This will generate a new temporary password. The employee can still log in with their <strong>Employee ID</strong> as username.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="secondary" onClick={() => setResetTarget(null)}>Cancel</Button>
+              <Button
+                disabled={resetPassword.isPending}
+                loading={resetPassword.isPending}
+                onClick={() => resetPassword.mutate(resetTarget.profile.id)}
+              >
+                Reset Password
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Reset Password result modal */}
+      {resetResult && (
+        <Modal
+          isOpen
+          title="Password Reset"
+          onClose={() => { setResetResult(null); setCopied(null) }}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-orange-700 bg-orange-50 border border-orange-200 rounded-lg p-3">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm font-medium">New temporary password generated</p>
+            </div>
+            <p className="text-sm text-gray-600">Share these credentials with the employee.</p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-1">Employee ID (Username)</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 text-sm font-mono text-gray-900">
+                    {resetResult.employee_id}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(resetResult.employee_id, 'id')}
+                    className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                    title="Copy"
+                  >
+                    {copied === 'id'
+                      ? <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    }
+                  </button>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-1">New Temporary Password</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-gray-100 rounded-lg px-3 py-2 text-sm font-mono text-gray-900">
+                    {resetResult.password}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(resetResult.password, 'password')}
+                    className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                    title="Copy"
+                  >
+                    {copied === 'password'
+                      ? <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">These credentials are shown once. Share them with the employee now.</p>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => { setResetResult(null); setCopied(null) }}>Done</Button>
             </div>
           </div>
         </Modal>

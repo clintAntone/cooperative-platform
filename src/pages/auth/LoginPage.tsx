@@ -88,7 +88,7 @@ export function LoginPage() {
   // If already logged in with requires_onboarding, show setup step inline
   useEffect(() => {
     if (!loading && user && profile?.requires_onboarding && step !== 'setup') {
-      const raw = profile.first_name || profile.full_name
+      const raw = profile.first_name || (profile.full_name || '').split(' ')[0]
       const titled = raw.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
       setSetupName(titled)
       setStep('setup')
@@ -133,7 +133,7 @@ export function LoginPage() {
       .single()
 
     if (prof?.requires_onboarding) {
-      const raw = (prof as any).first_name || prof.full_name || ''
+      const raw = (prof as any).first_name || ((prof.full_name || '').split(' ')[0])
       const titled = raw.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
       setSetupName(titled)
       setStep('setup')
