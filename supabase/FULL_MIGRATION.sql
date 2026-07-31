@@ -1,6 +1,11 @@
+-- FULL_MIGRATION.sql
+-- Auto-generated: concatenation of all migrations in order.
+-- Run this against a fresh Supabase instance to bootstrap the schema.
+
 -- ============================================================
--- 01_system_config.sql
+-- Migration: 01_system_config.sql
 -- ============================================================
+
 -- System Configuration Tables
 CREATE TABLE system_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,9 +42,11 @@ INSERT INTO system_config (config_key, config_value, value_type, description) VA
   ('loan_default_threshold_days', '30', 'number', 'Days overdue before a loan is marked defaulted'),
   ('membership_lapse_on_default', 'true', 'boolean', 'Whether loan default suspends membership');
 
+
 -- ============================================================
--- 02_users_and_roles.sql
+-- Migration: 02_users_and_roles.sql
 -- ============================================================
+
 -- Users and Roles
 CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -73,9 +80,11 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
+
 -- ============================================================
--- 03_equity.sql
+-- Migration: 03_equity.sql
 -- ============================================================
+
 -- Equity Tables
 CREATE TABLE equity_shares (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -126,9 +135,11 @@ CREATE TRIGGER after_contribution_insert
   AFTER INSERT ON equity_contributions
   FOR EACH ROW EXECUTE FUNCTION update_share_on_contribution();
 
+
 -- ============================================================
--- 04_membership.sql
+-- Migration: 04_membership.sql
 -- ============================================================
+
 -- Membership Tables
 CREATE TABLE membership_status (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -219,9 +230,11 @@ CREATE TRIGGER on_share_completed
   AFTER UPDATE ON equity_shares
   FOR EACH ROW EXECUTE FUNCTION trigger_membership_evaluation();
 
+
 -- ============================================================
--- 05_lending.sql
+-- Migration: 05_lending.sql
 -- ============================================================
+
 -- Lending Tables
 CREATE TABLE loan_applications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -280,9 +293,11 @@ CREATE TABLE loan_repayments (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+
 -- ============================================================
--- 06_ledger.sql
+-- Migration: 06_ledger.sql
 -- ============================================================
+
 -- Ledger Tables
 CREATE TABLE ledger_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -336,9 +351,11 @@ CREATE TRIGGER after_repayment_ledger
   AFTER INSERT ON loan_repayments
   FOR EACH ROW EXECUTE FUNCTION ledger_on_repayment();
 
+
 -- ============================================================
--- 07_rls_policies.sql
+-- Migration: 07_rls_policies.sql
 -- ============================================================
+
 -- Row Level Security Policies
 
 -- Enable RLS on all tables
@@ -408,9 +425,11 @@ CREATE POLICY config_read ON system_config FOR SELECT USING (get_user_role(auth.
 
 CREATE POLICY config_history_admin ON system_config_history FOR ALL USING (get_user_role(auth.uid()) = 'admin');
 
+
 -- ============================================================
--- 08_admin_user_view.sql
+-- Migration: 08_admin_user_view.sql
 -- ============================================================
+
 -- Admin user management functions and view
 -- Run this after 07_rls_policies.sql
 
@@ -512,9 +531,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_update_user_status(UUID, VARCHAR) TO authenticated;
 
+
 -- ============================================================
--- 09_employee_link.sql
+-- Migration: 09_employee_link.sql
 -- ============================================================
+
 -- Employee link functions
 -- employee_id column is defined in 02_users_and_roles.sql
 -- Run this after 08_admin_user_view.sql
@@ -542,9 +563,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_link_employee(UUID, VARCHAR) TO authenticated;
 
+
 -- ============================================================
--- 10_deposit_requests.sql
+-- Migration: 10_deposit_requests.sql
 -- ============================================================
+
 -- Deposit request submitted by member, approved by staff/admin
 CREATE TABLE deposit_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -669,9 +692,11 @@ GRANT EXECUTE ON FUNCTION reject_deposit_request(UUID, TEXT) TO authenticated;
 --    Allowed operation: INSERT
 --    Policy: (bucket_id = 'deposit-receipts' AND auth.uid()::text = (storage.foldername(name))[1])
 
+
 -- ============================================================
--- 11_membership_approval.sql
+-- Migration: 11_membership_approval.sql
 -- ============================================================
+
 -- Allow staff/admin to manually set a member's membership status
 -- Also ensures a membership_status record exists when a user is made a member
 
@@ -709,9 +734,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 12_registration_pending.sql
+-- Migration: 12_registration_pending.sql
 -- ============================================================
+
 -- Redefines handle_new_user() to include employee_id from metadata.
 -- New users register as 'active' immediately (employee ID verification happens client-side).
 CREATE OR REPLACE FUNCTION handle_new_user()
@@ -730,9 +757,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+
 -- ============================================================
--- 13_membership_history_improved.sql
+-- Migration: 13_membership_history_improved.sql
 -- ============================================================
+
 -- Add changed_by tracking to membership_history
 ALTER TABLE membership_history
   ADD COLUMN IF NOT EXISTS changed_by UUID REFERENCES profiles(id),
@@ -790,9 +819,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 14_branding_config.sql
+-- Migration: 14_branding_config.sql
 -- ============================================================
+
 -- Insert branding config keys if they don't already exist
 INSERT INTO system_config (config_key, config_value, value_type, description)
 VALUES
@@ -834,9 +865,11 @@ CREATE POLICY "branding_admin_delete"
     AND get_user_role(auth.uid()) = 'admin'
   );
 
+
 -- ============================================================
--- 15_loan_eligibility.sql
+-- Migration: 15_loan_eligibility.sql
 -- ============================================================
+
 -- Enforce that a member must have at least one completed equity share
 -- before they can submit a loan application.
 
@@ -853,9 +886,11 @@ CREATE POLICY loans_insert ON loan_applications FOR INSERT
     ) > 0
   );
 
+
 -- ============================================================
--- 16_loan_features.sql
+-- Migration: 16_loan_features.sql
 -- ============================================================
+
 -- ─── Co-makers table ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS loan_co_makers (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -981,9 +1016,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 17_co_maker_confirmation.sql
+-- Migration: 17_co_maker_confirmation.sql
 -- ============================================================
+
 -- Add status tracking to loan_co_makers
 ALTER TABLE loan_co_makers
   ADD COLUMN IF NOT EXISTS status VARCHAR CHECK (status IN ('pending', 'confirmed', 'declined')) NOT NULL DEFAULT 'pending',
@@ -1051,9 +1088,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 18_loan_approval.sql
+-- Migration: 18_loan_approval.sql
 -- ============================================================
+
 -- Admin approve loan application
 -- Enforces: all co-makers must have confirmed, no pending/declined
 -- Creates: loan record + full repayment schedule (flat or reducing balance) + ledger entry
@@ -1237,9 +1276,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 19_draft_flow.sql
+-- Migration: 19_draft_flow.sql
 -- ============================================================
+
 -- Change loan application flow:
 -- Member submits → status = 'draft' (waiting for co-makers)
 -- All co-makers confirm → auto-transition to 'submitted' (goes to admin)
@@ -1329,9 +1370,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 20_co_maker_shares_required.sql
+-- Migration: 20_co_maker_shares_required.sql
 -- ============================================================
+
 -- Co-makers must also have at least one completed equity share to be eligible
 
 CREATE OR REPLACE FUNCTION get_eligible_co_makers()
@@ -1366,9 +1409,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 21_deposit_overflow.sql
+-- Migration: 21_deposit_overflow.sql
 -- ============================================================
+
 -- Fix approve_deposit_request: auto-create next share for overflow
 -- instead of over-crediting the original share when no next share exists.
 
@@ -1481,9 +1526,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION approve_deposit_request(UUID) TO authenticated;
 
+
 -- ============================================================
--- 22_indexes_and_constraints.sql
+-- Migration: 22_indexes_and_constraints.sql
 -- ============================================================
+
 -- ─── Performance indexes ─────────────────────────────────────────────────────
 -- These cover the most common query patterns across the app.
 
@@ -1559,9 +1606,11 @@ ALTER TABLE deposit_requests
   ADD CONSTRAINT chk_deposit_amount_positive
   CHECK (amount > 0);
 
+
 -- ============================================================
--- 23_contribution_request_id.sql
+-- Migration: 23_contribution_request_id.sql
 -- ============================================================
+
 -- Add deposit_request_id FK to equity_contributions so receipts are directly linked
 
 ALTER TABLE equity_contributions
@@ -1690,9 +1739,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION approve_deposit_request(UUID) TO authenticated;
 
+
 -- ============================================================
--- 24_soft_delete_users.sql
+-- Migration: 24_soft_delete_users.sql
 -- ============================================================
+
 -- Soft delete for profiles: instead of hard-deleting, set deleted_at
 ALTER TABLE profiles
   ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
@@ -1737,9 +1788,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_restore_user(UUID) TO authenticated;
 
+
 -- ============================================================
--- 25_loan_products.sql
+-- Migration: 25_loan_products.sql
 -- ============================================================
+
 -- Loan Products table
 -- Admins define reusable loan product templates; members select one when applying.
 -- Also adds loan_product_id FK to loan_applications.
@@ -1799,9 +1852,11 @@ CREATE POLICY "loan_products_delete"
 ALTER TABLE loan_applications
   ADD COLUMN IF NOT EXISTS loan_product_id uuid REFERENCES loan_products (id);
 
+
 -- ============================================================
--- 26_loan_products_v2.sql
+-- Migration: 26_loan_products_v2.sql
 -- ============================================================
+
 -- Extend loan_products with interest period, equal_principal method, and fee columns
 
 -- Allow equal_principal as a calculation method
@@ -1825,9 +1880,11 @@ ALTER TABLE loan_products
   ADD COLUMN IF NOT EXISTS cbu_type TEXT CHECK (cbu_type IN ('fixed', 'percentage')),
   ADD COLUMN IF NOT EXISTS cbu_value NUMERIC;
 
+
 -- ============================================================
--- 27_public_branding_config.sql
+-- Migration: 27_public_branding_config.sql
 -- ============================================================
+
 -- Allow unauthenticated (anon) users to read branding config keys.
 -- Needed so the login/register pages can display the app name and logo
 -- before a session exists.
@@ -1835,9 +1892,11 @@ CREATE POLICY config_public_branding ON system_config
   FOR SELECT
   USING (config_key IN ('app_name', 'app_logo_url'));
 
+
 -- ============================================================
--- 28_loan_approval_v2.sql
+-- Migration: 28_loan_approval_v2.sql
 -- ============================================================
+
 -- Fix loan approval to use the selected loan product's settings
 -- (interest_rate, calculation_method, interest_rate_period) instead of global system_config.
 -- Also handles monthly vs annual interest rate period introduced in 26_loan_products_v2.sql.
@@ -1986,9 +2045,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 29_admin_audit_log.sql
+-- Migration: 29_admin_audit_log.sql
 -- ============================================================
+
 -- Admin audit log: records admin actions such as impersonation start/end,
 -- bulk approvals, config changes, etc.
 CREATE TABLE IF NOT EXISTS admin_audit_log (
@@ -2041,9 +2102,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION log_admin_action(TEXT, UUID, JSONB) TO authenticated;
 
+
 -- ============================================================
--- 30_employee_id_check.sql
+-- Migration: 30_employee_id_check.sql
 -- ============================================================
+
 -- Allows unauthenticated users (the register page) to check whether an
 -- employee_id is already taken without exposing any profile data.
 -- Returns TRUE if the employee_id is available, FALSE if already registered.
@@ -2062,9 +2125,11 @@ $$;
 GRANT EXECUTE ON FUNCTION is_employee_id_available(TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION is_employee_id_available(TEXT) TO authenticated;
 
+
 -- ============================================================
--- 31_restructure_loan.sql
+-- Migration: 31_restructure_loan.sql
 -- ============================================================
+
 -- Add updated_at to loans if missing
 ALTER TABLE loans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
@@ -2195,9 +2260,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION restructure_loan(UUID, INT, DECIMAL, VARCHAR, TEXT) TO authenticated;
 
+
 -- ============================================================
--- 32_role_permissions.sql
+-- Migration: 32_role_permissions.sql
 -- ============================================================
+
 -- Role-based permission matrix.
 -- Admin can configure which features staff and member roles can access.
 -- Admin always has full access (enforced in the app layer).
@@ -2237,9 +2304,11 @@ INSERT INTO role_permissions (role, permission_key, enabled) VALUES
   ('member', 'view_loan_calculator',   true)
 ON CONFLICT (role, permission_key) DO NOTHING;
 
+
 -- ============================================================
--- 33_safe_delete_share.sql
+-- Migration: 33_safe_delete_share.sql
 -- ============================================================
+
 -- Safe share deletion: block if any deposit_requests are pending or approved.
 -- This prevents money from being lost when a share is removed.
 
@@ -2277,9 +2346,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_delete_share(UUID) TO authenticated;
 
+
 -- ============================================================
--- 34_profile_completion.sql
+-- Migration: 34_profile_completion.sql
 -- ============================================================
+
 -- Profile completion: additional fields for member identity verification
 
 -- 1. Add new columns to profiles
@@ -2462,9 +2533,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION get_user_for_admin(UUID) TO authenticated;
 
+
 -- ============================================================
--- 35_deposit_reference_unique.sql
+-- Migration: 35_deposit_reference_unique.sql
 -- ============================================================
+
 -- ─── Unique deposit reference numbers ────────────────────────────────────────
 -- Prevent the same transaction reference from being submitted more than once.
 -- NULL and empty-string references are excluded (reference is optional).
@@ -2489,9 +2562,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_deposit_requests_reference_unique
   ON deposit_requests(reference)
   WHERE reference IS NOT NULL AND reference <> '';
 
+
 -- ============================================================
--- 36_batch_deposits.sql
+-- Migration: 36_batch_deposits.sql
 -- ============================================================
+
 -- Add collector role
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 ALTER TABLE profiles ADD CONSTRAINT profiles_role_check
@@ -2673,9 +2748,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_update_user_role(UUID, VARCHAR) TO authenticated;
 
+
 -- ============================================================
--- 37_member_documents.sql
+-- Migration: 37_member_documents.sql
 -- ============================================================
+
 -- Member document uploads (gov ID, proof of address, etc.)
 -- Members upload via their profile page; admin/staff view in member detail.
 
@@ -2706,9 +2783,11 @@ CREATE POLICY member_documents_admin ON member_documents
 -- Then add policy: allow authenticated users to upload to their own folder (user_id/*)
 -- and allow admin/staff to read all.
 
+
 -- ============================================================
--- 38_member_notes.sql
+-- Migration: 38_member_notes.sql
 -- ============================================================
+
 -- Admin/staff internal notes on members.
 -- Not visible to members themselves.
 
@@ -2729,9 +2808,11 @@ ALTER TABLE member_notes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY member_notes_admin ON member_notes
   FOR ALL USING (get_user_role(auth.uid()) IN ('admin', 'staff'));
 
+
 -- ============================================================
--- 39_savings.sql
+-- Migration: 39_savings.sql
 -- ============================================================
+
 -- ─── Savings Module ──────────────────────────────────────────────────────────
 -- One savings account per member, opened automatically when first share completes.
 -- Deposit flow: member submits request → admin approves → balance updated via trigger.
@@ -3108,9 +3189,11 @@ ON CONFLICT (config_key) DO NOTHING;
 -- ─── pg_cron schedule (run separately in Supabase dashboard if pg_cron is enabled) ──
 -- SELECT cron.schedule('release-savings-interest', '0 0 1 */6 *', 'SELECT release_savings_interest()');
 
+
 -- ============================================================
--- 40_savings_backfill.sql
+-- Migration: 40_savings_backfill.sql
 -- ============================================================
+
 -- Backfill: create savings accounts for members who already have ≥1 completed share
 -- but whose account was not created because the trigger didn't exist yet.
 INSERT INTO savings_accounts (user_id)
@@ -3119,9 +3202,11 @@ FROM membership_status
 WHERE completed_shares >= 1
 ON CONFLICT (user_id) DO NOTHING;
 
+
 -- ============================================================
--- 41_savings_interest_fix.sql
+-- Migration: 41_savings_interest_fix.sql
 -- ============================================================
+
 -- Fix savings interest calculation and remove weekly deposit cap.
 --
 -- Interest is now calculated on the "qualifying balance":
@@ -3254,9 +3339,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION release_savings_interest() TO authenticated;
 
+
 -- ============================================================
--- 42_savings_adb_interest.sql
+-- Migration: 42_savings_adb_interest.sql
 -- ============================================================
+
 -- Fix interest calculation to use Average Daily Balance (ADB).
 --
 -- ADB = balance_at_period_start
@@ -3392,9 +3479,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION release_savings_interest() TO authenticated;
 
+
 -- ============================================================
--- 43_config_corrections.sql
+-- Migration: 43_config_corrections.sql
 -- ============================================================
+
 -- Correct system_config values based on owner review.
 
 -- Equity shares: minimum weekly installment
@@ -3430,9 +3519,11 @@ INSERT INTO system_config (config_key, config_value, value_type, description) VA
    'How max loan is computed: collateral = (borrower shares + savings) + (co-maker shares + savings)')
 ON CONFLICT (config_key) DO NOTHING;
 
+
 -- ============================================================
--- 44_critical_fixes.sql
+-- Migration: 44_critical_fixes.sql
 -- ============================================================
+
 -- Migration 44: Critical accounting & flow fixes
 --
 -- C1: Savings withdrawal enforces minimum balance (savings_min_balance config)
@@ -3833,9 +3924,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_resolve_loan_default(UUID, TEXT) TO authenticated;
 
+
 -- ============================================================
--- 45_cron_schedules.sql
+-- Migration: 45_cron_schedules.sql
 -- ============================================================
+
 -- pg_cron scheduled jobs
 -- PREREQUISITE: Enable the pg_cron extension first:
 --   Supabase Dashboard → Database → Extensions → search "pg_cron" → Enable
@@ -3856,9 +3949,11 @@ SELECT cron.schedule(
   'SELECT release_savings_interest()'
 );
 
+
 -- ============================================================
--- 46_loan_product_rate_fix.sql
+-- Migration: 46_loan_product_rate_fix.sql
 -- ============================================================
+
 -- Migration 46: P2 — Align active loan product interest rates with system_config
 --
 -- The system_config loan_interest_rate is 3.33% per month.
@@ -3880,9 +3975,11 @@ SET
   calculation_method   = 'flat'
 WHERE is_active = true;
 
+
 -- ============================================================
--- 47_optional_co_maker.sql
+-- Migration: 47_optional_co_maker.sql
 -- ============================================================
+
 -- Migration 47: Co-maker is optional — only required when loan amount > borrower's own collateral
 --
 -- Previous rule: always require ≥ 1 confirmed co-maker before approval.
@@ -4095,9 +4192,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 48_equity_dividends.sql
+-- Migration: 48_equity_dividends.sql
 -- ============================================================
+
 -- Extend ledger entry_type
 ALTER TABLE ledger_entries DROP CONSTRAINT IF EXISTS ledger_entries_entry_type_check;
 ALTER TABLE ledger_entries ADD CONSTRAINT ledger_entries_entry_type_check CHECK (entry_type IN (
@@ -4182,9 +4281,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION release_equity_dividend() TO authenticated;
 
+
 -- ============================================================
--- 49_share_transfers.sql
+-- Migration: 49_share_transfers.sql
 -- ============================================================
+
 CREATE TABLE share_transfers (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   share_id         UUID NOT NULL REFERENCES equity_shares(id),
@@ -4282,9 +4383,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION admin_reject_share_transfer(UUID, TEXT) TO authenticated;
 
+
 -- ============================================================
--- 50_damayan.sql
+-- Migration: 50_damayan.sql
 -- ============================================================
+
 CREATE TABLE damayan_events (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title             VARCHAR NOT NULL,
@@ -4380,9 +4483,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION waive_damayan_assessment(UUID, TEXT) TO authenticated;
 
+
 -- ============================================================
--- 51_branches.sql
+-- Migration: 51_branches.sql
 -- ============================================================
+
 CREATE TABLE branches (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name       VARCHAR NOT NULL,
@@ -4410,9 +4515,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION assign_member_branch(UUID, UUID) TO authenticated;
 
+
 -- ============================================================
--- 52_rebates.sql
+-- Migration: 52_rebates.sql
 -- ============================================================
+
 CREATE TABLE rebate_releases (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   period_start DATE NOT NULL,
@@ -4513,9 +4620,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION release_rebates(DATE, DATE) TO authenticated;
 
+
 -- ============================================================
--- 53_transfer_members_rpc.sql
+-- Migration: 53_transfer_members_rpc.sql
 -- ============================================================
+
 -- Migration 53: SECURITY DEFINER RPC so members can fetch the active member list
 -- for the share transfer recipient dropdown (direct profiles query is blocked by RLS).
 
@@ -4534,9 +4643,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION get_active_members_for_transfer() TO authenticated;
 
+
 -- ============================================================
--- 54_branch_income.sql
+-- Migration: 54_branch_income.sql
 -- ============================================================
+
 -- Migration 54: Rework branches as cooperative business ventures
 --
 -- Branches are NOT member chapters. They are businesses owned by the cooperative
@@ -4702,9 +4813,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION distribute_branch_income(UUID) TO authenticated;
 
+
 -- ============================================================
--- 55_branch_expenses.sql
+-- Migration: 55_branch_expenses.sql
 -- ============================================================
+
 -- branch_expenses: categorized expense records per branch per period
 CREATE TABLE branch_expenses (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -4743,9 +4856,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION record_branch_expense(UUID, VARCHAR, DECIMAL, DATE, DATE, TEXT) TO authenticated;
 
+
 -- ============================================================
--- 56_board_role.sql
+-- Migration: 56_board_role.sql
 -- ============================================================
+
 -- Migration 56: Add Board of Directors role + fill in missing permission keys
 --
 -- Board of Directors (board):
@@ -4835,9 +4950,11 @@ DROP POLICY IF EXISTS branch_expenses_board_read ON branch_expenses;
 CREATE POLICY branch_expenses_board_read ON branch_expenses
   FOR SELECT USING (get_user_role(auth.uid()) = 'board');
 
+
 -- ============================================================
--- 57_comaker_shares_only.sql
+-- Migration: 57_comaker_shares_only.sql
 -- ============================================================
+
 -- Migration 57: Fix co-maker collateral formula
 --
 -- Old rule: max loan = borrower_shares + borrower_savings + co_maker_shares + co_maker_savings
@@ -5041,9 +5158,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 58_get_collateral_shares.sql
+-- Migration: 58_get_collateral_shares.sql
 -- ============================================================
+
 -- Migration 58: RPC to read co-maker share values for loan collateral
 --
 -- Members cannot read other members' equity_shares due to RLS (equity_shares_self policy).
@@ -5071,9 +5190,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION get_completed_share_totals(UUID[]) TO authenticated;
 
+
 -- ============================================================
--- 59_branch_income_breakdown.sql
+-- Migration: 59_branch_income_breakdown.sql
 -- ============================================================
+
 -- Migration 59: Add gross_sales, salary, expenses_total, roi to branch_income
 --
 -- net_profit (the distributable amount) = gross_sales - salary - expenses_total
@@ -5123,9 +5244,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION record_branch_income(UUID, DECIMAL, DATE, DATE, TEXT, DECIMAL, DECIMAL, DECIMAL, DECIMAL) TO authenticated;
 
+
 -- ============================================================
--- 60_branch_cutoff.sql
+-- Migration: 60_branch_cutoff.sql
 -- ============================================================
+
 -- Migration 60: Add report_cutoff_day to branches
 --
 -- report_cutoff_day: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -5136,9 +5259,11 @@ ALTER TABLE branches
   ADD COLUMN IF NOT EXISTS report_cutoff_day SMALLINT DEFAULT 0
     CHECK (report_cutoff_day BETWEEN 0 AND 6);
 
+
 -- ============================================================
--- 61_critical_accounting_fixes.sql
+-- Migration: 61_critical_accounting_fixes.sql
 -- ============================================================
+
 -- Migration 61: Critical accounting fixes
 --
 -- Fixes four CRITICAL issues identified in the senior accountant audit:
@@ -5547,9 +5672,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 62_high_accounting_fixes.sql
+-- Migration: 62_high_accounting_fixes.sql
 -- ============================================================
+
 -- Migration 62: HIGH-priority accounting fixes
 --
 -- 5. Overdue/late payment tracking  — mark_overdue_installments() + cron
@@ -5850,9 +5977,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION release_savings_interest() TO authenticated;
 
+
 -- ============================================================
--- 63_medium_accounting_fixes.sql
+-- Migration: 63_medium_accounting_fixes.sql
 -- ============================================================
+
 -- Migration 63: MEDIUM-priority accounting fixes
 --
 -- 10. Branch distribution snapshot — use period_end share count, not live count
@@ -6165,9 +6294,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION get_loan_aging_report() TO authenticated;
 
+
 -- ============================================================
--- 64_cancel_loan_application.sql
+-- Migration: 64_cancel_loan_application.sql
 -- ============================================================
+
 -- Migration 64: Allow members to cancel their own draft/submitted loan applications
 --
 -- Direct UPDATE is blocked by RLS (members have SELECT + INSERT only).
@@ -6199,9 +6330,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION cancel_loan_application(UUID) TO authenticated;
 
+
 -- ============================================================
--- 65_fix_under_review_rpc.sql
+-- Migration: 65_fix_under_review_rpc.sql
 -- ============================================================
+
 -- Migration 65: Fix admin_set_loan_under_review to accept orphaned drafts
 --
 -- Before this fix, the RPC only updated rows WHERE status = 'submitted'.
@@ -6226,9 +6359,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 66_member_batch_deposit_rls.sql
+-- Migration: 66_member_batch_deposit_rls.sql
 -- ============================================================
+
 -- Allow members to read profiles for employee ID lookup in batch deposit form.
 -- Previously only 'collector' role had this access; batch deposit is now open to all members.
 
@@ -6246,9 +6381,11 @@ CREATE POLICY deposit_requests_member_read ON deposit_requests
   FOR SELECT
   USING (user_id = auth.uid());
 
+
 -- ============================================================
--- 67_custom_roles.sql
+-- Migration: 67_custom_roles.sql
 -- ============================================================
+
 -- Custom roles: admin-defined organizational labels for members
 CREATE TABLE IF NOT EXISTS custom_roles (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -6326,9 +6463,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_assign_custom_role(UUID, UUID) TO authenticated;
 
+
 -- ============================================================
--- 68_custom_role_permissions.sql
+-- Migration: 68_custom_role_permissions.sql
 -- ============================================================
+
 -- Custom role permissions
 -- Stores configurable permission toggles for each custom role created by the admin.
 
@@ -6357,9 +6496,11 @@ CREATE POLICY crp_read_all ON custom_role_permissions
   FOR SELECT
   USING (get_user_role(auth.uid()) IN ('admin', 'staff', 'member', 'board'));
 
+
 -- ============================================================
--- 69_loan_repayment_frequency.sql
+-- Migration: 69_loan_repayment_frequency.sql
 -- ============================================================
+
 -- Add repayment_frequency to loan_products and loans.
 -- Replace admin_approve_loan_application to generate schedules with the correct cadence.
 
@@ -6550,9 +6691,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 70_loan_comaker_optional_savings_req.sql
+-- Migration: 70_loan_comaker_optional_savings_req.sql
 -- ============================================================
+
 -- Make co-makers optional for loan approval.
 -- Add savings balance requirement check.
 -- Add loan_min_savings_balance to system_config.
@@ -6743,9 +6886,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 71_fix_savings_deposit_rls.sql
+-- Migration: 71_fix_savings_deposit_rls.sql
 -- ============================================================
+
 -- Fix RLS on savings_deposit_requests so members can INSERT their own rows.
 -- Split the FOR ALL policy into explicit INSERT + SELECT/UPDATE/DELETE policies.
 
@@ -6785,9 +6930,11 @@ CREATE POLICY savings_withdrawal_requests_admin ON savings_withdrawal_requests
   USING (get_user_role(auth.uid()) IN ('admin', 'staff'))
   WITH CHECK (get_user_role(auth.uid()) IN ('admin', 'staff'));
 
+
 -- ============================================================
--- 72_savings_interest_schedule.sql
+-- Migration: 72_savings_interest_schedule.sql
 -- ============================================================
+
 -- Configurable savings interest release schedule.
 --
 -- Instead of a hardcoded every-6-months cron, admins can configure which calendar
@@ -6972,9 +7119,11 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
+
 -- ============================================================
--- 73_auto_share_on_member_role.sql
+-- Migration: 73_auto_share_on_member_role.sql
 -- ============================================================
+
 -- Migration 73: Auto-create one empty equity share when a user's role is set to 'member'
 -- This fires when admin accepts a user (assigns member role via admin_update_user_role).
 -- The share is created with paid_amount = 0 and status = 'active', so the member
@@ -7028,9 +7177,11 @@ CREATE TRIGGER trg_auto_create_equity_share
   FOR EACH ROW
   EXECUTE FUNCTION auto_create_equity_share_on_member();
 
+
 -- ============================================================
--- 74_rename_tables.sql
+-- Migration: 74_rename_tables.sql
 -- ============================================================
+
 -- Normalize table naming conventions:
 --   deposit_requests          → equity_deposit_requests  (add domain prefix, mirrors savings_deposit_requests)
 --   share_transfers           → equity_share_transfers   (align with equity_ prefix)
@@ -7046,9 +7197,11 @@ ALTER INDEX IF EXISTS idx_deposit_requests_user_id         RENAME TO idx_equity_
 ALTER INDEX IF EXISTS idx_deposit_requests_reference_unique RENAME TO idx_equity_deposit_requests_reference_unique;
 ALTER INDEX IF EXISTS idx_loan_repayment_schedule_loan     RENAME TO idx_loan_repayment_schedules_loan;
 
+
 -- ============================================================
--- 75_fix_savings_interest_period.sql
+-- Migration: 75_fix_savings_interest_period.sql
 -- ============================================================
+
 -- Fix: interest period should start from first deposit, not account opening.
 -- An account can sit at ₱0 for years before a member deposits; counting those
 -- empty days as part of the period would make the ADB ≈ 0 even with a real balance.
@@ -7190,9 +7343,11 @@ BEGIN
 END;
 $$;
 
+
 -- ============================================================
--- 76_savings_adb_rpc.sql
+-- Migration: 76_savings_adb_rpc.sql
 -- ============================================================
+
 -- RPC: get_savings_adb
 -- Computes Average Daily Balance server-side using database now().
 -- Client device time is never used, preventing manipulation.
@@ -7312,9 +7467,11 @@ $$;
 -- Grant execute to authenticated users (RLS on savings_accounts still applies)
 GRANT EXECUTE ON FUNCTION get_savings_adb(UUID) TO authenticated;
 
+
 -- ============================================================
--- 77_consolidate_release_savings_interest.sql
+-- Migration: 77_consolidate_release_savings_interest.sql
 -- ============================================================
+
 -- Consolidate release_savings_interest into a single unambiguous function.
 -- Drops both existing overloads (no-arg and BOOLEAN) then recreates one version
 -- with p_force BOOLEAN DEFAULT false — callable as release_savings_interest() or
@@ -7483,9 +7640,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION release_savings_interest(BOOLEAN) TO authenticated;
 
+
 -- ============================================================
--- 78_savings_adb_with_accrued.sql
+-- Migration: 78_savings_adb_with_accrued.sql
 -- ============================================================
+
 -- Extend get_savings_adb to also return accrued_interest.
 -- accrued_interest = ADB × rate% × (days_held / total_period_days)
 -- This grows by ~₱2.05/day for ₱15,000 at 2.5% over 6 months.
@@ -7603,9 +7762,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION get_savings_adb(UUID) TO authenticated;
 
+
 -- ============================================================
--- 79_savings_deposits_breakdown.sql
+-- Migration: 79_savings_deposits_breakdown.sql
 -- ============================================================
+
 -- Returns a per-deposit breakdown for the current interest period.
 -- Each row shows: when it was approved, amount, days held, and its individual accrued interest.
 -- All time calculations use DB now() — immune to client device clock.
@@ -7678,9 +7839,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION get_savings_deposits_breakdown(UUID) TO authenticated;
 
+
 -- ============================================================
--- 80_savings_breakdown_add_reference.sql
+-- Migration: 80_savings_breakdown_add_reference.sql
 -- ============================================================
+
 -- Add reference and request_id to get_savings_deposits_breakdown
 -- so the UI can show the reference number and link to the deposit request.
 
@@ -7758,9 +7921,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION get_savings_deposits_breakdown(UUID) TO authenticated;
 
+
 -- ============================================================
--- 81_savings_breakdown_sort_desc.sql
+-- Migration: 81_savings_breakdown_sort_desc.sql
 -- ============================================================
+
 -- Sort deposits breakdown most-recent first.
 
 DROP FUNCTION IF EXISTS get_savings_deposits_breakdown(UUID);
@@ -7836,9 +8001,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION get_savings_deposits_breakdown(UUID) TO authenticated;
 
+
 -- ============================================================
--- 82_loan_approval_savings_gate.sql
+-- Migration: 82_loan_approval_savings_gate.sql
 -- ============================================================
+
 -- Fix admin_approve_loan_application after table rename (loan_repayment_schedule → loan_repayment_schedules).
 -- Add savings balance gate: if savings_required_for_loan = true in system_config,
 -- the member must have an active savings account with balance >= loan_min_savings_balance.
@@ -8033,9 +8200,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+
 -- ============================================================
--- 83_fix_delete_share_fk.sql
+-- Migration: 83_fix_delete_share_fk.sql
 -- ============================================================
+
 -- Fix admin_delete_share: delete equity_contributions before deleting the share.
 -- The previous version blocked on paid_amount > 0 but didn't clean up contribution
 -- rows, causing a FK constraint violation even when the share had no real payments.
@@ -8077,9 +8246,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_delete_share(UUID) TO authenticated;
 
+
 -- ============================================================
--- 84_auto_share_on_register.sql
+-- Migration: 84_auto_share_on_register.sql
 -- ============================================================
+
 -- Migration 84: Also auto-create equity share on INSERT into profiles when role = 'member'
 -- Migration 73 handles role changes (UPDATE), but new registrations are direct inserts
 -- with role = 'member', so the UPDATE trigger never fires for them.
@@ -8118,9 +8289,11 @@ CREATE TRIGGER trg_auto_create_equity_share_on_insert
   FOR EACH ROW
   EXECUTE FUNCTION auto_create_equity_share_on_insert();
 
+
 -- ============================================================
--- 85_bulk_import.sql
+-- Migration: 85_bulk_import.sql
 -- ============================================================
+
 -- Migration 85: Bulk import support for admin bypass
 -- 1. Make loans.application_id nullable (bulk-imported loans have no application)
 -- 2. RPC to record a contribution directly and keep share balance in sync
@@ -8172,9 +8345,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_record_contribution_direct(UUID, UUID, DECIMAL, VARCHAR, VARCHAR, TIMESTAMPTZ, UUID) TO authenticated;
 
+
 -- ============================================================
--- 86_bulk_import_savings.sql
+-- Migration: 86_bulk_import_savings.sql
 -- ============================================================
+
 -- Migration 86: Direct savings recorder for admin bulk import
 -- Creates or reuses a member's savings_account, inserts a contribution,
 -- and keeps savings_accounts.balance in sync.
@@ -8224,9 +8399,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION admin_record_savings_direct(UUID, DECIMAL, VARCHAR, VARCHAR, TIMESTAMPTZ, UUID) TO authenticated;
 
+
 -- ============================================================
--- 87_member_name_fields.sql
+-- Migration: 87_member_name_fields.sql
 -- ============================================================
+
 -- Add first_name, middle_name, last_name to profiles
 ALTER TABLE profiles
   ADD COLUMN IF NOT EXISTS first_name VARCHAR,
@@ -8270,8 +8447,152 @@ $$;
 
 GRANT EXECUTE ON FUNCTION is_email_available(TEXT) TO authenticated;
 
+
 -- ============================================================
--- 88_add_requires_onboarding.sql
+-- Migration: 88_add_requires_onboarding.sql
 -- ============================================================
+
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS requires_onboarding BOOLEAN NOT NULL DEFAULT false;
+
+
+-- ============================================================
+-- Migration: 89_fix_staff_post_deposit_overflow.sql
+-- ============================================================
+
+-- Migration 89: Redefine staff_post_deposit with proper overflow cascade.
+-- Previous version dumped the full amount onto the current share with no overflow
+-- logic, causing overpayment on a single share instead of auto-opening new ones.
+
+DROP FUNCTION IF EXISTS staff_post_deposit(UUID, DECIMAL, VARCHAR, TIMESTAMPTZ, VARCHAR, UUID);
+
+CREATE OR REPLACE FUNCTION staff_post_deposit(
+  p_user_id      UUID,
+  p_amount       DECIMAL(15,2),
+  p_destination  VARCHAR,   -- 'shares' or 'savings'
+  p_date         TIMESTAMPTZ,
+  p_reference    VARCHAR,
+  p_recorded_by  UUID
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_share        equity_shares%ROWTYPE;
+  v_remaining    DECIMAL(15,2);
+  v_to_credit    DECIMAL(15,2);
+  v_leftover     DECIMAL(15,2);
+  v_share_price  DECIMAL(15,2);
+  v_max_shares   INT;
+  v_share_count  INT;
+  v_next_number  INT;
+  v_new_share_id UUID;
+  v_savings_id   UUID;
+BEGIN
+  IF get_user_role(auth.uid()) NOT IN ('admin', 'staff') THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Amount must be positive';
+  END IF;
+
+  -- ── SAVINGS path ─────────────────────────────────────────────────────────────
+  IF p_destination = 'savings' THEN
+    SELECT id INTO v_savings_id
+    FROM savings_accounts
+    WHERE user_id = p_user_id
+    LIMIT 1;
+
+    IF v_savings_id IS NULL THEN
+      RAISE EXCEPTION 'No savings account found for this member';
+    END IF;
+
+    INSERT INTO savings_deposit_requests
+      (user_id, savings_account_id, amount, payment_method, reference, status,
+       reviewed_by, reviewed_at, created_at, updated_at)
+    VALUES
+      (p_user_id, v_savings_id, p_amount, 'cash', p_reference, 'approved',
+       p_recorded_by, p_date, p_date, p_date);
+
+    RETURN;
+  END IF;
+
+  -- ── SHARES path with overflow cascade ────────────────────────────────────────
+  v_leftover := p_amount;
+
+  -- Walk existing in-progress shares in order
+  FOR v_share IN
+    SELECT * FROM equity_shares
+    WHERE user_id = p_user_id
+      AND status = 'in_progress'
+    ORDER BY share_number ASC
+  LOOP
+    EXIT WHEN v_leftover <= 0;
+
+    v_remaining := v_share.target_amount - v_share.paid_amount;
+    v_to_credit := LEAST(v_leftover, v_remaining);
+
+    INSERT INTO equity_contributions
+      (user_id, share_id, amount, payment_method, reference, recorded_by, contribution_at)
+    VALUES
+      (p_user_id, v_share.id, v_to_credit, 'cash', p_reference, p_recorded_by, p_date);
+
+    v_leftover := v_leftover - v_to_credit;
+  END LOOP;
+
+  -- Auto-open new shares for any remaining amount
+  IF v_leftover > 0 THEN
+    SELECT COALESCE(config_value::DECIMAL, 5000) INTO v_share_price
+    FROM system_config WHERE config_key = 'share_price';
+
+    SELECT COALESCE(config_value::INT, 10) INTO v_max_shares
+    FROM system_config WHERE config_key = 'max_shares_per_member';
+
+    LOOP
+      EXIT WHEN v_leftover <= 0;
+
+      SELECT COUNT(*) INTO v_share_count
+      FROM equity_shares
+      WHERE user_id = p_user_id AND status != 'cancelled';
+
+      EXIT WHEN v_share_count >= v_max_shares;
+
+      SELECT COALESCE(MAX(share_number), 0) + 1 INTO v_next_number
+      FROM equity_shares WHERE user_id = p_user_id;
+
+      INSERT INTO equity_shares (user_id, share_number, target_amount)
+      VALUES (p_user_id, v_next_number, v_share_price)
+      RETURNING id INTO v_new_share_id;
+
+      v_to_credit := LEAST(v_leftover, v_share_price);
+
+      INSERT INTO equity_contributions
+        (user_id, share_id, amount, payment_method, reference, recorded_by, contribution_at)
+      VALUES
+        (p_user_id, v_new_share_id, v_to_credit, 'cash', p_reference, p_recorded_by, p_date);
+
+      v_leftover := v_leftover - v_to_credit;
+    END LOOP;
+
+    -- Max shares reached: credit remainder to last share (accounting integrity)
+    IF v_leftover > 0 THEN
+      SELECT id INTO v_new_share_id
+      FROM equity_shares
+      WHERE user_id = p_user_id AND status != 'cancelled'
+      ORDER BY share_number DESC
+      LIMIT 1;
+
+      INSERT INTO equity_contributions
+        (user_id, share_id, amount, payment_method, reference, recorded_by, contribution_at)
+      VALUES
+        (p_user_id, v_new_share_id, v_leftover, 'cash', p_reference, p_recorded_by, p_date);
+    END IF;
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION staff_post_deposit(UUID, DECIMAL, VARCHAR, TIMESTAMPTZ, VARCHAR, UUID) TO authenticated;
+
 
