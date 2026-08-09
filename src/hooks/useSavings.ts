@@ -145,7 +145,7 @@ export function useSavingsInterestLogs(accountId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('savings_interest_logs')
-        .select('id, account_id, user_id, principal_at_time, interest_earned, period_start, period_end, released_by, created_at')
+        .select('id, account_id, user_id, average_daily_balance, interest_amount, period_start, period_end, released_by, created_at')
         .eq('account_id', accountId!)
         .order('created_at', { ascending: false })
 
@@ -485,7 +485,7 @@ export function useLastInterestRelease() {
     queryFn: async (): Promise<LastInterestRelease | null> => {
       const { data, error } = await supabase
         .from('savings_interest_logs')
-        .select('period_end, interest_earned, created_at')
+        .select('period_end, interest_amount, created_at')
         .order('created_at', { ascending: false })
         .limit(200)
 
@@ -494,11 +494,11 @@ export function useLastInterestRelease() {
 
       // Group by period_end to find the most recent batch
       const latest = data[0].period_end
-      const batch = data.filter((r: { period_end: string; interest_earned: number; created_at: string }) => r.period_end === latest)
+      const batch = data.filter((r: { period_end: string; interest_amount: number; created_at: string }) => r.period_end === latest)
 
       return {
         period_end: latest,
-        total_interest: batch.reduce((s: number, r: { interest_earned: number }) => s + r.interest_earned, 0),
+        total_interest: batch.reduce((s: number, r: { interest_amount: number }) => s + r.interest_amount, 0),
         account_count: batch.length,
         released_at: data[0].created_at,
       }

@@ -58,7 +58,7 @@ interface SavingsAccountRow {
   full_name: string
   last_deposit_at: string | null
   total_deposited: number
-  interest_earned: number
+  interest_amount: number
 }
 
 function useAllSavingsAccounts() {
@@ -106,13 +106,13 @@ function useAllSavingsAccounts() {
       // Step 4: total interest earned per account
       const { data: interestLogs } = await supabase
         .from('savings_interest_logs')
-        .select('account_id, interest_earned')
+        .select('account_id, interest_amount')
         .in('account_id', accountIds)
 
       const interestMap: Record<string, number> = {}
       for (const log of interestLogs ?? []) {
-        const l = log as { account_id: string; interest_earned: number }
-        interestMap[l.account_id] = (interestMap[l.account_id] ?? 0) + l.interest_earned
+        const l = log as { account_id: string; interest_amount: number }
+        interestMap[l.account_id] = (interestMap[l.account_id] ?? 0) + l.interest_amount
       }
 
       return accounts.map((a: { id: string; user_id: string; balance: number; status: string; opened_at: string; updated_at: string }) => ({
@@ -120,7 +120,7 @@ function useAllSavingsAccounts() {
         full_name: profileMap[a.user_id] ?? '—',
         last_deposit_at: lastDepositMap[a.id] ?? null,
         total_deposited: totalDepositedMap[a.id] ?? 0,
-        interest_earned: interestMap[a.id] ?? 0,
+        interest_amount: interestMap[a.id] ?? 0,
       }))
     },
     staleTime: 0,
@@ -133,10 +133,10 @@ function useTotalInterestPaid() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('savings_interest_logs')
-        .select('interest_earned')
+        .select('interest_amount')
 
       if (error) return 0
-      return (data ?? []).reduce((sum: number, r: { interest_earned: number }) => sum + r.interest_earned, 0)
+      return (data ?? []).reduce((sum: number, r: { interest_amount: number }) => sum + r.interest_amount, 0)
     },
     staleTime: 60_000,
   })
@@ -311,7 +311,7 @@ export function AdminSavingsPage() {
                         {currency(account.total_deposited)}
                       </td>
                       <td className="px-4 py-3 text-right text-emerald-600 font-medium">
-                        {account.interest_earned > 0 ? currency(account.interest_earned) : '—'}
+                        {account.interest_amount > 0 ? currency(account.interest_amount) : '—'}
                       </td>
                       <td className="px-4 py-3 text-gray-500">
                         {account.last_deposit_at ? formatDate(account.last_deposit_at) : '—'}
@@ -358,7 +358,7 @@ export function AdminSavingsPage() {
                     <div>
                       <span className="text-gray-400">Interest </span>
                       <span className="text-emerald-600 font-medium">
-                        {account.interest_earned > 0 ? currency(account.interest_earned) : '—'}
+                        {account.interest_amount > 0 ? currency(account.interest_amount) : '—'}
                       </span>
                     </div>
                     <div>

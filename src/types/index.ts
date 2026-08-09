@@ -286,8 +286,8 @@ export interface SavingsInterestLog {
   id: string
   account_id: string
   user_id: string
-  principal_at_time: number
-  interest_earned: number
+  average_daily_balance: number
+  interest_amount: number
   period_start: string
   period_end: string
   released_by: string

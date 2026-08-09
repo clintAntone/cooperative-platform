@@ -202,12 +202,12 @@ function useAllSavingsOverview() {
       // Step 4: savings_interest_logs — interest per account
       const { data: interest } = await supabase
         .from('savings_interest_logs')
-        .select('account_id, interest_earned')
+        .select('account_id, interest_amount')
         .in('account_id', accountIds)
 
       const interestMap: Record<string, number> = {}
-      for (const i of interest as { account_id: string; interest_earned: number }[]) {
-        interestMap[i.account_id] = (interestMap[i.account_id] ?? 0) + i.interest_earned
+      for (const i of interest as { account_id: string; interest_amount: number }[]) {
+        interestMap[i.account_id] = (interestMap[i.account_id] ?? 0) + i.interest_amount
       }
 
       return accs.map(a => ({
@@ -421,7 +421,7 @@ function useMemberSavingsModal(userId: string | null) {
           .order('created_at', { ascending: false })
           .limit(8),
         supabase.from('savings_interest_logs')
-          .select('id, interest_earned, period_start, period_end, created_at')
+          .select('id, interest_amount, period_start, period_end, created_at')
           .eq('account_id', accounts.id)
           .order('created_at', { ascending: false }),
       ])
@@ -698,7 +698,7 @@ function SavingsMemberModal({ userId, fullName, onClose }: {
                   ) : (data.interest as any[]).map((i: any) => (
                     <tr key={i.id}>
                       <td className="px-3 py-2.5 text-gray-600">{formatDate(i.period_start)} – {formatDate(i.period_end)}</td>
-                      <td className="px-3 py-2.5 text-right font-medium text-green-700">{currency(i.interest_earned)}</td>
+                      <td className="px-3 py-2.5 text-right font-medium text-green-700">{currency(i.interest_amount)}</td>
                     </tr>
                   ))}
                 </tbody>

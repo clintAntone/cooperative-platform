@@ -96,7 +96,7 @@ export function SavingsPage() {
   }
 
   const totalDeposited = contributions.reduce((s, c) => s + c.amount, 0)
-  const totalInterest = interestLogs.reduce((s, l) => s + l.interest_earned, 0)
+  const totalInterest = interestLogs.reduce((s, l) => s + l.interest_amount, 0)
   const pendingDeposits = depositRequests.filter(r => r.status === 'pending').length
   const pendingWithdrawals = withdrawalRequests.filter(r => r.status === 'pending').length
 

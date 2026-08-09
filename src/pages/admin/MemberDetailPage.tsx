@@ -738,7 +738,7 @@ export function MemberDetailPage() {
               </Card>
               <Card className="p-3 text-center">
                 <p className="text-xs text-gray-500">Interest Earned</p>
-                <p className="text-lg font-bold text-green-600 mt-0.5">{currency(savingsInterestLogs.reduce((s, l) => s + l.interest_earned, 0))}</p>
+                <p className="text-lg font-bold text-green-600 mt-0.5">{currency(savingsInterestLogs.reduce((s, l) => s + l.interest_amount, 0))}</p>
               </Card>
               <Card className="p-3 text-center">
                 <p className="text-xs text-gray-500">Status</p>

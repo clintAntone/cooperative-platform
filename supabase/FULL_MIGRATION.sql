@@ -2881,8 +2881,8 @@ CREATE TABLE savings_interest_logs (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id        UUID NOT NULL REFERENCES savings_accounts(id),
   user_id           UUID NOT NULL REFERENCES profiles(id),
-  principal_at_time DECIMAL(15,2) NOT NULL,
-  interest_earned   DECIMAL(15,2) NOT NULL,
+  average_daily_balance DECIMAL(15,2) NOT NULL,
+  interest_amount   DECIMAL(15,2) NOT NULL,
   period_start      DATE NOT NULL,
   period_end        DATE NOT NULL,
   released_by       VARCHAR NOT NULL DEFAULT 'system',
@@ -3152,7 +3152,7 @@ BEGIN
 
       -- Log interest
       INSERT INTO savings_interest_logs (
-        account_id, user_id, principal_at_time, interest_earned,
+        account_id, user_id, average_daily_balance, interest_amount,
         period_start, period_end, released_by
       )
       VALUES (
@@ -3313,9 +3313,9 @@ BEGIN
       SET balance = balance + v_interest, updated_at = now()
       WHERE id = v_account.id;
 
-      -- Log interest (principal_at_time reflects the qualifying balance, not raw balance)
+      -- Log interest (average_daily_balance reflects the qualifying balance, not raw balance)
       INSERT INTO savings_interest_logs (
-        account_id, user_id, principal_at_time, interest_earned,
+        account_id, user_id, average_daily_balance, interest_amount,
         period_start, period_end, released_by
       )
       VALUES (
@@ -3450,9 +3450,9 @@ BEGIN
       SET balance = balance + v_interest, updated_at = now()
       WHERE id = v_account.id;
 
-      -- Log interest (principal_at_time = ADB, not raw current balance)
+      -- Log interest (average_daily_balance = ADB, not raw current balance)
       INSERT INTO savings_interest_logs (
-        account_id, user_id, principal_at_time, interest_earned,
+        account_id, user_id, average_daily_balance, interest_amount,
         period_start, period_end, released_by
       )
       VALUES (
@@ -5951,7 +5951,7 @@ BEGIN
 
       -- Insert with ON CONFLICT DO NOTHING as a second safety layer
       INSERT INTO savings_interest_logs (
-        account_id, user_id, principal_at_time, interest_earned,
+        account_id, user_id, average_daily_balance, interest_amount,
         period_start, period_end, released_by
       )
       VALUES (
@@ -6095,7 +6095,7 @@ BEGIN
     WHERE swr.account_id = p_account_id AND swr.status = 'approved'
   ),
   interest AS (
-    SELECT COALESCE(SUM(sil.interest_earned), 0)::DECIMAL(15,2) AS total
+    SELECT COALESCE(SUM(sil.interest_amount), 0)::DECIMAL(15,2) AS total
     FROM savings_interest_logs sil
     WHERE sil.account_id = p_account_id
   ),
@@ -7066,9 +7066,9 @@ BEGIN
       SET balance = balance + v_interest, updated_at = now()
       WHERE id = v_account.id;
 
-      -- Log interest (principal_at_time = ADB, not raw current balance)
+      -- Log interest (average_daily_balance = ADB, not raw current balance)
       INSERT INTO savings_interest_logs (
-        account_id, user_id, principal_at_time, interest_earned,
+        account_id, user_id, average_daily_balance, interest_amount,
         period_start, period_end, released_by
       )
       VALUES (
@@ -7322,7 +7322,7 @@ BEGIN
 
     -- Log the interest release
     INSERT INTO savings_interest_logs (
-      account_id, user_id, principal_at_time, interest_earned,
+      account_id, user_id, average_daily_balance, interest_amount,
       period_start, period_end, released_by
     ) VALUES (
       v_account.id, v_account.user_id, v_adb, v_interest,
@@ -7614,7 +7614,7 @@ BEGIN
 
     -- Log the release
     INSERT INTO savings_interest_logs (
-      account_id, user_id, principal_at_time, interest_earned,
+      account_id, user_id, average_daily_balance, interest_amount,
       period_start, period_end, released_by
     ) VALUES (
       v_account.id, v_account.user_id,
