@@ -200,11 +200,10 @@ function useAllSavingsOverview() {
       }
 
       // Step 4: savings_interest_logs — interest per account
-      const { data: interest, error: intErr } = await supabase
+      const { data: interest } = await supabase
         .from('savings_interest_logs')
         .select('account_id, interest_earned')
         .in('account_id', accountIds)
-      if (intErr) throw intErr
 
       const interestMap: Record<string, number> = {}
       for (const i of interest as { account_id: string; interest_earned: number }[]) {
@@ -850,32 +849,52 @@ function EquityTab() {
         ) : memberReport.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">No member data found.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="text-left px-4 py-2 font-medium">Member</th>
-                  <th className="text-right px-4 py-2 font-medium">Shares</th>
-                  <th className="text-right px-4 py-2 font-medium">Completed</th>
-                  <th className="text-right px-4 py-2 font-medium">Amount Paid</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {memberReport.map(row => (
-                  <tr
-                    key={row.user_id}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => setSelectedMember({ userId: row.user_id, fullName: row.full_name })}
-                  >
-                    <td className="px-4 py-2.5 font-medium text-gray-900">{row.full_name}</td>
-                    <td className="px-4 py-2.5 text-right text-gray-600">{row.shareCount}</td>
-                    <td className="px-4 py-2.5 text-right text-gray-600">{row.completedCount}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{currency(row.totalPaid)}</td>
+          <>
+            {/* Mobile cards */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {memberReport.map(row => (
+                <div
+                  key={row.user_id}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => setSelectedMember({ userId: row.user_id, fullName: row.full_name })}
+                >
+                  <p className="font-medium text-gray-900 text-sm">{row.full_name}</p>
+                  <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
+                    <span>{row.shareCount} shares</span>
+                    <span>{row.completedCount} completed</span>
+                    <span className="ml-auto font-semibold text-gray-900">{currency(row.totalPaid)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                    <th className="text-left px-4 py-2 font-medium">Member</th>
+                    <th className="text-right px-4 py-2 font-medium">Shares</th>
+                    <th className="text-right px-4 py-2 font-medium">Completed</th>
+                    <th className="text-right px-4 py-2 font-medium">Amount Paid</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {memberReport.map(row => (
+                    <tr
+                      key={row.user_id}
+                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      onClick={() => setSelectedMember({ userId: row.user_id, fullName: row.full_name })}
+                    >
+                      <td className="px-4 py-2.5 font-medium text-gray-900">{row.full_name}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-600">{row.shareCount}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-600">{row.completedCount}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{currency(row.totalPaid)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
