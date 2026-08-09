@@ -10,13 +10,12 @@ export function useBranches() {
   return useQuery({
     queryKey: ['branches'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('branches')
-        .select('id, name, location, is_active, report_cutoff_day, created_at, updated_at')
-        .order('name', { ascending: true })
+      const { data, error } = await supabase.functions.invoke('pos-branches')
       if (error) throw error
+      if (data?.error) throw new Error(data.error)
       return data as Branch[]
     },
+    staleTime: 5 * 60 * 1000, // 5 min — sync on every page load but not every render
   })
 }
 
@@ -24,14 +23,12 @@ export function useActiveBranches() {
   return useQuery({
     queryKey: ['branches', 'active'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('branches')
-        .select('id, name, location, is_active, report_cutoff_day, created_at, updated_at')
-        .eq('is_active', true)
-        .order('name', { ascending: true })
+      const { data, error } = await supabase.functions.invoke('pos-branches')
       if (error) throw error
-      return data as Branch[]
+      if (data?.error) throw new Error(data.error)
+      return (data as Branch[]).filter(b => b.is_active)
     },
+    staleTime: 5 * 60 * 1000,
   })
 }
 

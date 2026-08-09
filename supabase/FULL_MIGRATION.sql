@@ -8596,3 +8596,11 @@ $$;
 GRANT EXECUTE ON FUNCTION staff_post_deposit(UUID, DECIMAL, VARCHAR, TIMESTAMPTZ, VARCHAR, UUID) TO authenticated;
 
 
+
+-- ============================================================
+-- Migration: 90_pos_branch_sync.sql
+-- ============================================================
+
+-- Add pos_branch_id to branches for POS sync matching
+ALTER TABLE branches
+  ADD COLUMN IF NOT EXISTS pos_branch_id VARCHAR UNIQUE;
