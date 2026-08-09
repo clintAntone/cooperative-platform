@@ -8604,3 +8604,44 @@ GRANT EXECUTE ON FUNCTION staff_post_deposit(UUID, DECIMAL, VARCHAR, TIMESTAMPTZ
 -- Add pos_branch_id to branches for POS sync matching
 ALTER TABLE branches
   ADD COLUMN IF NOT EXISTS pos_branch_id VARCHAR UNIQUE;
+
+-- ============================================================
+-- Migration: 91_branch_income_bills.sql
+-- ============================================================
+
+-- Add bills column to branch_income
+ALTER TABLE branch_income
+  ADD COLUMN IF NOT EXISTS bills DECIMAL(15,2);
+
+-- Update record_branch_income RPC to accept p_bills
+DROP FUNCTION IF EXISTS record_branch_income(UUID, DECIMAL, DATE, DATE, TEXT, DECIMAL, DECIMAL, DECIMAL, DECIMAL);
+
+CREATE OR REPLACE FUNCTION record_branch_income(
+  p_branch_id      UUID,
+  p_amount         DECIMAL,
+  p_period_start   DATE,
+  p_period_end     DATE,
+  p_description    TEXT    DEFAULT NULL,
+  p_gross_sales    DECIMAL DEFAULT NULL,
+  p_salary         DECIMAL DEFAULT NULL,
+  p_expenses_total DECIMAL DEFAULT NULL,
+  p_bills          DECIMAL DEFAULT NULL,
+  p_roi            DECIMAL DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE v_id UUID;
+BEGIN
+  IF get_user_role(auth.uid()) NOT IN ('admin','staff') THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+  INSERT INTO branch_income (
+    branch_id, amount, period_start, period_end, description,
+    gross_sales, salary, expenses_total, bills, roi, recorded_by
+  ) VALUES (
+    p_branch_id, p_amount, p_period_start, p_period_end, p_description,
+    p_gross_sales, p_salary, p_expenses_total, p_bills, p_roi, auth.uid()
+  ) RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+GRANT EXECUTE ON FUNCTION record_branch_income(UUID, DECIMAL, DATE, DATE, TEXT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL) TO authenticated;

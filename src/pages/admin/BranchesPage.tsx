@@ -77,6 +77,7 @@ export function BranchesPage() {
     gross_sales: '',
     salary: '',
     expenses_total: '',
+    bills: '',
     roi: '',
     period_start: '',
     period_end: '',
@@ -117,7 +118,8 @@ export function BranchesPage() {
     const grossSales = parseFloat(incomeForm.gross_sales) || 0
     const salary = parseFloat(incomeForm.salary) || 0
     const expensesTotal = parseFloat(incomeForm.expenses_total) || 0
-    const netProfit = grossSales - salary - expensesTotal
+    const bills = parseFloat(incomeForm.bills) || 0
+    const netProfit = grossSales - salary - expensesTotal - bills
     recordIncome.mutate(
       {
         branchId: showRecordIncome.id,
@@ -127,13 +129,14 @@ export function BranchesPage() {
         grossSales,
         salary,
         expensesTotal,
+        bills,
         roi: incomeForm.roi ? parseFloat(incomeForm.roi) : null,
         description: incomeForm.description.trim() || undefined,
       },
       {
         onSuccess: () => {
           setShowRecordIncome(null)
-          setIncomeForm({ gross_sales: '', salary: '', expenses_total: '', roi: '', period_start: '', period_end: '', description: '' })
+          setIncomeForm({ gross_sales: '', salary: '', expenses_total: '', bills: '', roi: '', period_start: '', period_end: '', description: '' })
         },
         onError: (err: any) => alert(err.message ?? 'Failed to record income'),
       }
@@ -515,6 +518,16 @@ export function BranchesPage() {
             </div>
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bills</label>
+            <input
+              type="number" min="0" step="0.01"
+              value={incomeForm.bills}
+              onChange={e => setIncomeForm(f => ({ ...f, bills: e.target.value }))}
+              placeholder="0.00"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">ROI (%)</label>
             <input
               type="number" min="0" step="0.01"
@@ -533,7 +546,8 @@ export function BranchesPage() {
                 ₱{(
                   (parseFloat(incomeForm.gross_sales) || 0) -
                   (parseFloat(incomeForm.salary) || 0) -
-                  (parseFloat(incomeForm.expenses_total) || 0)
+                  (parseFloat(incomeForm.expenses_total) || 0) -
+                  (parseFloat(incomeForm.bills) || 0)
                 ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>

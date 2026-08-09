@@ -414,6 +414,7 @@ export interface BranchIncome {
   gross_sales: number | null
   salary: number | null
   expenses_total: number | null
+  bills: number | null
   roi: number | null
   period_start: string
   period_end: string
