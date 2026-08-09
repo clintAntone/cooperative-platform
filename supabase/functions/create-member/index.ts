@@ -51,7 +51,7 @@ serve(async (req) => {
   }
 
   const body = await req.json()
-  const { first_name, middle_name, last_name, email, password, provided_employee_id } = body
+  const { first_name, middle_name, last_name, email, password, provided_employee_id, phone, date_of_birth } = body
 
   // provided_employee_id = POS employee ID; triggers temp-credentials mode
   const isTempCredentials = !!provided_employee_id
@@ -130,6 +130,7 @@ serve(async (req) => {
       middle_name: middle_name ?? null,
       last_name,
       employee_id: employeeId,
+      phone: phone ?? null,
     },
   })
 
@@ -138,6 +139,14 @@ serve(async (req) => {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+  }
+
+  // Store date_of_birth if provided (not in trigger metadata, update directly)
+  if (date_of_birth && newUser.user?.id) {
+    await adminClient
+      .from('profiles')
+      .update({ date_of_birth })
+      .eq('id', newUser.user.id)
   }
 
   // For temp credentials mode, mark profile as requiring onboarding.

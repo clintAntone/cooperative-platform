@@ -50,7 +50,7 @@ export function MembersPage() {
 
   // Create member modal
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [createForm, setCreateForm] = useState({ first_name: '', middle_name: '', last_name: '', email: '' })
+  const [createForm, setCreateForm] = useState({ first_name: '', middle_name: '', last_name: '', email: '', phone: '', date_of_birth: '' })
   const [createPassword, setCreatePassword] = useState('')
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null)
   const [emailChecking, setEmailChecking] = useState(false)
@@ -110,7 +110,7 @@ export function MembersPage() {
   }
 
   const createMember = useMutation({
-    mutationFn: async (payload: { first_name: string; middle_name: string; last_name: string; email: string; password: string }) => {
+    mutationFn: async (payload: { first_name: string; middle_name: string; last_name: string; email: string; password: string; phone?: string; date_of_birth?: string }) => {
       const { data, error } = await supabase.functions.invoke('create-member', { body: payload })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
@@ -119,7 +119,7 @@ export function MembersPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['members_list'] })
       setCreatedMember({ full_name: data.full_name, member_id: data.member_id, email: createForm.email, password: createPassword })
-      setCreateForm({ first_name: '', middle_name: '', last_name: '', email: '' })
+      setCreateForm({ first_name: '', middle_name: '', last_name: '', email: '', phone: '', date_of_birth: '' })
       setEmailAvailable(null)
     },
     onError: (err: any) => {
@@ -164,7 +164,7 @@ export function MembersPage() {
           activeTab === 'members' ? (
             <div className="flex items-center gap-2">
               <button
-                onClick={() => { const pw = generatePassword(); setCreatePassword(pw); setShowCreateModal(true); setCreatedMember(null); setCreateForm({ first_name: '', middle_name: '', last_name: '', email: '' }); setEmailAvailable(null) }}
+                onClick={() => { const pw = generatePassword(); setCreatePassword(pw); setShowCreateModal(true); setCreatedMember(null); setCreateForm({ first_name: '', middle_name: '', last_name: '', email: '', phone: '', date_of_birth: '' }); setEmailAvailable(null) }}
                 className="inline-flex items-center gap-1.5 bg-blue-600 text-white rounded-lg px-3 py-1.5 text-sm font-medium hover:bg-blue-700 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -613,6 +613,27 @@ export function MembersPage() {
               {emailAvailable === false && <p className="text-xs text-red-600">This email is already registered.</p>}
               {emailAvailable === true && <p className="text-xs text-green-600">Email is available.</p>}
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Contact Number <span className="text-red-500">*</span></label>
+                <input
+                  type="tel"
+                  value={createForm.phone}
+                  onChange={e => setCreateForm(f => ({ ...f, phone: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="09xxxxxxxxx"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Date of Birth <span className="text-red-500">*</span></label>
+                <input
+                  type="date"
+                  value={createForm.date_of_birth}
+                  onChange={e => setCreateForm(f => ({ ...f, date_of_birth: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
             <div className="space-y-1">
               <label className="block text-sm font-medium text-gray-700">Auto-generated Password</label>
               <div className="flex gap-2">
@@ -635,7 +656,7 @@ export function MembersPage() {
               <Button variant="secondary" onClick={() => setShowCreateModal(false)}>Cancel</Button>
               <Button
                 loading={createMember.isPending}
-                disabled={!createForm.first_name || !createForm.last_name || !createForm.email || emailAvailable === false || emailChecking}
+                disabled={!createForm.first_name || !createForm.last_name || !createForm.email || !createForm.phone || !createForm.date_of_birth || emailAvailable === false || emailChecking}
                 onClick={() => createMember.mutate({ ...createForm, password: createPassword })}
               >
                 Create Member
