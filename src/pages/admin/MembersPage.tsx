@@ -341,12 +341,12 @@ export function MembersPage() {
                               onClick={() => handleSort('full_name')}>
                             First Name <SortIcon active={sortKey === 'full_name'} dir={sortDir} />
                           </th>
-                          <th className="text-left px-4 py-3 font-medium text-gray-600">Middle Name</th>
+                          <th className="hidden lg:table-cell text-left px-4 py-3 font-medium text-gray-600">Middle Name</th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Last Name</th>
-                          <th className="text-left px-4 py-3 font-medium text-gray-600">Employee ID</th>
+                          <th className="hidden lg:table-cell text-left px-4 py-3 font-medium text-gray-600">Employee ID</th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
                           <th className="text-left px-4 py-3 font-medium text-gray-600">Membership</th>
-                          <th className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900"
+                          <th className="hidden lg:table-cell text-left px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900"
                               onClick={() => handleSort('completed_shares')}>
                             Shares <SortIcon active={sortKey === 'completed_shares'} dir={sortDir} />
                           </th>
@@ -354,8 +354,8 @@ export function MembersPage() {
                               onClick={() => handleSort('total_invested')}>
                             Total Invested <SortIcon active={sortKey === 'total_invested'} dir={sortDir} />
                           </th>
-                          <th className="text-left px-4 py-3 font-medium text-gray-600">Savings</th>
-                          <th className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900"
+                          <th className="hidden xl:table-cell text-left px-4 py-3 font-medium text-gray-600">Savings</th>
+                          <th className="hidden xl:table-cell text-left px-4 py-3 font-medium text-gray-600 cursor-pointer select-none hover:text-gray-900"
                               onClick={() => handleSort('created_at')}>
                             Joined <SortIcon active={sortKey === 'created_at'} dir={sortDir} />
                           </th>
@@ -388,9 +388,9 @@ export function MembersPage() {
                               />
                             </td>
                             <td className="px-4 py-3 font-medium text-gray-900">{member.first_name ?? member.full_name}</td>
-                            <td className="px-4 py-3 text-gray-600">{member.middle_name ?? <span className="text-gray-300">—</span>}</td>
+                            <td className="hidden lg:table-cell px-4 py-3 text-gray-600">{member.middle_name ?? <span className="text-gray-300">—</span>}</td>
                             <td className="px-4 py-3 font-medium text-gray-900">{member.last_name ?? <span className="text-gray-300">—</span>}</td>
-                            <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                            <td className="hidden lg:table-cell px-4 py-3 font-mono text-xs text-gray-600">
                               {member.employee_id ?? <span className="text-gray-400">—</span>}
                             </td>
                             <td className="px-4 py-3">
@@ -404,12 +404,12 @@ export function MembersPage() {
                                 : <span className="text-gray-400 text-xs">—</span>
                               }
                             </td>
-                            <td className="px-4 py-3 text-gray-700">{isMember ? member.completed_shares : <span className="text-gray-400">—</span>}</td>
+                            <td className="hidden lg:table-cell px-4 py-3 text-gray-700">{isMember ? member.completed_shares : <span className="text-gray-400">—</span>}</td>
                             <td className="px-4 py-3 text-gray-700">{isMember ? currency(member.total_invested) : <span className="text-gray-400">—</span>}</td>
-                            <td className="px-4 py-3 text-gray-700">
+                            <td className="hidden xl:table-cell px-4 py-3 text-gray-700">
                               {isMember && member.savings_balance > 0 ? currency(member.savings_balance) : <span className="text-gray-400">—</span>}
                             </td>
-                            <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(member.created_at)}</td>
+                            <td className="hidden xl:table-cell px-4 py-3 text-gray-500 text-xs">{formatDate(member.created_at)}</td>
                             <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                               {!isMember && (
                                 <button
