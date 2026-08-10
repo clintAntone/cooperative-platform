@@ -377,6 +377,7 @@ export interface Branch {
   location: string | null
   is_active: boolean
   report_cutoff_day: number  // 0=Sun, 1=Mon, ..., 6=Sat
+  pos_branch_id: string | null
   created_at: string
   updated_at: string
 }
@@ -413,6 +414,7 @@ export interface BranchIncome {
   gross_sales: number | null
   salary: number | null
   expenses_total: number | null
+  bills: number | null
   roi: number | null
   period_start: string
   period_end: string

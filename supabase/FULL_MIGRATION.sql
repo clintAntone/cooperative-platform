@@ -4682,6 +4682,7 @@ CREATE TABLE branch_income (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id    UUID NOT NULL REFERENCES branches(id),
   amount       DECIMAL(15,2) NOT NULL CHECK (amount > 0),
+  income_date  DATE NOT NULL DEFAULT CURRENT_DATE,
   period_start DATE NOT NULL,
   period_end   DATE NOT NULL,
   description  TEXT,
@@ -4725,8 +4726,8 @@ BEGIN
     RAISE EXCEPTION 'Access denied';
   END IF;
 
-  INSERT INTO branch_income (branch_id, amount, period_start, period_end, description, recorded_by)
-  VALUES (p_branch_id, p_amount, p_period_start, p_period_end, p_description, auth.uid())
+  INSERT INTO branch_income (branch_id, amount, income_date, period_start, period_end, description, recorded_by)
+  VALUES (p_branch_id, p_amount, p_period_end, p_period_start, p_period_end, p_description, auth.uid())
   RETURNING id INTO v_income_id;
 
   RETURN v_income_id;
@@ -4771,7 +4772,8 @@ BEGIN
     RAISE EXCEPTION 'No members with completed shares found';
   END IF;
 
-  v_per_share := v_income.amount / v_total_shares;
+  -- 50% of net profit goes to shareholders; 50% is retained by the branch owner
+  v_per_share := (v_income.amount * 0.5) / v_total_shares;
 
   -- Distribute to each member proportional to their share count
   FOR r IN
@@ -5229,11 +5231,11 @@ BEGIN
   END IF;
 
   INSERT INTO branch_income (
-    branch_id, amount, period_start, period_end, description,
+    branch_id, amount, income_date, period_start, period_end, description,
     gross_sales, salary, expenses_total, roi, recorded_by
   )
   VALUES (
-    p_branch_id, p_amount, p_period_start, p_period_end, p_description,
+    p_branch_id, p_amount, p_period_end, p_period_start, p_period_end, p_description,
     p_gross_sales, p_salary, p_expenses_total, p_roi, auth.uid()
   )
   RETURNING id INTO v_income_id;
@@ -6029,7 +6031,8 @@ BEGIN
     RAISE EXCEPTION 'No members with completed shares found for the period ending %', v_income.period_end;
   END IF;
 
-  v_per_share := v_income.amount / v_total_shares;
+  -- 50% of net profit goes to shareholders; 50% is retained by the branch owner
+  v_per_share := (v_income.amount * 0.5) / v_total_shares;
 
   FOR r IN
     SELECT es.user_id, COUNT(*) AS share_count
@@ -8596,3 +8599,181 @@ $$;
 GRANT EXECUTE ON FUNCTION staff_post_deposit(UUID, DECIMAL, VARCHAR, TIMESTAMPTZ, VARCHAR, UUID) TO authenticated;
 
 
+
+-- ============================================================
+-- Migration: 90_pos_branch_sync.sql
+-- ============================================================
+
+-- Add pos_branch_id to branches for POS sync matching
+ALTER TABLE branches
+  ADD COLUMN IF NOT EXISTS pos_branch_id VARCHAR UNIQUE;
+
+-- ============================================================
+-- Migration: 91_branch_income_bills.sql
+-- ============================================================
+
+-- Add bills column to branch_income
+ALTER TABLE branch_income
+  ADD COLUMN IF NOT EXISTS bills DECIMAL(15,2);
+
+-- Update record_branch_income RPC to accept p_bills and set income_date
+DROP FUNCTION IF EXISTS record_branch_income(UUID, DECIMAL, DATE, DATE, TEXT, DECIMAL, DECIMAL, DECIMAL, DECIMAL);
+
+CREATE OR REPLACE FUNCTION record_branch_income(
+  p_branch_id      UUID,
+  p_amount         DECIMAL,
+  p_period_start   DATE,
+  p_period_end     DATE,
+  p_description    TEXT    DEFAULT NULL,
+  p_gross_sales    DECIMAL DEFAULT NULL,
+  p_salary         DECIMAL DEFAULT NULL,
+  p_expenses_total DECIMAL DEFAULT NULL,
+  p_bills          DECIMAL DEFAULT NULL,
+  p_roi            DECIMAL DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE v_id UUID;
+BEGIN
+  IF get_user_role(auth.uid()) NOT IN ('admin','staff') THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+  INSERT INTO branch_income (
+    branch_id, amount, income_date, period_start, period_end, description,
+    gross_sales, salary, expenses_total, bills, roi, recorded_by
+  ) VALUES (
+    p_branch_id, p_amount, p_period_end, p_period_start, p_period_end, p_description,
+    p_gross_sales, p_salary, p_expenses_total, p_bills, p_roi, auth.uid()
+  ) RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+GRANT EXECUTE ON FUNCTION record_branch_income(UUID, DECIMAL, DATE, DATE, TEXT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL) TO authenticated;
+
+-- ============================================================
+-- Migration: 92_branch_income_date.sql
+-- ============================================================
+
+-- Add income_date to branch_income if missing (live DBs created before this column was in CREATE TABLE).
+-- income_date = the single day this record covers (same as period_end for daily entries).
+ALTER TABLE branch_income
+  ADD COLUMN IF NOT EXISTS income_date DATE NOT NULL DEFAULT CURRENT_DATE;
+
+-- Backfill income_date for existing rows where it is the default (set from period_end)
+UPDATE branch_income
+SET income_date = period_end
+WHERE income_date = CURRENT_DATE AND period_end <> CURRENT_DATE;
+
+-- ============================================================
+-- Migration: 93_distribute_50_50_split.sql
+-- ============================================================
+
+-- Update distribute_branch_income: shareholders receive 50% of net profit.
+-- The other 50% is retained by the branch owner.
+CREATE OR REPLACE FUNCTION distribute_branch_income(p_income_id UUID)
+RETURNS INT AS $$
+DECLARE
+  v_income        branch_income%ROWTYPE;
+  v_total_shares  INT;
+  v_per_share     DECIMAL(15,2);
+  v_count         INT := 0;
+  r               RECORD;
+  v_member_amount DECIMAL(15,2);
+BEGIN
+  IF get_user_role(auth.uid()) NOT IN ('admin') THEN
+    RAISE EXCEPTION 'Access denied — only admin can distribute income';
+  END IF;
+
+  SELECT * INTO v_income FROM branch_income WHERE id = p_income_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Income record not found'; END IF;
+  IF v_income.distributed THEN RAISE EXCEPTION 'This income has already been distributed'; END IF;
+
+  SELECT COALESCE(SUM(share_count), 0) INTO v_total_shares
+  FROM (
+    SELECT COUNT(*) AS share_count
+    FROM equity_shares es
+    JOIN profiles p ON p.id = es.user_id
+    WHERE es.status = 'completed'
+      AND (es.completed_at IS NULL OR es.completed_at::DATE <= v_income.period_end)
+      AND p.account_status = 'active'
+      AND p.role IN ('member', 'collector')
+    GROUP BY es.user_id
+  ) sub;
+
+  IF v_total_shares = 0 THEN
+    RAISE EXCEPTION 'No members with completed shares found for the period ending %', v_income.period_end;
+  END IF;
+
+  -- 50% of net profit goes to shareholders; 50% is retained by the branch owner
+  v_per_share := (v_income.amount * 0.5) / v_total_shares;
+
+  FOR r IN
+    SELECT es.user_id, COUNT(*) AS share_count
+    FROM equity_shares es
+    JOIN profiles p ON p.id = es.user_id
+    WHERE es.status = 'completed'
+      AND (es.completed_at IS NULL OR es.completed_at::DATE <= v_income.period_end)
+      AND p.account_status = 'active'
+      AND p.role IN ('member', 'collector')
+    GROUP BY es.user_id
+  LOOP
+    v_member_amount := ROUND(v_per_share * r.share_count, 2);
+
+    INSERT INTO branch_income_distributions (income_id, user_id, share_count, amount)
+    VALUES (p_income_id, r.user_id, r.share_count::INT, v_member_amount)
+    ON CONFLICT (income_id, user_id) DO NOTHING;
+
+    UPDATE savings_accounts
+    SET balance = balance + v_member_amount, updated_at = now()
+    WHERE user_id = r.user_id AND status = 'active';
+
+    INSERT INTO ledger_entries (
+      user_id, entry_type, reference_id, reference_table, amount, direction, notes, created_by
+    ) VALUES (
+      r.user_id, 'branch_income', p_income_id, 'branch_income',
+      v_member_amount, 'credit', 'Branch income distribution (50% shareholder share)', auth.uid()
+    );
+
+    v_count := v_count + 1;
+  END LOOP;
+
+  UPDATE branch_income SET distributed = true WHERE id = p_income_id;
+  RETURN v_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+GRANT EXECUTE ON FUNCTION distribute_branch_income(UUID) TO authenticated;
+
+-- ============================================================
+-- Migration: 94_distribute_branch_income_for_period.sql
+-- ============================================================
+
+-- Distribute all undistributed income records for a branch within a date range.
+CREATE OR REPLACE FUNCTION distribute_branch_income_for_period(
+  p_branch_id  UUID,
+  p_start      DATE,
+  p_end        DATE
+)
+RETURNS INT AS $$
+DECLARE
+  v_income_id  UUID;
+  v_total      INT := 0;
+BEGIN
+  IF get_user_role(auth.uid()) NOT IN ('admin') THEN
+    RAISE EXCEPTION 'Access denied — only admin can distribute income';
+  END IF;
+
+  FOR v_income_id IN
+    SELECT id FROM branch_income
+    WHERE branch_id = p_branch_id
+      AND period_start >= p_start
+      AND period_start <= p_end
+      AND distributed = false
+    ORDER BY period_start
+  LOOP
+    PERFORM distribute_branch_income(v_income_id);
+    v_total := v_total + 1;
+  END LOOP;
+
+  RETURN v_total;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+GRANT EXECUTE ON FUNCTION distribute_branch_income_for_period(UUID, DATE, DATE) TO authenticated;
