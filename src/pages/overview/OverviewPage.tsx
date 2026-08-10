@@ -7,26 +7,15 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { supabase } from '../../lib/supabase'
 import { useCurrency } from '../../hooks/useCurrency'
 import { useLoanPortfolioStats } from '../../hooks/useLoans'
+import { useSavingsAdb } from '../../hooks/useSavings'
 import { useMembershipBreakdown } from '../../hooks/useMembership'
-import { useBranches, useAllBranchIncome, useAllBranchExpenses } from '../../hooks/useBranches'
+import { useBranches, useAllBranchIncome } from '../../hooks/useBranches'
 import { useMonthlyContributions, useMonthlyNewMembers } from '../../hooks/useReports'
 import { Header } from '../../components/layout/Header'
 import { StatusBadge } from '../../components/shared/StatusBadge'
 import { formatDate, formatNumber } from '../../lib/utils'
 import { exportToExcel } from '../../lib/exportExcel'
 import { exportMembersPdf, exportLoanPortfolioPdf } from '../../lib/exportPdf'
-import type { ExpenseCategory } from '../../types'
-
-// ─── Category badge colors (mirrors BranchKPIPage) ───────────────────────────
-
-const categoryBadgeColors: Record<ExpenseCategory, string> = {
-  salary: 'bg-purple-100 text-purple-700',
-  utilities: 'bg-blue-100 text-blue-700',
-  rent: 'bg-orange-100 text-orange-700',
-  supplies: 'bg-yellow-100 text-yellow-700',
-  maintenance: 'bg-red-100 text-red-700',
-  other: 'bg-gray-100 text-gray-600',
-}
 
 // ─── Shared KPI card ──────────────────────────────────────────────────────────
 
@@ -410,11 +399,11 @@ function useMemberSavingsModal(userId: string | null) {
       if (!accounts) return { account: null, deposits: [], withdrawals: [], interest: [] }
 
       const [dep, with_, int] = await Promise.all([
-        supabase.from('savings_deposit_requests')
-          .select('id, amount, payment_method, status, created_at')
-          .eq('user_id', userId!)
-          .order('created_at', { ascending: false })
-          .limit(8),
+        supabase.from('savings_contributions')
+          .select('id, amount, contributed_at, payment_method')
+          .eq('account_id', accounts.id)
+          .order('contributed_at', { ascending: false })
+          .limit(20),
         supabase.from('savings_withdrawal_requests')
           .select('id, amount, status, created_at')
           .eq('user_id', userId!)
@@ -595,6 +584,7 @@ function SavingsMemberModal({ userId, fullName, onClose }: {
   const { format: currency } = useCurrency()
   const { data, isLoading } = useMemberSavingsModal(userId)
   const [tab, setTab] = useState<'deposits' | 'withdrawals' | 'interest'>('deposits')
+  const { data: adb = { adb: 0, periodDays: 0, accruedInterest: 0 } } = useSavingsAdb(data?.account?.id)
 
   return (
     <ModalBase title={fullName} subtitle="Savings Account" onClose={onClose} wide>
@@ -605,10 +595,15 @@ function SavingsMemberModal({ userId, fullName, onClose }: {
       ) : (
         <>
           {/* Account summary */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="bg-emerald-50 rounded-lg p-3">
               <p className="text-xs text-emerald-700 mb-1">Balance</p>
               <p className="text-xl font-bold text-emerald-800">{currency(data.account.balance)}</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-3">
+              <p className="text-xs text-green-700 mb-1">Accruing Interest</p>
+              <p className="text-xl font-bold text-green-700">{currency(adb.accruedInterest)}</p>
+              {adb.periodDays > 0 && <p className="text-xs text-green-500 mt-0.5">{adb.periodDays}d this period</p>}
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <p className="text-xs text-gray-500 mb-1">Status</p>
@@ -638,19 +633,17 @@ function SavingsMemberModal({ userId, fullName, onClose }: {
                   <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                     <th className="text-left px-3 py-2">Date</th>
                     <th className="text-right px-3 py-2">Amount</th>
-                    <th className="text-left px-3 py-2">Method</th>
-                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-left px-3 py-2">Source</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {(data.deposits as any[]).length === 0 ? (
-                    <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">No deposits found.</td></tr>
+                    <tr><td colSpan={3} className="px-3 py-4 text-center text-gray-400">No deposits found.</td></tr>
                   ) : (data.deposits as any[]).map((d: any) => (
                     <tr key={d.id}>
-                      <td className="px-3 py-2.5 text-gray-500">{formatDate(d.created_at)}</td>
+                      <td className="px-3 py-2.5 text-gray-500">{formatDate(d.contributed_at)}</td>
                       <td className="px-3 py-2.5 text-right font-medium text-gray-900">{currency(d.amount)}</td>
-                      <td className="px-3 py-2.5 text-gray-600 capitalize">{d.payment_method.replace('_', ' ')}</td>
-                      <td className="px-3 py-2.5"><StatusBadge status={d.status} /></td>
+                      <td className="px-3 py-2.5 text-gray-600 capitalize">{d.payment_method ? d.payment_method.replace(/_/g, ' ') : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -693,7 +686,16 @@ function SavingsMemberModal({ userId, fullName, onClose }: {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {(data.interest as any[]).length === 0 ? (
+                  {adb.accruedInterest > 0 && (
+                    <tr className="bg-green-50">
+                      <td className="px-3 py-2.5 text-green-700 font-medium">
+                        Current period · {adb.periodDays}d
+                        <span className="ml-1.5 text-xs font-normal text-green-500">accruing</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-medium text-green-700">{currency(adb.accruedInterest)}</td>
+                    </tr>
+                  )}
+                  {(data.interest as any[]).length === 0 && adb.accruedInterest === 0 ? (
                     <tr><td colSpan={2} className="px-3 py-4 text-center text-gray-400">No interest credited yet.</td></tr>
                   ) : (data.interest as any[]).map((i: any) => (
                     <tr key={i.id}>
@@ -804,7 +806,6 @@ function EquityTab() {
   const { data: totalEquity = 0, isLoading: equityLoading } = useTotalEquity()
   const { data: membership } = useMembershipBreakdown()
   const { data: completedShares = 0 } = useCompletedSharesCount()
-  const { data: pendingDeposits = 0 } = usePendingDepositCountOverview()
   const { data: memberReport = [], isLoading: reportLoading } = useMemberEquityReport()
   const [selectedMember, setSelectedMember] = useState<{ userId: string; fullName: string } | null>(null)
 
@@ -813,7 +814,7 @@ function EquityTab() {
   return (
     <div className="space-y-6">
       {/* KPI row */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <KpiCard
           label="Total Equity Raised"
           value={equityLoading ? '…' : currency(totalEquity)}
@@ -830,12 +831,6 @@ function EquityTab() {
           value={completedShares}
           sub="Shares at 100% target"
           valueClass="text-blue-700"
-        />
-        <KpiCard
-          label="Pending Deposits"
-          value={pendingDeposits}
-          sub="Awaiting admin approval"
-          valueClass={pendingDeposits > 0 ? 'text-amber-600' : 'text-gray-900'}
         />
       </div>
 
@@ -992,7 +987,7 @@ function SavingsTab() {
                 <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                   <th className="text-left px-4 py-2 font-medium">Member</th>
                   <th className="text-right px-4 py-2 font-medium">Balance</th>
-                  <th className="text-right px-4 py-2 font-medium">Interest Earned</th>
+                  <th className="text-right px-4 py-2 font-medium">Interest Released</th>
                   <th className="text-left px-4 py-2 font-medium hidden sm:table-cell">Last Deposit</th>
                   <th className="text-left px-4 py-2 font-medium hidden sm:table-cell">Status</th>
                 </tr>
@@ -1159,60 +1154,90 @@ function LoansTab() {
   )
 }
 
+type BranchPeriod = 'month' | '3months' | 'year' | 'all'
+
+function getBranchPeriodDates(period: BranchPeriod): { startDate?: string; endDate?: string; label: string } {
+  const now = new Date()
+  if (period === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1)
+    return { startDate: start.toISOString().slice(0, 10), label: 'This Month' }
+  }
+  if (period === '3months') {
+    const start = new Date(now)
+    start.setMonth(start.getMonth() - 3)
+    return { startDate: start.toISOString().slice(0, 10), label: 'Last 3 Months' }
+  }
+  if (period === 'year') {
+    const start = new Date(now.getFullYear(), 0, 1)
+    return { startDate: start.toISOString().slice(0, 10), label: 'This Year' }
+  }
+  return { label: 'All Time' }
+}
+
 function BranchesTab() {
+  const navigate = useNavigate()
   const { format: currency } = useCurrency()
+  const [period, setPeriod] = useState<BranchPeriod>('month')
+  const { startDate, endDate, label: periodLabel } = getBranchPeriodDates(period)
+
   const { data: branches = [], isLoading: branchesLoading } = useBranches()
-  const { data: allIncome = [], isLoading: incomeLoading } = useAllBranchIncome()
-  const { data: allExpenses = [], isLoading: expensesLoading } = useAllBranchExpenses()
+  const { data: allIncome = [], isLoading: incomeLoading } = useAllBranchIncome(startDate, endDate)
 
   const [expandedBranch, setExpandedBranch] = useState<string | null>(null)
-  const [branchTab, setBranchTab] = useState<Record<string, 'income' | 'expenses'>>({})
 
-  const isLoading = branchesLoading || incomeLoading || expensesLoading
+  const isLoading = branchesLoading || incomeLoading
 
-  const totalRevenue = allIncome.reduce((s, i) => s + i.amount, 0)
-  const totalExpenses = allExpenses.reduce((s, e) => s + e.amount, 0)
+  const totalRevenue = allIncome.reduce((s, i) => s + (i.gross_sales ?? 0), 0)
+  const totalSalary = allIncome.reduce((s, i) => s + (i.salary ?? 0), 0)
+  const totalOtherExp = allIncome.reduce((s, i) => s + (i.expenses_total ?? 0), 0)
+  const totalVault = allIncome.reduce((s, i) => s + (i.bills ?? 0), 0)
+  const totalExpenses = totalSalary + totalOtherExp + totalVault
   const netProfit = totalRevenue - totalExpenses
-  const overallMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : null
-
-  const getTab = (branchId: string) => branchTab[branchId] ?? 'income'
-  const setTab = (branchId: string, t: 'income' | 'expenses') =>
-    setBranchTab(prev => ({ ...prev, [branchId]: t }))
 
   return (
     <div className="space-y-6">
+      {/* Period filter */}
+      <div className="flex items-center gap-2">
+        {(['month', '3months', 'year', 'all'] as BranchPeriod[]).map(p => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${period === p ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+          >
+            {getBranchPeriodDates(p).label}
+          </button>
+        ))}
+      </div>
+
       {/* Overall KPI cards */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Overall Performance</h2>
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Overall Performance · {periodLabel}</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <KpiCard
             label="Total Revenue"
             value={currency(totalRevenue)}
-            sub="All branches, all time"
+            sub={periodLabel}
+          />
+          <KpiCard
+            label="Total Salary"
+            value={currency(totalSalary)}
+            sub={periodLabel}
           />
           <KpiCard
             label="Total Expenses"
-            value={currency(totalExpenses)}
-            sub="All branches, all time"
-            valueClass="text-red-600"
+            value={currency(totalOtherExp)}
+            sub={periodLabel}
+          />
+          <KpiCard
+            label="Total Vault"
+            value={currency(totalVault)}
+            sub={periodLabel}
           />
           <KpiCard
             label="Net Profit"
             value={currency(netProfit)}
             sub="Revenue minus expenses"
             valueClass={netProfit >= 0 ? 'text-green-700' : 'text-red-600'}
-          />
-          <KpiCard
-            label="Profit Margin"
-            value={overallMargin === null ? '—' : `${overallMargin.toFixed(1)}%`}
-            sub="Net profit as % of revenue"
-            valueClass={
-              overallMargin === null
-                ? 'text-gray-400'
-                : overallMargin >= 0
-                ? 'text-green-700'
-                : 'text-red-600'
-            }
           />
         </div>
       </div>
@@ -1233,22 +1258,21 @@ function BranchesTab() {
           <div className="space-y-4">
             {branches.map(branch => {
               const income = allIncome.filter(i => i.branch_id === branch.id)
-              const expenses = allExpenses.filter(e => e.branch_id === branch.id)
-              const branchRevenue = income.reduce((s, i) => s + i.amount, 0)
-              const branchExpenses = expenses.reduce((s, e) => s + e.amount, 0)
+              const branchRevenue = income.reduce((s, i) => s + (i.gross_sales ?? 0), 0)
+              const branchExpenses = income.reduce((s, i) => s + (i.salary ?? 0) + (i.expenses_total ?? 0) + (i.bills ?? 0), 0)
               const branchNet = branchRevenue - branchExpenses
-              const branchMargin = branchRevenue > 0 ? (branchNet / branchRevenue) * 100 : null
 
               const isExpanded = expandedBranch === branch.id
-              const activeTab = getTab(branch.id)
 
               const recentIncome = income.slice(0, 3)
-              const recentExpenses = expenses.slice(0, 3)
 
               return (
                 <div key={branch.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                  {/* Branch header */}
-                  <div className="px-4 py-3 border-b border-gray-100">
+                  {/* Branch header — click anywhere to expand/collapse */}
+                  <div
+                    className="px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+                    onClick={() => setExpandedBranch(isExpanded ? null : branch.id)}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -1268,118 +1292,102 @@ function BranchesTab() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${branch.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                           {branch.is_active ? 'Active' : 'Inactive'}
                         </span>
-                        <button
-                          onClick={() => setExpandedBranch(isExpanded ? null : branch.id)}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          {isExpanded ? 'Collapse' : 'Details'}
-                        </button>
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </div>
                     </div>
                   </div>
 
                   {/* Branch KPI row */}
-                  <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 text-xs">
-                    <div>
-                      <p className="text-gray-500">Revenue</p>
-                      <p className="font-semibold text-gray-900">{currency(branchRevenue)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Expenses</p>
-                      <p className="font-semibold text-red-600">{currency(branchExpenses)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Net Profit</p>
-                      <p className={`font-semibold ${branchNet >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                        {currency(branchNet)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Margin</p>
-                      <p className={`font-semibold ${branchMargin === null ? 'text-gray-400' : branchMargin >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                        {branchMargin === null ? '—' : `${branchMargin.toFixed(1)}%`}
-                      </p>
-                    </div>
-                  </div>
+                  {(() => {
+                    const branchSalary = income.reduce((s, i) => s + (i.salary ?? 0), 0)
+                    const branchOtherExp = income.reduce((s, i) => s + (i.expenses_total ?? 0), 0)
+                    const branchVault = income.reduce((s, i) => s + (i.bills ?? 0), 0)
+                    return (
+                      <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-5 gap-3 bg-blue-50 border-y border-blue-100 text-xs">
+                        <div>
+                          <p className="text-blue-500 font-medium uppercase tracking-wide">Total Revenue</p>
+                          <p className="font-bold text-sm text-gray-900">{currency(branchRevenue)}</p>
+                        </div>
+                        <div>
+                          <p className="text-blue-500 font-medium uppercase tracking-wide">Total Salary</p>
+                          <p className="font-bold text-sm text-gray-700">{currency(branchSalary)}</p>
+                        </div>
+                        <div>
+                          <p className="text-blue-500 font-medium uppercase tracking-wide">Total Expenses</p>
+                          <p className="font-bold text-sm text-gray-700">{currency(branchOtherExp)}</p>
+                        </div>
+                        <div>
+                          <p className="text-blue-500 font-medium uppercase tracking-wide">Total Vault</p>
+                          <p className="font-bold text-sm text-gray-700">{currency(branchVault)}</p>
+                        </div>
+                        <div>
+                          <p className="text-blue-500 font-medium uppercase tracking-wide">Net Profit</p>
+                          <p className={`font-bold text-sm ${branchNet >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                            {currency(branchNet)}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Expandable details */}
                   {isExpanded && (
-                    <>
-                      <div className="flex border-b border-gray-100 bg-white">
-                        <button
-                          className={`px-4 py-2 text-xs font-medium transition-colors ${activeTab === 'income' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                          onClick={() => setTab(branch.id, 'income')}
-                        >
-                          Recent Income
-                        </button>
-                        <button
-                          className={`px-4 py-2 text-xs font-medium transition-colors ${activeTab === 'expenses' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                          onClick={() => setTab(branch.id, 'expenses')}
-                        >
-                          Recent Expenses
-                        </button>
+                    recentIncome.length === 0 ? (
+                      <p className="px-4 py-3 text-xs text-gray-400 italic">No income recorded yet.</p>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {recentIncome.map(inc => (
+                          <div key={inc.id} className="px-4 py-3">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <p className="text-xs text-gray-500">
+                                {formatDate(inc.period_start)}
+                                {inc.description && ` · ${inc.description}`}
+                              </p>
+                              {inc.distributed && (
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                                  Distributed
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                              <div>
+                                <p className="text-gray-400">Gross Sales</p>
+                                <p className="font-semibold text-gray-900">{currency(inc.gross_sales ?? 0)}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400">Salary</p>
+                                <p className="font-medium text-gray-700">{currency(inc.salary ?? 0)}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400">Expenses</p>
+                                <p className="font-medium text-gray-700">{currency(inc.expenses_total ?? 0)}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400">Vault</p>
+                                <p className="font-medium text-gray-700">{currency(inc.bills ?? 0)}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-400">Net Profit</p>
+                                <p className={`font-semibold ${inc.amount >= 0 ? 'text-green-700' : 'text-red-600'}`}>{currency(inc.amount)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="px-4 py-2 flex items-center justify-between border-t border-gray-100">
+                          <p className="text-xs text-gray-400 italic">
+                            {income.length > 3 ? `Showing 3 of ${income.length} records` : `${income.length} record${income.length !== 1 ? 's' : ''}`}
+                          </p>
+                          <button
+                            onClick={() => navigate('/admin/branches')}
+                            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            Manage branch →
+                          </button>
+                        </div>
                       </div>
-
-                      {activeTab === 'income' && (
-                        recentIncome.length === 0 ? (
-                          <p className="px-4 py-3 text-xs text-gray-400 italic">No income recorded yet.</p>
-                        ) : (
-                          <div className="divide-y divide-gray-50">
-                            {recentIncome.map(inc => (
-                              <div key={inc.id} className="px-4 py-3 flex items-center gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900">{currency(inc.amount)}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {formatDate(inc.period_start)} – {formatDate(inc.period_end)}
-                                    {inc.description && ` · ${inc.description}`}
-                                  </p>
-                                </div>
-                                {inc.distributed && (
-                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium shrink-0">
-                                    Distributed
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                            {income.length > 3 && (
-                              <p className="px-4 py-2 text-xs text-gray-400 italic">
-                                +{income.length - 3} more records
-                              </p>
-                            )}
-                          </div>
-                        )
-                      )}
-
-                      {activeTab === 'expenses' && (
-                        recentExpenses.length === 0 ? (
-                          <p className="px-4 py-3 text-xs text-gray-400 italic">No expenses recorded yet.</p>
-                        ) : (
-                          <div className="divide-y divide-gray-50">
-                            {recentExpenses.map(exp => (
-                              <div key={exp.id} className="px-4 py-3 flex items-center gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-0.5">
-                                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium capitalize ${categoryBadgeColors[exp.category]}`}>
-                                      {exp.category}
-                                    </span>
-                                    <p className="text-sm font-medium text-gray-900">{currency(exp.amount)}</p>
-                                  </div>
-                                  <p className="text-xs text-gray-500">
-                                    {formatDate(exp.period_start)} – {formatDate(exp.period_end)}
-                                    {exp.description && ` · ${exp.description}`}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                            {expenses.length > 3 && (
-                              <p className="px-4 py-2 text-xs text-gray-400 italic">
-                                +{expenses.length - 3} more records
-                              </p>
-                            )}
-                          </div>
-                        )
-                      )}
-                    </>
+                    )
                   )}
                 </div>
               )
@@ -1485,7 +1493,6 @@ function ReportsTab() {
 
   const { data: membershipBreakdown } = useMembershipBreakdown()
   const { data: loanStats } = useLoanPortfolioStats()
-  const { data: totalEquity = 0 } = useTotalEquity()
   const { data: contributions = [] } = useMonthlyContributions()
   const { data: newMembers = [] } = useMonthlyNewMembers()
   const { data: membersRaw = [], isLoading: membersLoading } = useMemberListForReport(dateFrom, dateTo)
@@ -1722,14 +1729,6 @@ function ReportsTab() {
         </div>,
         document.body
       )}
-
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <KpiCard label="Total Members" value={formatNumber(totalMembers)} sub="All roles" />
-        <KpiCard label="Active Members" value={formatNumber(membershipBreakdown?.active ?? 0)} sub={`${formatNumber(membershipBreakdown?.pending ?? 0)} pending`} valueClass="text-green-700" />
-        <KpiCard label="Total Equity Raised" value={currency(totalEquity)} sub="All contributions" />
-        <KpiCard label="Active Loans" value={formatNumber(loanStats?.activeLoans ?? 0)} sub={`${currency(loanStats?.totalOutstanding ?? 0)} outstanding`} valueClass="text-amber-600" />
-      </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

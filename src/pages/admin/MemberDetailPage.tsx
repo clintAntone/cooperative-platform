@@ -15,7 +15,7 @@ import { useApproveDepositRequest, useRejectDepositRequest } from '../../hooks/u
 import { useLoans } from '../../hooks/useLoans'
 import { useMemberDocuments, DOCUMENT_TYPE_LABELS } from '../../hooks/useMemberDocuments'
 import { useMemberNotes, useAddMemberNote, useDeleteMemberNote } from '../../hooks/useMemberNotes'
-import { useSavingsAccount, useSavingsDepositRequests, useSavingsWithdrawalRequests, useSavingsInterestLogs } from '../../hooks/useSavings'
+import { useSavingsAccount, useSavingsDepositRequests, useSavingsWithdrawalRequests, useSavingsInterestLogs, useSavingsAdb } from '../../hooks/useSavings'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate, formatDateTime, getProgressPercent } from '../../lib/utils'
 import { exportMemberStatementPdf } from '../../lib/exportPdf'
@@ -103,6 +103,7 @@ export function MemberDetailPage() {
   const { data: savingsDeposits = [] } = useSavingsDepositRequests(id!)
   const { data: savingsWithdrawals = [] } = useSavingsWithdrawalRequests(id!)
   const { data: savingsInterestLogs = [] } = useSavingsInterestLogs(savingsAccount?.id)
+  const { data: savingsAdb = { adb: 0, periodDays: 0, accruedInterest: 0 } } = useSavingsAdb(savingsAccount?.id)
   const addNote = useAddMemberNote(id!)
   const deleteNote = useDeleteMemberNote(id!)
   const { data: customRoles = [] } = useCustomRoles()
@@ -738,7 +739,14 @@ export function MemberDetailPage() {
               </Card>
               <Card className="p-3 text-center">
                 <p className="text-xs text-gray-500">Interest Earned</p>
-                <p className="text-lg font-bold text-green-600 mt-0.5">{currency(savingsInterestLogs.reduce((s, l) => s + l.interest_amount, 0))}</p>
+                <p className="text-lg font-bold text-green-600 mt-0.5">
+                  {currency(savingsInterestLogs.reduce((s, l) => s + l.interest_amount, 0) + savingsAdb.accruedInterest)}
+                </p>
+                {savingsAdb.accruedInterest > 0 && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {currency(savingsAdb.accruedInterest)} accruing · {savingsAdb.periodDays}d
+                  </p>
+                )}
               </Card>
               <Card className="p-3 text-center">
                 <p className="text-xs text-gray-500">Status</p>

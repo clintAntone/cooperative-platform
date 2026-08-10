@@ -395,30 +395,27 @@ export function SavingsPage() {
         {tab === 'deposits' && (
           <Card>
             <CardHeader>
-              <h3 className="text-sm font-semibold text-gray-900">Deposit Requests</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Deposit History</h3>
             </CardHeader>
-            {depositRequests.length === 0 ? (
+            {contributions.length === 0 ? (
               <CardBody>
-                <p className="text-sm text-gray-400 text-center py-6">No deposit requests yet.</p>
+                <p className="text-sm text-gray-400 text-center py-6">No deposits found.</p>
               </CardBody>
             ) : (
               <div className="divide-y divide-gray-100">
-                {depositRequests.map(req => (
-                  <div key={req.id} className="px-4 py-3 flex items-start justify-between gap-4">
+                {contributions.map((c: any) => (
+                  <div key={c.id} className="px-4 py-3 flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="text-sm text-gray-700">{formatDate(req.created_at)}</p>
+                      <p className="text-sm text-gray-700">{formatDate(c.contributed_at)}</p>
                       <p className="text-xs text-gray-400 mt-0.5 capitalize">
-                        {req.payment_method.replace('_', ' ')}
-                        {req.reference && <span> · #{req.reference}</span>}
+                        {c.payment_method ? c.payment_method.replace(/_/g, ' ') : 'recorded by admin'}
+                        {c.reference && <span> · #{c.reference}</span>}
                       </p>
-                      {req.status === 'rejected' && req.rejection_reason && (
-                        <p className="text-xs text-red-500 mt-0.5">{req.rejection_reason}</p>
-                      )}
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-semibold text-gray-900">{currency(req.amount)}</p>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize mt-1 ${statusColors[req.status]}`}>
-                        {req.status}
+                      <p className="text-sm font-semibold text-gray-900">{currency(c.amount)}</p>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize mt-1 bg-green-100 text-green-800">
+                        credited
                       </span>
                     </div>
                   </div>
