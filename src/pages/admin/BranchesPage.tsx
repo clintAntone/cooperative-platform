@@ -416,7 +416,7 @@ function BranchCard({
                         className="text-xs font-medium bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
                         onClick={() => setShowDistributePeriod(true)}
                       >
-                        Distribute ({undistributed.length}) · {currency(undistributedTotal * 0.5)}
+                        Release Earnings ({undistributed.length})
                       </button>
                     ) : income.length > 0 ? (
                       <span className="text-xs text-green-600 font-medium">✓ All distributed</span>

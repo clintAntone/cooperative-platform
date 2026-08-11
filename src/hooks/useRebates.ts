@@ -29,7 +29,7 @@ export function useRebatePreview(periodStart: string, periodEnd: string) {
         .from('system_config')
         .select('config_value')
         .eq('config_key', 'rebate_rate')
-        .single()
+        .maybeSingle()
       const rate = parseFloat(configData?.config_value ?? '10')
 
       // 2. Fetch paid schedule rows in range

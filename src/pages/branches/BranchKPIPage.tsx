@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Header } from '../../components/layout/Header'
 import { Card } from '../../components/ui/Card'
 import { useBranches, useAllBranchIncome, useMyBranchIncomeDistributions } from '../../hooks/useBranches'
+import { useMembershipStatus } from '../../hooks/useMembership'
 import { useCurrency } from '../../hooks/useCurrency'
 import { formatDate } from '../../lib/utils'
 
@@ -56,6 +57,10 @@ export function BranchKPIPage() {
   const [period, setPeriod] = useState<Period>('month')
   const { start, end } = getPeriodDates(period)
 
+  const { data: membership, isLoading: membershipLoading } = useMembershipStatus()
+  const completedShares = membership?.completed_shares ?? 0
+  const earningShares = Math.floor(completedShares) // only whole shares earn
+
   const { data: branches = [], isLoading: branchesLoading } = useBranches()
   const { data: allIncome = [], isLoading: incomeLoading } = useAllBranchIncome(start, end)
   const { data: myDistributions = [], isLoading: distLoading } = useMyBranchIncomeDistributions()
@@ -77,6 +82,8 @@ export function BranchKPIPage() {
   const totalVault = allIncome.reduce((s, i) => s + (i.bills ?? 0), 0)
   const totalNet = allIncome.reduce((s, i) => s + i.amount, 0)
 
+  const isLocked = !membershipLoading && earningShares === 0
+
   return (
     <div>
       <Header
@@ -84,7 +91,23 @@ export function BranchKPIPage() {
         subtitle="Cooperative business ventures and their financial performance"
       />
 
-      <div className="p-4 sm:p-6 space-y-6">
+      <div className="relative">
+      {isLocked && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <div className="pointer-events-auto bg-white rounded-2xl border border-gray-200 shadow-xl px-8 py-8 text-center max-w-sm w-full mx-4">
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <p className="text-base font-semibold text-gray-900 mb-1">No completed shares yet</p>
+            <p className="text-sm text-gray-500">
+              Branch portfolio and earnings unlock once you have at least one fully completed share.
+            </p>
+          </div>
+        </div>
+      )}
+      <div className={`p-4 sm:p-6 space-y-6 ${isLocked ? 'blur-sm pointer-events-none select-none' : ''}`}>
         {/* Overall KPI cards */}
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Overall Performance</h2>
@@ -114,7 +137,7 @@ export function BranchKPIPage() {
           ) : (
             <Card>
               {/* Summary row */}
-              <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 text-xs border-b border-gray-100">
+              <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 text-xs border-b border-gray-100">
                 <div>
                   <p className="text-gray-500">Earned This Period</p>
                   <p className="font-bold text-lg text-green-700">{currency(myTotalEarnings)}</p>
@@ -126,6 +149,13 @@ export function BranchKPIPage() {
                 <div>
                   <p className="text-gray-500">Total Distributions</p>
                   <p className="font-bold text-lg text-gray-900">{myDistributions.length}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Earning Shares</p>
+                  <p className="font-bold text-lg text-blue-700">{earningShares}</p>
+                  {completedShares !== earningShares && (
+                    <p className="text-gray-400 mt-0.5">{completedShares} completed · only whole shares earn</p>
+                  )}
                 </div>
               </div>
 
@@ -338,6 +368,7 @@ export function BranchKPIPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   )
